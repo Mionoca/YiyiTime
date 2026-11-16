@@ -69,7 +69,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 128 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 129 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 
@@ -85,7 +85,7 @@ Get-ChildItem tests/*.test.js | ForEach-Object { node $_.FullName; if ($LASTEXIT
 
 ```bash
 node scripts/check-secrets.js   # 环境 ID / AppSecret / 私钥扫描（需要 git）
-node scripts/release-check.js   # 页面与组件路径、模板残留、默认头像、隐私接线、敏感 console、env.js 是否被跟踪
+node scripts/release-check.js   # 页面/组件路径与注册、require 可解析、模板残留、默认头像、隐私接线、敏感 console、密钥、集合白名单、env.js 是否被跟踪
 ```
 
 `release-check.js` 会额外打印云开发控制台待办（集合/索引/部署/隐私指引/真机验收），手动项清单见

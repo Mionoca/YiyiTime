@@ -235,6 +235,23 @@ test('发布预检：夹具里放一个假环境 ID 会 FAIL（密钥扫描确�
   }
 });
 
+test('发布预检：require 路径、未注册组件、未登记集合都会 FAIL', () => {
+  const dir = makeFixture();
+  try {
+    writeFixtureFile(dir, 'miniprogram/pages/home/index.js', "const helper = require('./not-here');\nPage({});\n");
+    writeFixtureFile(dir, 'miniprogram/pages/home/index.wxml', PRIVACY_TAG + '<foo-bar />\n');
+    writeFixtureFile(dir, 'cloudfunctions/api/handlers/leak.js', "db.collection('secrets_log');\n");
+    const result = runChecks(dir);
+    const fails = failMessages(result).join('\n');
+    assert.strictEqual(result.ok, false);
+    assert.ok(fails.includes("的 require 路径不存在：./not-here"), fails);
+    assert.ok(fails.includes('用了未注册的组件 <foo-bar>'), fails);
+    assert.ok(fails.includes('未登记的集合 secrets_log'), fails);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test('发布预检：本地 .env / .pem / env.js 不会被当成待提交密钥', () => {
   const dir = makeFixture();
   try {

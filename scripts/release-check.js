@@ -250,6 +250,106 @@ function checkPages(root, lines) {
   return app;
 }
 
+/**
+ * 结构自检：相对 require 能解析、自定义组件都有注册与文件、云函数只碰预期集合。
+ * 这三类问题编译期不报，往往到真机才炸（组件未找到 / 新集合没建权限）。
+ */
+function checkStructure(root, lines, warnings) {
+  const files = [];
+  const walkErrors = [];
+  walk(root, 'miniprogram', files, walkErrors);
+  walk(root, 'cloudfunctions', files, walkErrors);
+  for (const err of walkErrors) lines.push({ level: 'WARN', msg: err });
+
+
+  // 1) 相对 require 路径必须存在
+  let badRequire = 0;
+  for (const rel of files) {
+    if (!rel.endsWith('.js')) continue;
+    if (!(rel.startsWith('miniprogram/') || rel.startsWith('cloudfunctions/api/'))) continue;
+    const text = readText(path.join(root, rel));
+    if (!text) continue;
+    const re = /require\(\s*['"](\.[^'"]*)['"]\s*\)/g;
+    let m;
+    while ((m = re.exec(text))) {
+      const target = path.resolve(path.dirname(path.join(root, rel)), m[1]);
+      const candidates = [target, target + '.js', target + '.json', path.join(target, 'index.js'), path.join(target, 'index.json')];
+      if (!candidates.some((c) => fs.existsSync(c))) {
+        lines.push({ level: 'FAIL', msg: rel + ' 的 require 路径不存在：' + m[1] });
+        badRequire += 1;
+      }
+    }
+  }
+  if (!badRequire) lines.push({ level: 'PASS', msg: '小程序与云函数里的相对 require 路径全部可解析' });
+
+  // 2) usingComponents 的文件存在，wxml 里用到的自定义组件都已在某个 json 注册
+  const registered = new Set();
+  let badComponent = 0;
+  for (const rel of files) {
+    if (!rel.endsWith('.json') || !rel.startsWith('miniprogram/')) continue;
+    let conf;
+    try {
+      conf = JSON.parse(readText(path.join(root, rel)) || '{}');
+    } catch {
+      lines.push({ level: 'FAIL', msg: rel + ' 无法解析' });
+      badComponent += 1;
+      continue;
+    }
+    const using = conf.usingComponents || {};
+    for (const tag of Object.keys(using)) {
+      registered.add(tag);
+      const ref = using[tag];
+      const base = ref.startsWith('/')
+        ? path.join(root, 'miniprogram', ref.replace(/^\//, ''))
+        : path.resolve(path.dirname(path.join(root, rel)), ref);
+      const ok = ['.js', '.wxml', '.json'].every((ext) => fs.existsSync(base + ext));
+      if (!ok) {
+        lines.push({ level: 'FAIL', msg: rel + ' 引用的组件 ' + tag + ' 缺少文件：' + ref });
+        badComponent += 1;
+      }
+    }
+  }
+  let badTag = 0;
+  for (const rel of files) {
+    if (!rel.endsWith('.wxml') || !rel.startsWith('miniprogram/')) continue;
+    const text = readText(path.join(root, rel)) || '';
+    const tags = new Set();
+    const tagRe = /<([a-z][a-z0-9]*(?:-[a-z0-9]+)+)\b/g;
+    let m;
+    while ((m = tagRe.exec(text))) tags.add(m[1]);
+    for (const tag of tags) {
+      if (!registered.has(tag)) {
+        lines.push({ level: 'FAIL', msg: rel + ' 用了未注册的组件 <' + tag + '>' });
+        badTag += 1;
+      }
+    }
+  }
+  if (!badComponent && !badTag) lines.push({ level: 'PASS', msg: '自定义组件都有文件且已在 json 注册' });
+
+  // 3) 云函数只访问预期集合（新增集合要先去控制台创建 + 配权限 + 建索引）
+  const expected = ['users', 'couples', 'bind_invites', 'moods', 'hugs', 'safety_checkins', 'diaries', 'wishes'];
+  const used = new Set();
+  let badCollection = 0;
+  for (const rel of files) {
+    if (!rel.endsWith('.js') || !rel.startsWith('cloudfunctions/api/')) continue;
+    const text = readText(path.join(root, rel));
+    if (!text) continue;
+    const re = /collection\(\s*'([A-Za-z_][A-Za-z0-9_]*)'\s*\)/g;
+    let m;
+    while ((m = re.exec(text))) {
+      if (!expected.includes(m[1])) {
+        lines.push({ level: 'FAIL', msg: '云函数用了未登记的集合 ' + m[1] + '（需先在云开发控制台创建并配权限）' });
+        badCollection += 1;
+      }
+      used.add(m[1]);
+    }
+  }
+  if (!used.size) warnings.push('没有读到云函数里的集合引用（目录为空？），请确认 cloudfunctions/api 路径');
+  if (!badCollection && used.size) {
+    lines.push({ level: 'PASS', msg: '云函数只用了预期的 ' + expected.length + ' 个集合（' + Array.from(used).sort().join('、') + '）' });
+  }
+}
+
 function checkTemplate(root, lines) {
   const candidates = [
     'miniprogram/pages/example',
@@ -391,6 +491,7 @@ function runChecks(root) {
   const lines = [];
   const warnings = [];
   const app = checkPages(root, lines);
+  checkStructure(root, lines, warnings);
   checkTemplate(root, lines);
   checkAssets(root, lines, warnings);
   checkPrivacy(app, root, lines);
@@ -427,6 +528,7 @@ if (require.main === module) main();
 
 module.exports = {
   runChecks,
+  checkStructure,
   scanTextForSecrets,
   scanConsoleStatement,
   extractConsoleStatements,
