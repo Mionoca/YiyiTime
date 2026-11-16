@@ -198,7 +198,8 @@ Page({
 
   onChooseAvatar(e) {
     const tempUrl = e.detail && e.detail.avatarUrl;
-    if (!tempUrl) return;
+    // 保存中不允许再换图：上传 await 期间换图会被失败回退逻辑覆盖（与 profile 页 saving 守卫一致）
+    if (!tempUrl || this.data.submitting) return;
     this.pendingAvatar = tempUrl;
     this.setData({ avatarPreview: tempUrl });
   },
@@ -230,8 +231,13 @@ Page({
         try {
           avatarFileID = await this.uploadAvatar(this.pendingAvatar);
         } catch (uploadErr) {
+          const validation = upload.isAvatarValidationError(uploadErr);
+          // 和 profile 页对齐：失败后预览退回已保存头像，别把一张被拒/没传成的图留在资料卡上。
+          // 校验失败说明这张图不能再用了，清掉待上传指针；网络失败保留，用户再点保存还能重试同一张。
+          if (validation) this.pendingAvatar = null;
+          this.setData({ avatarPreview: this.data.avatarFileID || DEFAULT_AVATAR });
           // 类型/大小校验失败要把具体原因透给用户，其它上传失败仍用通用文案
-          throw upload.isAvatarValidationError(uploadErr) ? uploadErr : new Error('头像上传失败，稍后再试');
+          throw validation ? uploadErr : new Error('头像上传失败，稍后再试');
         }
       }
       const payload = { nickname };

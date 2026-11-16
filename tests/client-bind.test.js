@@ -477,6 +477,8 @@ test('bind: 头像校验失败时透出具体原因，不提交资料（文档 1
     await page.init();
     assert.strictEqual(page.data.step, 'profile');
     page.data.nickname = '小怡';
+    page.data.avatarFileID = 'cloud://env/avatars/old.png';
+    page.data.avatarPreview = 'wxfile://tmp/a.gif';
     page.pendingAvatar = 'wxfile://tmp/a.gif';
     const err = new Error('头像图片超过 2MB，请换一张');
     err.code = 'AVATAR_TOO_LARGE';
@@ -487,6 +489,9 @@ test('bind: 头像校验失败时透出具体原因，不提交资料（文档 1
     assert.strictEqual(errors.length, 1);
     assert.strictEqual(errors[0], err, '校验错误要原样交给 api.showError，不能换成通用文案');
     assert.strictEqual(page.data.submitting, false);
+    // 被拒的图不能继续留在资料卡上：预览退回**已保存头像**（非空分支），待上传指针清空（profile 页行为一致）
+    assert.strictEqual(page.data.avatarPreview, 'cloud://env/avatars/old.png');
+    assert.strictEqual(page.pendingAvatar, null);
     assert.strictEqual(calls.filter((c) => c.action === 'user.updateProfile').length, 0);
   } finally {
     restoreWx();
@@ -501,6 +506,7 @@ test('bind: 非校验类上传失败仍用通用文案', async () => {
   try {
     await page.init();
     page.data.nickname = '小怡';
+    page.data.avatarPreview = 'wxfile://tmp/a.png';
     page.pendingAvatar = 'wxfile://tmp/a.png';
     page.uploadAvatar = async () => {
       throw new Error('uploadFile:fail net');
@@ -508,6 +514,31 @@ test('bind: 非校验类上传失败仍用通用文案', async () => {
     await page.onTapSaveProfile();
     assert.strictEqual(errors.length, 1);
     assert.strictEqual(errors[0].message, '头像上传失败，稍后再试');
+    // 网络失败也退回预览，但保留待上传指针，再点保存可以重试同一张
+    assert.strictEqual(page.data.avatarPreview, constants.DEFAULT_AVATAR);
+    assert.strictEqual(page.pendingAvatar, 'wxfile://tmp/a.png');
+    assert.strictEqual(page.data.submitting, false, '失败后保存按钮要恢复可点');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('bind: 保存中再换头像会被忽略，避免失败回退把新选择覆盖掉', async () => {
+  const { page } = setup({
+    'user.get': () => userRes('', false),
+    'bind.status': () => statusRes({ todayKey: tomorrowKey() }),
+  });
+  try {
+    await page.init();
+    assert.strictEqual(page.data.step, 'profile');
+    page.data.submitting = true;
+    page.onChooseAvatar({ detail: { avatarUrl: 'wxfile://tmp/late.png' } });
+    assert.strictEqual(page.pendingAvatar, undefined, '保存中换图不能改写待上传指针');
+    assert.strictEqual(page.data.avatarPreview, constants.DEFAULT_AVATAR, '保存中换图不能改写预览');
+    page.data.submitting = false;
+    page.onChooseAvatar({ detail: { avatarUrl: 'wxfile://tmp/next.png' } });
+    assert.strictEqual(page.pendingAvatar, 'wxfile://tmp/next.png');
+    assert.strictEqual(page.data.avatarPreview, 'wxfile://tmp/next.png');
   } finally {
     restoreWx();
   }
