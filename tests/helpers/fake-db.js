@@ -87,8 +87,14 @@ function makeFakeDb(initial) {
         };
       },
       async add({ data }) {
+        if (data && data._id !== undefined && storeOf(name).has(data._id)) {
+          // 真实云开发对显式 _id 重复会报错（bind_invites 用邀请码当 _id，靠它兜底冲突）
+          const err = new Error('duplicate key _id: ' + data._id);
+          err.errCode = -502001;
+          throw err;
+        }
         autoIdSeq += 1;
-        const id = 'auto_' + autoIdSeq;
+        const id = data && data._id !== undefined ? data._id : 'auto_' + autoIdSeq;
         storeOf(name).set(id, Object.assign({ _id: id }, clone(data)));
         return { _id: id };
       },
@@ -135,8 +141,33 @@ function makeFakeDb(initial) {
     };
   }
 
+  /**
+   * 简化的云开发事务：同一份存储上执行回调，抛错时整体回滚。
+   * 深拷贝快照用 structuredClone（保留 Date，嵌套数组/对象也一起回滚）。
+   * 注意：不模拟真实 SDK 的并发隔离与事务冲突自动重试（默认 3 次），
+   * 所以测试覆盖的是「单次执行失败回滚」，不是并发冲突重试。
+   */
+  async function runTransaction(fn) {
+    const snapshot = new Map();
+    for (const [name, store] of stores) {
+      snapshot.set(name, new Map(Array.from(store, ([id, doc]) => [id, structuredClone(doc)])));
+    }
+    const restore = () => {
+      stores.clear();
+      for (const [name, store] of snapshot) {
+        stores.set(name, new Map(Array.from(store, ([id, doc]) => [id, structuredClone(doc)])));
+      }
+    };
+    try {
+      return await fn({ collection });
+    } catch (err) {
+      restore();
+      throw err;
+    }
+  }
+
   return {
-    db: { collection, command },
+    db: { collection, command, runTransaction },
     get: (name, id) => storeOf(name).get(id),
     all: (name) => Array.from(storeOf(name).values()),
   };

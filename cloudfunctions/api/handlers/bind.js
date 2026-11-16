@@ -139,16 +139,10 @@ async function loadJoinableInvite(ctx, code) {
 }
 
 async function create(payload, ctx) {
-  const startDate = validate.string(payload.startDate, {
-    field: '开始日期',
-    min: 10,
-    max: 10,
-    required: true,
-    emptyCode: 'START_DATE_INVALID',
-  });
-  const regenerate = payload.regenerate === undefined
+  const p = validate.asObject(payload);
+  const regenerate = p.regenerate === undefined
     ? false
-    : validate.boolean(payload.regenerate, 'regenerate');
+    : validate.boolean(p.regenerate, 'regenerate');
 
   if (!ctx.user.nickname) {
     throw new AppError('PROFILE_REQUIRED', '先给自己起个名字吧');
@@ -157,8 +151,12 @@ async function create(payload, ctx) {
     throw new AppError('ALREADY_BOUND', '你们已经绑定啦');
   }
 
+  // 文档 7.4 只约定 START_DATE_INVALID：非字符串、长度不对、非法日期都归到这里，
+  // 不走 validate.string（否则非字符串会漏出 INVALID_INPUT、超长会漏出 TEXT_TOO_LONG）。
+  // 日期字段按 11.4 之外的严格 YYYY-MM-DD 处理：不 trim，首尾空格视为非法。
+  const startDate = p.startDate;
   const todayKey = time.dateKeyOf(ctx.now);
-  if (!time.isValidStartDate(startDate, todayKey)) {
+  if (typeof startDate !== 'string' || startDate.length !== 10 || !time.isValidStartDate(startDate, todayKey)) {
     throw new AppError('START_DATE_INVALID', '开始日期要选 2000 年以后、今天之前');
   }
 
@@ -209,7 +207,7 @@ async function create(payload, ctx) {
       // 只记录失败次数与错误类型，不打印错误消息（可能带出 _id，也就是完整邀请码）
       console.error('[bind.create] invite write failed', JSON.stringify({
         attempt: attempt + 1,
-        errCode: err && err.code,
+        errCode: err && (err.errCode || err.code),
       }));
     }
   }
