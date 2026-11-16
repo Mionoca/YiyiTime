@@ -17,15 +17,20 @@ function tomorrowKey() {
   return timeUtil.dateKeyOf(Date.now() + 86400000);
 }
 
-function setup(handlers) {
+function setup(handlers, wxExtra) {
   const toasts = [];
   const errors = [];
   const calls = [];
   const vibrates = [];
-  installWx({
-    showToast: (opts) => toasts.push(opts),
-    vibrateShort: (opts) => vibrates.push(opts),
-  });
+  installWx(
+    Object.assign(
+      {
+        showToast: (opts) => toasts.push(opts),
+        vibrateShort: (opts) => vibrates.push(opts),
+      },
+      wxExtra || {}
+    )
+  );
   api.call = async (action, payload) => {
     calls.push({ action, payload });
     if (handlers[action]) return handlers[action](payload, calls.length);
@@ -217,6 +222,32 @@ test('safety: onLoad 拉第一页与我的资料，onShow 首次不重复请求�
     assert.strictEqual(lists, 2);
   } finally {
     meUtil.clearMe();
+    restoreWx();
+  }
+});
+
+test('safety: 下拉刷新静默重拉第一页并收起转圈', async () => {
+  let lists = 0;
+  let stops = 0;
+  const { page } = setup(
+    {
+      'safety.list': () => {
+        lists += 1;
+        return { items: [entry('k1')], nextCursor: null, todayKey: tomorrowKey() };
+      },
+    },
+    { stopPullDownRefresh: () => { stops += 1; } }
+  );
+  try {
+    await page.load(true);
+    assert.strictEqual(lists, 1);
+    page.onPullDownRefresh();
+    assert.strictEqual(page.data.loading, false, '下拉刷新是静默的，不应闪「正在看门口的灯」');
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(lists, 2);
+    assert.strictEqual(stops, 1);
+    assert.strictEqual(page.data.items.length, 1, '静默刷新保留列表');
+  } finally {
     restoreWx();
   }
 });

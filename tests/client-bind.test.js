@@ -416,3 +416,55 @@ test('bind: 初始化失败进入错误步骤，重试成功后恢复', async ()
     restoreWx();
   }
 });
+
+test('bind: 下拉刷新静默刷新状态并收起转圈（失败也收起）', async () => {
+  let statuses = 0;
+  let stops = 0;
+  let fail = false;
+  const { page } = setup(
+    {
+      'user.get': () => userRes(),
+      'bind.status': () => {
+        statuses += 1;
+        if (fail) throw new Error('down');
+        return statusRes({ todayKey: tomorrowKey() });
+      },
+    },
+    { stopPullDownRefresh: () => { stops += 1; } }
+  );
+  try {
+    page.ready = true;
+    page.onPullDownRefresh();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(statuses, 1);
+    assert.strictEqual(stops, 1, '成功要收起转圈');
+    fail = true;
+    page.onPullDownRefresh();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(statuses, 2);
+    assert.strictEqual(stops, 2, '失败也要收起转圈');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('bind: 未就绪时下拉先 init 并立即收起转圈', () => {
+  const stops = [];
+  const { page } = setup(
+    { 'user.get': () => userRes(), 'bind.status': () => statusRes({ todayKey: tomorrowKey() }) },
+    { stopPullDownRefresh: () => stops.push(1) }
+  );
+  try {
+    let initCalls = 0;
+    page.ready = false;
+    page.data.step = 'error';
+    page.init = () => {
+      initCalls += 1;
+    };
+    page.onPullDownRefresh();
+    assert.strictEqual(initCalls, 1, '未就绪时下拉走 init');
+    assert.strictEqual(stops.length, 1, 'init 之后立刻收起转圈，不能等 init 的异步结果');
+  } finally {
+    restoreWx();
+  }
+});

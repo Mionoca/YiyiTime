@@ -17,15 +17,20 @@ function tomorrowKey() {
   return timeUtil.dateKeyOf(Date.now() + 86400000);
 }
 
-function setup(handlers) {
+function setup(handlers, wxExtra) {
   const toasts = [];
   const errors = [];
   const calls = [];
-  installWx({
-    showToast: (opts) => {
-      toasts.push(opts);
-    },
-  });
+  installWx(
+    Object.assign(
+      {
+        showToast: (opts) => {
+          toasts.push(opts);
+        },
+      },
+      wxExtra || {}
+    )
+  );
   api.call = async (action, payload) => {
     calls.push({ action, payload });
     if (handlers[action]) return handlers[action](payload, calls.length);
@@ -248,6 +253,41 @@ test('diary: onLoad 拉第一页，onShow 首次不重复请求、之后静默�
     page.onShow();
     await new Promise((r) => setTimeout(r, 20));
     assert.strictEqual(lists, 2);
+  } finally {
+    restoreWx();
+  }
+});
+
+test('diary: 下拉刷新静默重拉第一页并收起转圈（失败也收起）', async () => {
+  let lists = 0;
+  let stops = 0;
+  let fail = false;
+  const { page, errors } = setup(
+    {
+      'diary.list': () => {
+        lists += 1;
+        if (fail) throw new Error('down');
+        return listRes({ items: [{ date: tomorrowKey(), unlockAt: 'x', mine: null, partner: null }] });
+      },
+    },
+    { stopPullDownRefresh: () => { stops += 1; } }
+  );
+  try {
+    await page.load();
+    assert.strictEqual(lists, 1);
+    page.onPullDownRefresh();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(lists, 2, '下拉刷新重新拉第一页');
+    assert.strictEqual(stops, 1, '成功要收起转圈');
+    assert.strictEqual(page.data.items.length, 1);
+    fail = true;
+    page.onPullDownRefresh();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(lists, 3);
+    assert.strictEqual(stops, 2, '失败也要收起转圈');
+    assert.strictEqual(errors.length, 1, '静默刷新失败只 toast');
+    assert.strictEqual(page.data.items.length, 1, '失败保留旧列表');
+    assert.strictEqual(page.data.loading, false);
   } finally {
     restoreWx();
   }

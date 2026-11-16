@@ -42,6 +42,18 @@ Page({
     if (this.ready) this.refreshStatus(true);
   },
 
+  onPullDownRefresh() {
+    // 文档 L637：子页支持下拉刷新；成功失败都收起转圈
+    const stop = () => wx.stopPullDownRefresh();
+    if (!this.ready) {
+      this.init();
+      stop();
+      return;
+    }
+    // refreshStatus 内部已 catch，reject 侧只是防御，保证无论如何收起转圈
+    this.refreshStatus(true).then(stop, stop);
+  },
+
   onUnload() {
     if (this.leaveTimer) clearTimeout(this.leaveTimer);
   },

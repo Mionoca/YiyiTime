@@ -211,3 +211,29 @@ test('profile: 改昵称过程中静默刷新不覆盖输入草稿，强制刷�
     restoreWx();
   }
 });
+
+test('profile: 下拉刷新静默刷新并收起转圈，改昵称中不覆盖草稿', async () => {
+  const stops = [];
+  installWx({ stopPullDownRefresh: () => stops.push(1) });
+  try {
+    let calls = 0;
+    api.call = async () => {
+      calls += 1;
+      return baseHome();
+    };
+    const page = newPage();
+    page.onPullDownRefresh();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(calls, 1);
+    assert.strictEqual(stops.length, 1, '成功要收起转圈');
+    page.data.editing = true;
+    page.data.nickname = '改到一半';
+    page.onPullDownRefresh();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(stops.length, 2);
+    assert.strictEqual(calls, 1, '正在改昵称时 load 提前 return，不再请求（只靠草稿兜底不算）');
+    assert.strictEqual(page.data.nickname, '改到一半', '正在改昵称时别用服务端旧值覆盖输入框');
+  } finally {
+    restoreWx();
+  }
+});

@@ -270,3 +270,30 @@ test('wish: sortWishes 未完成按创建升序在前，已完成按完成时间
     restoreWx();
   }
 });
+
+test('wish: 下拉刷新静默重拉并收起转圈', async () => {
+  let lists = 0;
+  let stops = 0;
+  const { page } = setup(
+    {
+      'wish.list': () => {
+        lists += 1;
+        return loadRes([{ wishId: 'w1', done: false }], { total: 1, done: 0 });
+      },
+    },
+    { stopPullDownRefresh: () => { stops += 1; } }
+  );
+  try {
+    await page.load();
+    assert.strictEqual(lists, 1);
+    page.onPullDownRefresh();
+    assert.strictEqual(page.data.loading, false, '下拉刷新是静默的，不应闪 loading');
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(lists, 2);
+    assert.strictEqual(stops, 1);
+    assert.strictEqual(page.data.items.length, 1);
+    assert.strictEqual(page.data.loading, false);
+  } finally {
+    restoreWx();
+  }
+});

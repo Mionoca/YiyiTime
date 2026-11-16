@@ -44,6 +44,12 @@ Page({
     if (this._loaded) this.load(true, true);
   },
 
+  onPullDownRefresh() {
+    // 文档 L637：子页支持下拉刷新；静默刷新保留旧列表，成功失败都收起转圈
+    const stop = () => wx.stopPullDownRefresh();
+    this.load(true, true).then(stop, stop);
+  },
+
   onReachBottom() {
     this.loadMore();
   },

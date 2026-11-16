@@ -34,6 +34,12 @@ Page({
     this.load();
   },
 
+  onPullDownRefresh() {
+    // 文档 L637：子页支持下拉刷新。这里不 force：正在改昵称时别用服务端旧值覆盖输入框
+    const stop = () => wx.stopPullDownRefresh();
+    this.load().then(stop, stop);
+  },
+
   onRetry() {
     this.load(true);
   },
