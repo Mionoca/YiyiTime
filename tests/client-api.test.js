@@ -61,7 +61,8 @@ test('call: 云函数返回空响应（res 为 null/undefined/无 result）时�
 test('call: 业务错误缺 code/message 时 ApiError 用兜底 code 与文案', async () => {
   stubWx(() => Promise.resolve({ result: { ok: false } }));
   await assert.rejects(() => api.call('x'), (err) => {
-    assert.strictEqual(err.code, 'UNKNOWN');
+    // 兜底码必须是文档 16.2 表内的 INTERNAL_ERROR（不能出现表外的 UNKNOWN）
+    assert.strictEqual(err.code, 'INTERNAL_ERROR');
     assert.strictEqual(err.message, '服务开小差了，稍后再试');
     assert.strictEqual(err.requestId, '');
     return true;

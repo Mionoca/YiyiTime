@@ -6,7 +6,8 @@ class ApiError extends Error {
   constructor(code, message, requestId) {
     super(message || code);
     this.name = 'ApiError';
-    this.code = code || 'UNKNOWN';
+    // 兜底也用文档 16.2 里的码（服务端正常都会带 code，不能出现表外的码）
+    this.code = code || 'INTERNAL_ERROR';
     this.message = message || '服务开小差了，稍后再试';
     this.requestId = requestId || '';
   }
