@@ -42,7 +42,16 @@
         <text class="row-label">下一个纪念日</text>
         <text class="row-value">{{anniversaryText}}</text>
       </view>
-      <view class="row-link" bindtap="onTapComingSoon">修改开始日期 →</view>
+      <picker
+        mode="date"
+        value="{{startDateSelect}}"
+        start="2000-01-01"
+        end="{{maxStartDate}}"
+        disabled="{{startDateSaving}}"
+        bindchange="onStartDateChange"
+      >
+        <view class="row-link">{{startDateSaving ? '保存中…' : '修改开始日期 →'}}</view>
+      </picker>
     </view>
 
     <!-- 邀请 -->

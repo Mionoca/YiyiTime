@@ -48,7 +48,10 @@ async function buildContext({ openid }) {
     }
   }
 
-  return { openid, user, couple, partner, db, now };
+  const ctx = { openid, user, couple, partner, db, now };
+  // 双人接口统一用 ctx.requireBound() 做前置校验（绑定关系 + 成员身份）
+  ctx.requireBound = () => requireBound(ctx);
+  return ctx;
 }
 
 function requireBound(ctx) {

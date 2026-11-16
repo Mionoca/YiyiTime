@@ -5,7 +5,9 @@ page {
   --floor: #E7D3B8;
   --ink: #3F3A36;
   --muted: #8C837A;
+  --ink-faint: #C4B9AC;
   --accent: #D98E73;
+  --accent-ink: #8A5A45;
   --accent-soft: #F4C9B8;
   --card: #FFFDF9;
   --danger: #C25B4E;
@@ -28,6 +30,7 @@ page {
   --space-xl: 48rpx;
 
   /* 字号 */
+  --font-xs: 22rpx;
   --font-sm: 24rpx;
   --font-md: 28rpx;
   --font-lg: 40rpx;

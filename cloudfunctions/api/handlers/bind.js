@@ -9,13 +9,7 @@ const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 邀请码 24 小时有效
 const BIND_FAIL_LIMIT = 5; // 连续失败 5 次触发限流
 const BIND_FAIL_WINDOW_MS = 60 * 60 * 1000; // 限流窗口 1 小时
 
-/** Date / ISO 字符串 / 时间戳 → 毫秒；非法返回 NaN */
-function msOf(value) {
-  if (!value) return NaN;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === 'object' && typeof value.getTime === 'function') return value.getTime();
-  return new Date(value).getTime();
-}
+const msOf = time.toMillis;
 
 function iso(value) {
   const ms = msOf(value);

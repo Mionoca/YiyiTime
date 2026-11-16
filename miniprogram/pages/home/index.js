@@ -26,6 +26,9 @@ Page({
     startDateText: '',
     anniversaryText: '',
     showDaysSheet: false,
+    startDateSelect: '',
+    maxStartDate: '',
+    startDateSaving: false,
     defaultAvatar: DEFAULT_AVATAR,
   },
 
@@ -80,6 +83,9 @@ Page({
     const partner = home.partner;
     const patch = {
       phase: home.phase || 'day',
+      // 上限用服务端 todayKey（文档 13.5：日期规则以服务端为准），取不到再退回本机
+      maxStartDate: home.todayKey || timeUtil.todayKey(),
+      startDateSelect: home.couple ? home.couple.startDate : '',
       myAvatar: user.avatarFileID || DEFAULT_AVATAR,
       myName: user.nickname || '我',
       partnerAvatar: (partner && partner.avatarFileID) || DEFAULT_AVATAR,
@@ -123,6 +129,43 @@ Page({
 
   onCloseDaysSheet() {
     this.setData({ showDaysSheet: false });
+  },
+
+  /** 墙历里改开始日期：先二次确认，避免一方随手改掉两个人的天数 */
+  onStartDateChange(e) {
+    const value = String((e && e.detail && e.detail.value) || '');
+    const home = this.data.home;
+    const current = home && home.couple ? home.couple.startDate : '';
+    if (!value || value === current) return;
+    wx.showModal({
+      title: '改开始日期？',
+      content: '改完后你们都会看到新的天数，纪念日也会跟着变。',
+      confirmText: '改',
+      cancelText: '再想想',
+      success: (res) => {
+        if (res.confirm) this.saveStartDate(value);
+      },
+    });
+  },
+
+  async saveStartDate(value) {
+    if (this.data.startDateSaving) return;
+    this.setData({ startDateSaving: true });
+    try {
+      const res = await api.call('couple.updateStartDate', { startDate: value });
+      // 先按返回值把天数和日期改对，再静默刷新补纪念日；刷新失败也不会停在旧天数
+      this.setData({
+        startDateSaving: false,
+        startDateSelect: res.startDate,
+        startDateText: timeUtil.formatDateCN(res.startDate),
+        daysText: '第 ' + res.daysTogether + ' 天',
+      });
+      await this.load(true);
+      wx.showToast({ title: '日子重新算好啦', icon: 'none' });
+    } catch (err) {
+      this.setData({ startDateSaving: false });
+      api.showError(err);
+    }
   },
 
   onTapComingSoon() {

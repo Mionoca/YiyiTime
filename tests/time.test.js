@@ -116,3 +116,13 @@ test('isValidStartDate: 2000-01-01 至今天', () => {
   assert.strictEqual(time.isValidStartDate('2026-11-15', todayKey), true);
   assert.strictEqual(time.isValidStartDate('2026-11-16', todayKey), false);
 });
+
+test('toMillis: Date / ISO 字符串 / 时间戳 / 对象 / 非法值', () => {
+  const d = new Date('2026-11-15T04:00:00.000Z');
+  assert.strictEqual(time.toMillis(d), d.getTime());
+  assert.strictEqual(time.toMillis('2026-11-15T04:00:00.000Z'), d.getTime());
+  assert.strictEqual(time.toMillis(d.getTime()), d.getTime());
+  assert.strictEqual(time.toMillis({ getTime: () => 123 }), 123);
+  assert.ok(Number.isNaN(time.toMillis(null)));
+  assert.ok(Number.isNaN(time.toMillis('not-a-date')));
+});

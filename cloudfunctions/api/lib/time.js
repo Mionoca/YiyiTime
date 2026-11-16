@@ -84,9 +84,18 @@ function isValidStartDate(key, todayKey) {
   return isValidDateKey(key) && key >= '2000-01-01' && key <= todayKey;
 }
 
+/** Date / ISO 字符串 / 时间戳 → 毫秒；非法返回 NaN（云数据库日期可能是 Date、字符串或对象） */
+function toMillis(value) {
+  if (!value) return NaN;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && typeof value.getTime === 'function') return value.getTime();
+  return new Date(value).getTime();
+}
+
 module.exports = {
   TZ_OFFSET_MS,
   DAY_MS,
+  toMillis,
   dateKeyOf,
   startOfDateKey,
   addDays,

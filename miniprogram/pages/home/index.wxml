@@ -132,12 +132,25 @@
       <view class="sheet-days">{{daysText}}</view>
       <view class="sheet-row">
         <text class="sheet-label">开始于</text>
-        <text class="sheet-value">{{startDateText}}</text>
+        <picker
+          mode="date"
+          value="{{startDateSelect}}"
+          start="2000-01-01"
+          end="{{maxStartDate}}"
+          disabled="{{startDateSaving}}"
+          bindchange="onStartDateChange"
+        >
+          <view class="sheet-value sheet-editable">
+            {{startDateText}}
+            <text class="sheet-edit">{{startDateSaving ? '保存中…' : '改'}}</text>
+          </view>
+        </picker>
       </view>
       <view class="sheet-row">
         <text class="sheet-label">下一个纪念日</text>
         <text class="sheet-value">{{anniversaryText}}</text>
       </view>
+      <view class="sheet-tip">点「开始于」右边的「改」可以重新选日子</view>
       <view class="sheet-close" bindtap="onCloseDaysSheet">知道啦</view>
     </view>
   </view>

@@ -1,9 +1,0 @@
-feat: 完成 M0+M1 环境骨架、用户与双人绑定
-
-- 云函数 api 单函数骨架（鉴权 / requestId / 统一响应 / lib 工具层）
-- user.get、user.updateProfile、bind.create/preview/apply/confirm/cancel/status、home.get
-- 邀请状态机、事务确认、1 小时 5 次失败限流
-- 小程序 home/bind/profile 三页：首页小屋场景与未绑定空态、绑定全流程、我的页
-- utils 统一云函数入口、东八区时间展示、设计变量 tokens
-- tests 18 个用例、清理 quickstart 模板、README 与开发进度文档
-- 依据前后端独立代码审查修复：分享进入崩溃、预览污染日期、惰性过期覆写、日志脱敏等

@@ -5,26 +5,18 @@ const bind = require('./bind');
 
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
-function msOf(value) {
-  if (!value) return NaN;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === 'object' && typeof value.getTime === 'function') return value.getTime();
-  return new Date(value).getTime();
-}
-
 function publicUser(user) {
   return {
     openid: user._id || user.openid,
     nickname: user.nickname || '',
     avatarFileID: user.avatarFileID || '',
     profileComplete: !!(user.profileComplete || user.nickname),
-    coupleId: user.coupleId || null,
   };
 }
 
 /** lastActiveAt 节流更新：距上次超过 5 分钟才写 */
 async function touchLastActive(ctx) {
-  const last = msOf(ctx.user.lastActiveAt);
+  const last = time.toMillis(ctx.user.lastActiveAt);
   if (!Number.isFinite(last) || ctx.now.getTime() - last > TOUCH_INTERVAL_MS) {
     await ctx.db.collection('users').doc(ctx.openid).update({
       data: { lastActiveAt: ctx.now },

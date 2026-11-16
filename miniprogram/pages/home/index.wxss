@@ -679,6 +679,27 @@
   color: var(--ink);
 }
 
+.sheet-editable {
+  display: flex;
+  align-items: center;
+}
+
+.sheet-edit {
+  margin-left: 12rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  background-color: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--font-xs);
+}
+
+.sheet-tip {
+  margin-top: 8rpx;
+  font-size: var(--font-xs);
+  color: var(--ink-faint);
+  text-align: right;
+}
+
 .sheet-close {
   margin-top: 32rpx;
   height: 88rpx;
