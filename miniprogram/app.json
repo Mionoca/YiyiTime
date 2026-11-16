@@ -12,7 +12,8 @@
     "backgroundTextStyle": "dark",
     "navigationBarBackgroundColor": "#FBF6EE",
     "navigationBarTitleText": "小怡怡安",
-    "navigationBarTextStyle": "black"
+    "navigationBarTextStyle": "black",
+    "pageOrientation": "portrait"
   },
   "sitemapLocation": "sitemap.json",
   "style": "v2",

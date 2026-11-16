@@ -20,6 +20,10 @@ Page({
     home: null,
     statusBarHeight: 20,
     phase: 'day',
+    // 场景首屏入场动画（文档 9.7）：一次性 class，520ms 后移除
+    sceneEnter: false,
+    // 首页分享卡片带的邀请码（文档 9.12 / 13.8）
+    shareCode: '',
     myAvatar: DEFAULT_AVATAR,
     myName: '我',
     partnerName: 'TA',
@@ -60,6 +64,14 @@ Page({
 
   onLoad() {
     this.setData({ statusBarHeight: this.getStatusBarHeight() });
+    try {
+      // 让分享卡片能带邀请码（文档 9.12 / 13.8）
+      if (wx.showShareMenu) {
+        wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] });
+      }
+    } catch (err) {
+      // 分享菜单不可用不影响主流程
+    }
   },
 
   onShow() {
@@ -67,7 +79,10 @@ Page({
   },
 
   onUnload() {
+    // 页面已卸载：之后的定时器 / nextTick 回调不再 setData（微信会告警）
+    this._unloaded = true;
     clearTimeout(this._celebrateTimer);
+    clearTimeout(this._enterTimer);
   },
 
   toast(title) {
@@ -103,7 +118,9 @@ Page({
       .then((home) => {
         if (seq !== this._loadSeq) return;
         this.loadingPromise = null;
+        const firstHome = !this.data.home;
         this.setData(Object.assign({ loading: false, error: '', home }, this.derive(home)));
+        if (firstHome) this.playSceneEnter();
         this.maybeCelebrate(home);
       })
       .catch((err) => {
@@ -131,6 +148,7 @@ Page({
     const safety = home.safety || null;
     const diary = home.diary || null;
     const wish = home.wish || null;
+    const nowMs = Date.parse(home.serverNow || '') || Date.now();
     const patch = {
       phase: home.phase || 'day',
       // 上限用服务端 todayKey（文档 13.5：日期规则以服务端为准），取不到再退回本机
@@ -146,9 +164,17 @@ Page({
       moodPartner: mood.partner || null,
       hugIncoming: hug.incoming || null,
       hugOutgoing: hug.outgoing || null,
-      // 门：对方今天报平安门灯暖（文档 9.10）
+      // 门：对方今天报平安门灯暖；门牌显示对方最近一次报平安（文档 9.10）
       doorLit: !!(safety && safety.partnerToday),
-      safetyLabel: safety && safety.partnerToday ? 'TA 到家了' : '还没报平安',
+      safetyLabel: !home.couple
+        ? ''
+        : (safety && safety.partnerToday
+          ? 'TA 到家了'
+          : (safety && safety.partnerLastAt
+            ? 'TA ' + timeUtil.formatAgo(safety.partnerLastAt, nowMs)
+            : '还没报平安')),
+      // 只有自己刚创建的邀请码可以分享；applied_* 阶段的 code 已失效或属于对方（文档 11.5）
+      shareCode: (home.bind && home.bind.state === 'code_created' && home.bind.pending && home.bind.pending.code) || '',
       // 台灯：我写了今天灯亮；TA 写了未解锁旁边小光点（文档 9.10）
       lampDim: !home.couple || !diary || diary.mineWritten === false,
       lampDot: !!(diary && diary.partnerWritten && !diary.partnerUnlocked),
@@ -245,9 +271,53 @@ Page({
     clearTimeout(this._celebrateTimer);
     this.setData({ hugCelebrate: false });
     this._celebrateTimer = setTimeout(() => {
+      if (this._unloaded) return;
       this.setData({ hugCelebrate: true });
-      this._celebrateTimer = setTimeout(() => this.setData({ hugCelebrate: false }), 1200);
+      this._celebrateTimer = setTimeout(() => {
+        if (this._unloaded) return;
+        this.setData({ hugCelebrate: false });
+      }, 1200);
     }, 16);
+  },
+
+  /** 首屏场景入场（文档 9.7）：背景淡入 + 家具上移 8rpx，一次性 */
+  playSceneEnter() {
+    this.setData({ sceneEnter: false });
+    const start = () => {
+      if (this._unloaded) return;
+      this.setData({ sceneEnter: true });
+      clearTimeout(this._enterTimer);
+      this._enterTimer = setTimeout(() => {
+        if (this._unloaded) return;
+        this.setData({ sceneEnter: false });
+      }, 520);
+    };
+    // 等一次渲染后再加 class，保证动画能重播（同心形动画的做法）；低端机 setData 慢也不会丢
+    this._enterTimer = setTimeout(() => {
+      if (this._unloaded) return;
+      if (typeof wx.nextTick === 'function') wx.nextTick(start);
+      else start();
+    }, 16);
+  },
+
+  onShareAppMessage() {
+    const code = this.data.shareCode;
+    const home = this.data.home;
+    if (home && home.bind && home.bind.state === 'bound') {
+      return { title: '我的小屋，今天也在等你', path: constants.ROUTES.home };
+    }
+    return {
+      title: '来和我一起住进小怡怡安',
+      path: constants.ROUTES.bind + (code ? '?code=' + code : ''),
+    };
+  },
+
+  onShareTimeline() {
+    // 朋友圈固定分享当前页（首页）；home.onLoad 不解析 code，带码也没用，
+    // 且文档 11.5 要求邀请码不公开贴出 —— 朋友圈只分享小屋本身
+    const home = this.data.home;
+    const bound = !!(home && home.bind && home.bind.state === 'bound');
+    return { title: bound ? '我的小屋，今天也在等你' : '来和我一起住进小怡怡安' };
   },
 
   onRetry() {

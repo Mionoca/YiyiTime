@@ -46,9 +46,24 @@ function formatMonthDay(dateKey) {
   return Number(parts[1]) + '月' + Number(parts[2]) + '日';
 }
 
+/** 最近一次发生的时刻 → 短文案（门牌等窄标签用）：刚刚 / N 分钟前 / N 小时前 / 昨天 / 11月14日 */
+function formatAgo(iso, nowMs) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date(Number.isFinite(nowMs) ? nowMs : Date.now());
+  const diff = now.getTime() - d.getTime();
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+  const day = dateKeyOf(d);
+  if (day === dateKeyOf(now)) return Math.floor(diff / 3600000) + ' 小时前';
+  if (day === dateKeyOf(new Date(now.getTime() - 86400000))) return '昨天';
+  return formatMonthDay(day);
+}
+
 /** 东八区的今天（用于日期选择器默认值/上限） */
 function todayKey() {
   return dateKeyOf(new Date());
 }
 
-module.exports = { dateKeyOf, formatTime, formatDateCN, formatMonthDay, todayKey };
+module.exports = { dateKeyOf, formatTime, formatDateCN, formatMonthDay, formatAgo, todayKey };

@@ -131,4 +131,7 @@
     <view class="link-row" bindtap="onTapCancel">取消申请</view>
   </view>
 
+  <!-- 隐私授权（文档 9.6 / 13.8）：微信要求授权时出现 -->
+  <privacy-guard />
+
 </view>

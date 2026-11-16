@@ -65,7 +65,7 @@
 
 .add--disabled {
   opacity: 0.45;
-  border-color: var(--ink-faint, #C4B9AC);
+  border-color: var(--muted, #6F685F);
   color: var(--muted, #8C837A);
 }
 
@@ -132,7 +132,7 @@
 }
 
 .form__placeholder {
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .form__textarea {
@@ -151,7 +151,7 @@
   padding: 8rpx 8rpx 0;
   text-align: right;
   font-size: var(--font-xs, 22rpx);
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .form__actions {
@@ -181,7 +181,7 @@
   justify-content: center;
   height: 96rpx;
   border-radius: 48rpx;
-  background: var(--accent, #D98E73);
+  background: var(--accent-strong, #A85C42);
   color: #FFFFFF;
   font-size: 30rpx;
   font-weight: 500;

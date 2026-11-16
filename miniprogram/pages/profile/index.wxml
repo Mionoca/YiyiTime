@@ -71,6 +71,10 @@
         <text>心情记录</text>
         <text class="list-arrow">›</text>
       </view>
+      <view class="list-item" bindtap="onOpenPrivacy">
+        <text>隐私保护指引</text>
+        <text class="list-arrow">›</text>
+      </view>
       <view class="list-item" bindtap="onTapComingSoon">
         <text>关于小怡怡安</text>
         <text class="list-arrow">›</text>
@@ -79,5 +83,8 @@
 
     <view class="footer">小怡怡安 · 只属于两个人的小屋</view>
   </block>
+
+  <!-- 隐私授权（文档 9.6 / 13.8）：微信要求授权时出现 -->
+  <privacy-guard />
 
 </view>

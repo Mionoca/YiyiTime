@@ -125,7 +125,7 @@
   line-height: 34rpx;
   text-align: center;
   border-radius: 50%;
-  background: var(--accent, #D98E73);
+  background: var(--accent-strong, #A85C42);
   color: #FFFFFF;
   font-size: 20rpx;
   box-shadow: 0 2rpx 8rpx rgba(63, 58, 54, 0.2);

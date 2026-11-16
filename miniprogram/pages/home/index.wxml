@@ -18,24 +18,28 @@
     <view class="sk-block sk-calendar"></view>
     <view class="sk-block sk-frame"></view>
     <view class="sk-block sk-sofa"></view>
+    <view class="sk-block sk-table"></view>
     <view class="sk-block sk-fridge"></view>
+    <view class="sk-block sk-lamp"></view>
     <view class="sk-block sk-door"></view>
     <view class="state-overlay">
       <view class="state-text" wx:if="{{loading}}">正在开门…</view>
       <block wx:else>
         <view class="state-text">{{error}}</view>
+        <view class="state-sub">检查一下网络，再敲敲门</view>
         <button class="btn-primary retry-btn" bindtap="onRetry">再试一次</button>
       </block>
     </view>
   </view>
 
-  <!-- 小屋 -->
-  <view class="scene" wx:if="{{home}}">
+  <!-- 小屋：首屏入场动画（文档 9.7），一次性 class 由页面在 520ms 后移除 -->
+  <view class="scene {{sceneEnter ? 'is-enter' : ''}}" wx:if="{{home}}">
     <!-- 窗 -->
     <view class="window">
       <view class="window-glass">
         <view class="moon" wx:if="{{phase === 'night'}}"></view>
         <view class="sun" wx:if="{{phase === 'day' || phase === 'morning'}}"></view>
+        <view class="sun sun--dusk" wx:if="{{phase === 'dusk'}}"></view>
         <view class="star star-1" wx:if="{{phase === 'night'}}"></view>
         <view class="star star-2" wx:if="{{phase === 'night'}}"></view>
       </view>
@@ -43,14 +47,14 @@
     </view>
 
     <!-- 墙历 -->
-    <view class="calendar" bindtap="onTapCalendar" aria-label="我们的日子">
+    <view class="calendar" bindtap="onTapCalendar" aria-label="我们的日子" aria-role="button">
       <view class="calendar-top">我们的日子</view>
       <view class="calendar-days" wx:if="{{home.couple}}">{{daysText}}</view>
       <view class="calendar-days calendar-days-empty" wx:else>从今天开始</view>
     </view>
 
     <!-- 相框 -->
-    <view class="frame" bindtap="onTapProfile" aria-label="我的">
+    <view class="frame" bindtap="onTapProfile" aria-label="我的" aria-role="button">
       <image class="frame-avatar" src="{{myAvatar}}" mode="aspectFill" />
     </view>
 
@@ -59,6 +63,7 @@
       class="lamp {{lampDim ? 'dim' : ''}}"
       bindtap="onTapLamp"
       aria-label="日记"
+      aria-role="button"
     >
       <view class="lamp-glow"></view>
       <view class="lamp-shade"></view>
@@ -96,7 +101,7 @@
           />
           <view class="person-name">{{partnerName}}</view>
         </view>
-        <view class="empty-seat" wx:else bindtap="onTapBind" aria-label="邀请 TA 住进来">
+        <view class="empty-seat" wx:else bindtap="onTapBind" aria-label="邀请 TA 住进来" aria-role="button">
           <view class="empty-cushion"></view>
           <view class="empty-text">屋里还缺一个人</view>
         </view>
@@ -104,7 +109,7 @@
     </view>
 
     <!-- 冰箱（愿望进度，文档 9.10 / 10.8） -->
-    <view class="fridge" bindtap="onTapFridge" aria-label="愿望清单">
+    <view class="fridge" bindtap="onTapFridge" aria-label="愿望清单" aria-role="button">
       <view class="fridge-door">
         <view class="fridge-handle"></view>
         <view class="fridge-note"></view>
@@ -114,7 +119,7 @@
     </view>
 
     <!-- 桌子便签（愿望预览，文档 9.10） -->
-    <view class="table" bindtap="onTapTableNote" aria-label="愿望">
+    <view class="table" bindtap="onTapTableNote" aria-label="愿望" aria-role="button">
       <view class="table-note">
         <text class="table-note-text">{{wishPreviewTitle || '下次见面想做的事'}}</text>
       </view>
@@ -124,11 +129,16 @@
     </view>
 
     <!-- 门（报平安，文档 9.10：对方今天报平安门灯暖） -->
-    <view class="door {{doorLit ? 'door--lit' : ''}}" bindtap="onTapDoor" aria-label="报平安">
+    <view
+      class="door {{doorLit ? 'door--lit' : ''}} {{home.couple ? '' : 'door--off'}}"
+      bindtap="onTapDoor"
+      aria-label="报平安"
+      aria-role="button"
+    >
       <view class="door-panel">
         <view class="door-knob"></view>
       </view>
-      <view class="door-label">{{safetyLabel}}</view>
+      <view class="door-label" wx:if="{{home.couple}}">{{safetyLabel}}</view>
     </view>
 
     <!-- 门垫信封：邀请状态 -->
@@ -136,7 +146,8 @@
       class="envelope {{home.bind.state}}"
       wx:if="{{!home.couple && home.bind.state !== 'unbound'}}"
       bindtap="onTapBind"
-      aria-label="有人在等你"
+      aria-label="{{home.bind.state === 'applied_by_partner' ? '有人在等你' : '邀请码'}}"
+      aria-role="button"
     >
       <view class="envelope-body"></view>
       <view class="envelope-flap"></view>
@@ -239,5 +250,8 @@
     bind:select="onMoodSelect"
     bind:close="onCloseMoodPicker"
   />
+
+  <!-- 隐私授权（文档 9.6 / 13.8）：只在微信要求授权时出现，低版本基础库交给微信原生弹窗 -->
+  <privacy-guard />
 
 </view>

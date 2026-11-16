@@ -44,14 +44,67 @@
   background: linear-gradient(180deg, #3E4360 0%, #333852 60%, #2C3048 100%);
 }
 
+/* 文档 9.6：夜间整体降亮，导航与底部动作区一起变暗；暖白文字保证对比度 */
+.phase-night {
+  background-color: #2C3048;
+}
+
+.phase-night .nav-title {
+  color: #F3E9DA;
+}
+
+.phase-night .action-bar {
+  background: linear-gradient(180deg, rgba(44, 48, 72, 0) 0%, #2C3048 32%);
+}
+
+.phase-night .action-hint {
+  color: #D5C7B2;
+}
+
+.phase-night .state-text {
+  color: #EDE2D1;
+}
+
+.phase-night .state-sub {
+  color: #B9AB96;
+}
+
+/* ---------- 首屏入场（文档 9.7）：500ms，背景淡入 + 家具上移 8rpx ---------- */
+.scene.is-enter {
+  animation: scene-fade 500ms ease-out;
+}
+
+.scene.is-enter .window,
+.scene.is-enter .calendar,
+.scene.is-enter .lamp,
+.scene.is-enter .rug,
+.scene.is-enter .sofa,
+.scene.is-enter .table,
+.scene.is-enter .fridge,
+.scene.is-enter .door {
+  animation: scene-lift 500ms ease-out;
+}
+
+@keyframes scene-fade {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+
+@keyframes scene-lift {
+  from { transform: translateY(8rpx); }
+  to { transform: translateY(0); }
+}
+
 /* 通用木质感 */
 /* ---------- 窗 ---------- */
 .window {
   position: absolute;
-  top: 5%;
-  left: 8%;
-  width: 40%;
-  height: 22%;
+  /* 文档 9.2：窗在左上，文档 9.8：窗户在第 2 层 */
+  top: 4.5%;
+  left: 6%;
+  width: 38%;
+  height: 21%;
+  z-index: 10;
 }
 
 .window-glass {
@@ -86,6 +139,21 @@
   border-radius: 50%;
   background: #F7D48A;
   box-shadow: 0 0 24rpx rgba(247, 212, 138, 0.8);
+}
+
+.sun--dusk {
+  top: 46%;
+  background: #F0A56E;
+  box-shadow: 0 0 32rpx rgba(240, 165, 110, 0.85);
+}
+
+.phase-morning .sun {
+  top: 32%;
+  background: #FBE3B0;
+}
+
+.phase-night .window-sill {
+  background: #8C7760;
 }
 
 .moon {
@@ -127,10 +195,12 @@
 /* ---------- 墙历 ---------- */
 .calendar {
   position: absolute;
-  top: 8%;
-  right: 8%;
-  width: 26%;
+  /* 文档 9.2：墙历右上；9.8：第 2 层 */
+  top: 7%;
+  right: 7%;
+  width: 24%;
   padding: 16rpx 8rpx 20rpx;
+  z-index: 10;
   border-radius: 8rpx;
   background: var(--card);
   box-shadow: 0 6rpx 16rpx rgba(63, 58, 54, 0.08);
@@ -158,27 +228,30 @@
   margin-top: 8rpx;
   font-size: 30rpx;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .calendar-days-empty {
   font-size: 22rpx;
-  color: #C4B9AC;
+  /* 文档 8.9：提示文字也要可读，不用过淡的 --ink-faint */
+  color: var(--muted);
   font-weight: 400;
 }
 
 /* ---------- 相框 ---------- */
 .frame {
   position: absolute;
-  top: 34%;
-  left: 9%;
-  width: 18%;
-  height: 14%;
+  /* 文档 9.2 示意图：相框在右侧墙面（墙历下方）；9.8：第 2 层 */
+  top: 32%;
+  right: 6%;
+  width: 16%;
+  height: 13%;
   padding: 8rpx;
+  z-index: 10;
   border-radius: 8rpx;
   background: #E8D3B8;
   box-shadow: 0 6rpx 16rpx rgba(63, 58, 54, 0.12);
-  transform: rotate(-3deg);
+  transform: rotate(3deg);
 }
 
 .frame-avatar {
@@ -188,13 +261,14 @@
   background: var(--wall);
 }
 
-/* ---------- 落地灯 ---------- */
+/* ---------- 落地灯（文档 9.2：台灯在左） ---------- */
 .lamp {
   position: absolute;
-  right: 7%;
-  bottom: 34%;
-  width: 14%;
-  height: 34%;
+  left: 3.5%;
+  bottom: 4%;
+  width: 12%;
+  height: 31%;
+  z-index: 20;
 }
 
 .lamp-glow {
@@ -206,15 +280,31 @@
   margin-left: -160rpx;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(247, 212, 138, 0.55) 0%, rgba(247, 212, 138, 0) 68%);
+  opacity: 0;
   transition: opacity 400ms ease;
+  /* 文档 9.2 / 9.8：光晕是装饰，320rpx 的隐形区域不能拦截沙发/地毯的点击 */
+  pointer-events: none;
 }
 
 .lamp.dim .lamp-glow {
   opacity: 0;
+  animation: none;
 }
 
-.phase-night .lamp-glow {
-  background: radial-gradient(circle, rgba(255, 214, 148, 0.6) 0%, rgba(255, 214, 148, 0) 70%);
+/* 文档 9.6：黄昏台灯开始亮；文档 9.7：夜间暖光常驻 4s 呼吸 */
+.phase-dusk .lamp:not(.dim) .lamp-glow,
+.phase-night .lamp:not(.dim) .lamp-glow {
+  opacity: 1;
+}
+
+.phase-night .lamp:not(.dim) .lamp-glow {
+  background: radial-gradient(circle, rgba(255, 214, 148, 0.62) 0%, rgba(255, 214, 148, 0) 70%);
+  animation: lamp-breathe 4s ease-in-out infinite;
+}
+
+@keyframes lamp-breathe {
+  0%, 100% { opacity: 0.82; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
 }
 
 .lamp-shade {
@@ -269,9 +359,9 @@
 .rug {
   position: absolute;
   left: 50%;
-  bottom: 14%;
-  width: 66%;
-  height: 6%;
+  bottom: 9%;
+  width: 62%;
+  height: 5.5%;
   transform: translateX(-50%);
   border-radius: 999rpx;
   background: rgba(217, 142, 115, 0.22);
@@ -282,11 +372,12 @@
 /* ---------- 沙发 ---------- */
 .sofa {
   position: absolute;
-  left: 50%;
-  bottom: 24%;
-  width: 76%;
-  height: 20%;
-  transform: translateX(-50%);
+  /* 文档 9.2：两个人+沙发居中、贴住底部家具上方；不设 z-index/transform，
+     让子节点 .people 能按文档 9.8 提到头像层（30） */
+  left: 19%;
+  bottom: 28%;
+  width: 62%;
+  height: 19%;
   /* 沙发本体不接点击，避免遮住台灯热区；两个座位上的可点区域单独放行（文档 9.2） */
   pointer-events: none;
 }
@@ -345,6 +436,8 @@
   left: 0;
   right: 0;
   bottom: 52%;
+  /* 文档 9.8：头像/心情气泡在第 4 层，压在沙发、家具之上 */
+  z-index: 30;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -402,11 +495,12 @@
 /* ---------- 桌子（愿望便签） ---------- */
 .table {
   position: absolute;
-  left: 50%;
-  bottom: 4%;
-  width: 34%;
-  height: 16%;
-  transform: translateX(-50%);
+  /* 文档 9.2：底排 台灯-桌子-冰箱 */
+  left: 37.5%;
+  bottom: 3.5%;
+  width: 25%;
+  height: 15%;
+  z-index: 20;
 }
 
 .table-top {
@@ -461,10 +555,12 @@
 /* ---------- 冰箱 ---------- */
 .fridge {
   position: absolute;
-  left: 5%;
-  bottom: 5%;
-  width: 22%;
-  height: 30%;
+  /* 文档 9.2：冰箱在底排右侧（不压住门的右下热区） */
+  right: 19.5%;
+  bottom: 3.5%;
+  width: 16%;
+  height: 24%;
+  z-index: 20;
   border-radius: 10rpx;
   background: #EBE4D8;
   box-shadow: inset 0 0 0 4rpx #DCD0BE;
@@ -513,7 +609,8 @@
   bottom: 14%;
   padding: 2rpx 10rpx;
   border-radius: 999rpx;
-  background: var(--accent, #D98E73);
+  /* 白字压在 --accent 上只有 2.6:1，改用 --accent-ink（5.8:1，文档 8.9） */
+  background: var(--accent-ink, #8A5A45);
   color: #FFFFFF;
   font-size: 18rpx;
   line-height: 1.6;
@@ -522,13 +619,20 @@
 /* ---------- 门 ---------- */
 .door {
   position: absolute;
-  right: 5%;
-  bottom: 5%;
-  width: 22%;
-  height: 28%;
+  /* 文档 9.2：门在右下；9.8：家具层 20 */
+  right: 2.5%;
+  bottom: 6%;
+  width: 15%;
+  height: 25%;
+  z-index: 20;
   border-radius: 10rpx 10rpx 0 0;
   background: #C99C7C;
   box-shadow: inset 0 0 0 4rpx #B98A6A;
+}
+
+/* 未绑定：门还没「启用」，只做装饰，避免和门垫邀请信封抢热区（文档 9.12） */
+.door--off {
+  pointer-events: none;
 }
 
 .door-panel {
@@ -559,28 +663,31 @@
 /* 门牌：伴侣最近报平安状态（文档 9.10，partnerLastAt 为空显示「还没报平安」） */
 .door-label {
   position: absolute;
-  left: 9%;
-  right: 9%;
-  bottom: 9%;
-  padding: 2rpx 8rpx;
+  left: 7%;
+  right: 7%;
+  bottom: 8%;
+  padding: 2rpx 6rpx;
   border-radius: 4rpx;
   background: rgba(255, 253, 249, 0.92);
   text-align: center;
-  font-size: 18rpx;
-  line-height: 1.5;
+  /* 文档 9.9：门牌是三档机型都要读的文案，字号不低于 --font-xs 附近的 20rpx */
+  font-size: 20rpx;
+  line-height: 1.4;
   color: #8A5A45;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  /* 文档 9.9：窄标签不写死高度，允许换行（「TA 11月14日」这类文案） */
+  white-space: normal;
+  word-break: break-all;
 }
 
 /* ---------- 信封 ---------- */
 .envelope {
   position: absolute;
-  right: 7%;
-  bottom: 15%;
-  width: 18%;
-  height: 9%;
+  /* 文档 9.12：门垫上的邀请信封；热区按文档 8.9 保证 ≥88rpx 高 */
+  right: 2.5%;
+  bottom: 1%;
+  width: 15%;
+  height: 88rpx;
+  z-index: 30;
   transform: rotate(-4deg);
 }
 
@@ -601,9 +708,9 @@
   top: 0;
   width: 0;
   height: 0;
-  border-left: 60rpx solid transparent;
-  border-right: 60rpx solid transparent;
-  border-top: 34rpx solid #F4E6D2;
+  border-left: 56rpx solid transparent;
+  border-right: 56rpx solid transparent;
+  border-top: 32rpx solid #F4E6D2;
 }
 
 .envelope.applied_by_partner {
@@ -612,7 +719,7 @@
 
 @keyframes envelope-pulse {
   0%, 100% { transform: rotate(-4deg) scale(1); }
-  50% { transform: rotate(-4deg) scale(1.08); }
+  50% { transform: rotate(-4deg) scale(1.04); }
 }
 
 .envelope-avatar {
@@ -652,45 +759,59 @@
 }
 
 .sk-window {
-  top: 6%;
-  left: 8%;
-  width: 40%;
-  height: 22%;
+  top: 4.5%;
+  left: 6%;
+  width: 38%;
+  height: 21%;
 }
 
 .sk-calendar {
-  top: 8%;
-  right: 8%;
-  width: 26%;
-  height: 16%;
+  top: 7%;
+  right: 7%;
+  width: 24%;
+  height: 15%;
 }
 
 .sk-frame {
-  top: 34%;
-  left: 9%;
-  width: 18%;
-  height: 14%;
+  top: 32%;
+  right: 6%;
+  width: 16%;
+  height: 13%;
 }
 
 .sk-sofa {
-  left: 12%;
-  bottom: 24%;
-  width: 76%;
-  height: 20%;
+  left: 19%;
+  bottom: 28%;
+  width: 62%;
+  height: 19%;
+}
+
+.sk-table {
+  left: 37.5%;
+  bottom: 3.5%;
+  width: 25%;
+  height: 15%;
 }
 
 .sk-fridge {
-  left: 5%;
-  bottom: 5%;
-  width: 22%;
-  height: 30%;
+  right: 19.5%;
+  bottom: 3.5%;
+  width: 16%;
+  height: 24%;
+}
+
+.sk-lamp {
+  left: 3.5%;
+  bottom: 4%;
+  width: 12%;
+  height: 31%;
 }
 
 .sk-door {
-  right: 5%;
-  bottom: 5%;
-  width: 22%;
-  height: 28%;
+  right: 2.5%;
+  bottom: 6%;
+  width: 15%;
+  height: 25%;
 }
 
 .state-overlay {
@@ -706,6 +827,14 @@
 .state-text {
   color: var(--muted);
   font-size: var(--font-md);
+}
+
+.state-sub {
+  margin-top: 8rpx;
+  text-align: center;
+  font-size: var(--font-sm);
+  /* 文档 8.9：日间错误提示副文案也要 ≥4.5:1（--ink-faint 只有 1.8） */
+  color: var(--muted);
 }
 
 .retry-btn {
@@ -838,7 +967,7 @@
 }
 
 .pm-note-empty {
-  color: var(--ink-faint);
+  color: var(--muted);
 }
 
 /* ---------- 浮层 ---------- */
@@ -923,7 +1052,7 @@
 .sheet-tip {
   margin-top: 8rpx;
   font-size: var(--font-xs);
-  color: var(--ink-faint);
+  color: var(--muted);
   text-align: right;
 }
 
@@ -933,7 +1062,30 @@
   line-height: 88rpx;
   text-align: center;
   border-radius: var(--radius-md);
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #FFFFFF;
   font-size: 30rpx;
+}
+
+/* ---------- 小屏适配（文档 9.9：320×568 / 375×667 一屏放得下、按钮不被遮挡） ---------- */
+@media (max-height: 640px) {
+  .nav-title {
+    height: 72rpx;
+    line-height: 72rpx;
+    font-size: 30rpx;
+  }
+
+  .action-bar {
+    padding-top: 8rpx;
+    padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  }
+
+  .action-hint {
+    margin-bottom: 8rpx;
+    font-size: 22rpx;
+  }
+
+  .action-btn {
+    height: 88rpx;
+  }
 }

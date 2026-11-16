@@ -1,0 +1,19 @@
+<view class="privacy" wx:if="{{show}}">
+  <view class="privacy__mask" catchtouchmove="noop"></view>
+  <view class="privacy__card" catchtap="noop">
+    <view class="privacy__title">住进小屋之前</view>
+    <view class="privacy__text">小屋只属于你们两个人，所以想先和你说清楚：</view>
+    <view class="privacy__item">· 头像和昵称只会给绑定后的 TA 看</view>
+    <view class="privacy__item">· 日记当天上锁，第二天两个人一起解锁</view>
+    <view class="privacy__item">· 心情、抱抱和报平安只留在你们的小屋里</view>
+    <view class="privacy__link" bindtap="onOpenContract" aria-role="button">查看《小怡怡安隐私保护指引》</view>
+    <button
+      class="privacy__agree"
+      open-type="agreePrivacyAuthorization"
+      bindagreeprivacyauthorization="onAgree"
+    >
+      同意并继续
+    </button>
+    <view class="privacy__skip" bindtap="onClose" aria-role="button">先逛逛，之后再说</view>
+  </view>
+</view>

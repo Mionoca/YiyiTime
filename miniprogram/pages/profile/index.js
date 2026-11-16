@@ -1,6 +1,7 @@
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
 const timeUtil = require('../../utils/time');
+const upload = require('../../utils/upload');
 
 const DEFAULT_AVATAR = constants.DEFAULT_AVATAR;
 
@@ -121,10 +122,7 @@ Page({
   },
 
   uploadAvatar(filePath) {
-    const extMatch = String(filePath).match(/\.(\w+)$/);
-    const ext = extMatch ? extMatch[1] : 'png';
-    const cloudPath = 'avatars/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
-    return wx.cloud.uploadFile({ cloudPath, filePath }).then((res) => res.fileID);
+    return upload.uploadAvatar(filePath);
   },
 
   async onChooseAvatar(e) {
@@ -192,6 +190,17 @@ Page({
 
   onTapBind() {
     wx.navigateTo({ url: constants.ROUTES.bind });
+  },
+
+  /** 隐私保护指引（文档 13.8：隐私弹窗与授权口径要能被用户随时查到） */
+  onOpenPrivacy() {
+    if (typeof wx.openPrivacyContract === 'function') {
+      wx.openPrivacyContract({
+        fail: () => this.toast('可以在「微信 - 设置 - 隐私」里查看'),
+      });
+      return;
+    }
+    this.toast('可以在「微信 - 设置 - 隐私」里查看');
   },
 
   onTapComingSoon() {

@@ -1,6 +1,7 @@
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
 const timeUtil = require('../../utils/time');
+const upload = require('../../utils/upload');
 
 const DEFAULT_AVATAR = constants.DEFAULT_AVATAR;
 const STEP_WITH_PENDING = ['code', 'confirm', 'waiting'];
@@ -51,12 +52,16 @@ Page({
   },
 
   onShareTimeline() {
-    const share = this.buildShare();
-    return { title: share.title, query: share.path.split('?')[1] || '' };
+    // 朋友圈固定分享当前页，且文档 11.5 要求邀请码不公开贴出：只分享标题，不带 code
+    return { title: '来和我一起住进小怡怡安' };
   },
 
   buildShare() {
-    const code = (this.data.pending && this.data.pending.code) || this.data.code || '';
+    // 只有自己刚创建、还在等的邀请码可以分享；applied_* 阶段的 code 属于对方或已失效（文档 11.5）
+    const code =
+      this.data.bindState === 'code_created'
+        ? (this.data.pending && this.data.pending.code) || this.data.code || ''
+        : '';
     return {
       title: '来和我一起住进小怡怡安',
       path: constants.ROUTES.bind + (code ? '?code=' + code : ''),
@@ -174,10 +179,7 @@ Page({
   },
 
   uploadAvatar(filePath) {
-    const extMatch = String(filePath).match(/\.(\w+)$/);
-    const ext = extMatch ? extMatch[1] : 'png';
-    const cloudPath = 'avatars/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
-    return wx.cloud.uploadFile({ cloudPath, filePath }).then((res) => res.fileID);
+    return upload.uploadAvatar(filePath);
   },
 
   async onTapSaveProfile() {

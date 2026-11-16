@@ -39,7 +39,7 @@
   flex-shrink: 0;
   padding: 12rpx 28rpx;
   border-radius: 999rpx;
-  background: var(--accent, #D98E73);
+  background: var(--accent-strong, #A85C42);
   color: #FFFFFF;
   font-size: var(--font-sm, 24rpx);
   font-weight: 500;

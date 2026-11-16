@@ -28,7 +28,7 @@
 }
 
 .editor__placeholder {
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .editor__bar {
@@ -40,13 +40,13 @@
 
 .editor__count {
   font-size: var(--font-xs, 22rpx);
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .editor__save {
   padding: 14rpx 40rpx;
   border-radius: 999rpx;
-  background: var(--accent, #D98E73);
+  background: var(--accent-strong, #A85C42);
   color: #FFFFFF;
   font-size: var(--font-sm, 24rpx);
 }
@@ -64,7 +64,7 @@
 }
 
 .hint--faint {
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .state {

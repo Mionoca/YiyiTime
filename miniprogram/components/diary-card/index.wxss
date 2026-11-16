@@ -78,7 +78,7 @@
 .dc__time {
   margin-left: 12rpx;
   font-size: var(--font-xs, 22rpx);
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .dc__text {
@@ -91,7 +91,7 @@
 
 .dc__empty {
   font-size: var(--font-md, 28rpx);
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .dc__locktext {

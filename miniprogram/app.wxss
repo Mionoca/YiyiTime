@@ -28,7 +28,8 @@ button::after {
   height: 96rpx;
   padding: 0 48rpx;
   border-radius: 48rpx;
-  background-color: var(--accent);
+  /* 白字要压在 --accent-strong 上才够对比度（文档 8.9） */
+  background-color: var(--accent-strong, #A85C42);
   color: #FFFFFF;
   font-size: 30rpx;
   font-weight: 500;
@@ -37,8 +38,9 @@ button::after {
 
 .btn-primary.btn-ghost {
   background-color: transparent;
-  border: 2rpx solid var(--accent);
-  color: var(--accent);
+  border: 2rpx solid var(--accent-strong, #A85C42);
+  /* --accent 本身在浅底上对比度不足，描边按钮文字用 --accent-ink（文档 8.9） */
+  color: var(--accent-ink);
 }
 
 .btn-primary[disabled] {

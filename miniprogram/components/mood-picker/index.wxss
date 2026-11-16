@@ -95,14 +95,14 @@
 }
 
 .mp-note__ph {
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .mp-count {
   margin-top: 8rpx;
   text-align: right;
   font-size: var(--font-xs, 22rpx);
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
 }
 
 .mp-confirm {
@@ -111,7 +111,7 @@
   line-height: 96rpx;
   text-align: center;
   border-radius: 48rpx;
-  background: var(--accent, #D98E73);
+  background: var(--accent-strong, #A85C42);
   color: #FFFFFF;
   font-size: 30rpx;
   letter-spacing: 2rpx;

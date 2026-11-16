@@ -18,7 +18,7 @@
 .es__desc {
   margin-top: 12rpx;
   font-size: var(--font-sm, 24rpx);
-  color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #6F685F);
   line-height: 1.6;
 }
 
@@ -30,7 +30,7 @@
   margin-top: 40rpx;
   padding: 0 56rpx;
   border-radius: 999rpx;
-  background: var(--accent, #D98E73);
+  background: var(--accent-strong, #A85C42);
   color: #FFFFFF;
   font-size: var(--font-sm, 24rpx);
   letter-spacing: 2rpx;

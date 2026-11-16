@@ -4,9 +4,12 @@ page {
   --wall: #F3E8D8;
   --floor: #E7D3B8;
   --ink: #3F3A36;
-  --muted: #8C837A;
+  /* 文档 8.9：正文/提示文字需 ≥4.5:1（#6F685F 在 --bg / --card 上分别为 5.11 / 5.41） */
+  --muted: #6F685F;
   --ink-faint: #C4B9AC;
   --accent: #D98E73;
+  /* 按钮底色：白字在 #D98E73 上只有 2.6:1，改用加深一档的 #A85C42（4.91:1，文档 8.9） */
+  --accent-strong: #A85C42;
   --accent-ink: #8A5A45;
   --accent-soft: #F4C9B8;
   --card: #FFFDF9;
