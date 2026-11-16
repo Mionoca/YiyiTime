@@ -1,0 +1,28 @@
+# 依赖
+node_modules/
+miniprogram_npm/
+cloudfunctions/**/node_modules/
+
+# 微信开发者工具个人配置（包含本机设置，不提交）
+project.private.config.json
+
+# 本地云环境 ID：复制 config/env.example.js 为 config/env.js 后填写
+# 真实值只留在本机，不进入 Git / GitHub
+miniprogram/config/env.js
+
+# 本地密钥与环境文件
+.env
+.env.*
+*.local.js
+*.pem
+*.key
+
+# 日志与临时文件
+*.log
+logs/
+.DS_Store
+Thumbs.db
+
+# 构建 / 覆盖率产物
+dist/
+coverage/
