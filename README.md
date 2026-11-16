@@ -64,12 +64,12 @@ YiyiTime/
   - `safety_checkins`：`coupleId`+`date`、`coupleId`+`createdAt`
   - `diaries`：`coupleId`+`date`
   - `wishes`：`coupleId`+`done`+`createdAt`、`coupleId`+`createdAt`
-- 存储：头像由前端上传到云存储 `avatars/` 目录，默认权限即可
+- 存储：头像由前端上传到云存储 `avatars/` 目录，默认权限即可；客户端上传前校验格式（JPG / PNG）与单张 ≤2MB（文档 11.9 / 3442），格式不符或超限直接提示、不发起上传
 
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 463 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 477 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 

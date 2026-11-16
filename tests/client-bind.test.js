@@ -468,3 +468,48 @@ test('bind: 未就绪时下拉先 init 并立即收起转圈', () => {
     restoreWx();
   }
 });
+test('bind: 头像校验失败时透出具体原因，不提交资料（文档 11.9）', async () => {
+  const { page, errors, calls } = setup({
+    'user.get': () => userRes('', false),
+    'bind.status': () => statusRes({ todayKey: tomorrowKey() }),
+  });
+  try {
+    await page.init();
+    assert.strictEqual(page.data.step, 'profile');
+    page.data.nickname = '小怡';
+    page.pendingAvatar = 'wxfile://tmp/a.gif';
+    const err = new Error('头像图片超过 2MB，请换一张');
+    err.code = 'AVATAR_TOO_LARGE';
+    page.uploadAvatar = async () => {
+      throw err;
+    };
+    await page.onTapSaveProfile();
+    assert.strictEqual(errors.length, 1);
+    assert.strictEqual(errors[0], err, '校验错误要原样交给 api.showError，不能换成通用文案');
+    assert.strictEqual(page.data.submitting, false);
+    assert.strictEqual(calls.filter((c) => c.action === 'user.updateProfile').length, 0);
+  } finally {
+    restoreWx();
+  }
+});
+
+test('bind: 非校验类上传失败仍用通用文案', async () => {
+  const { page, errors } = setup({
+    'user.get': () => userRes('', false),
+    'bind.status': () => statusRes({ todayKey: tomorrowKey() }),
+  });
+  try {
+    await page.init();
+    page.data.nickname = '小怡';
+    page.pendingAvatar = 'wxfile://tmp/a.png';
+    page.uploadAvatar = async () => {
+      throw new Error('uploadFile:fail net');
+    };
+    await page.onTapSaveProfile();
+    assert.strictEqual(errors.length, 1);
+    assert.strictEqual(errors[0].message, '头像上传失败，稍后再试');
+  } finally {
+    restoreWx();
+  }
+});
+

@@ -126,3 +126,154 @@ test('uploadAvatar: 空文件路径直接拒绝，不发请求', async () => {
   await assert.rejects(() => upload.uploadAvatar(null), /头像文件不存在/);
   assert.strictEqual(called, false);
 });
+// 文档 11.9 / 3218 / 3442：上传前客户端校验图片类型与大小（仅 JPG/PNG，单张 ≤2MB）。
+function fsManager(sizes) {
+  return {
+    stat(opts) {
+      const size = sizes[opts.path];
+      if (typeof size === 'number') opts.success({ stats: { size } });
+      else opts.fail({ errMsg: 'stat:fail' });
+    },
+  };
+}
+
+test('uploadAvatar: 后缀不在白名单（GIF）直接拒绝，不压缩也不上传', async () => {
+  let compressed = false;
+  let uploaded = false;
+  installWx({
+    // 正确实现会在压缩前就拒绝，桩不会被调用；万一校验被删掉，让流程干净失败而不是悬空
+    compressImage(opts) { compressed = true; opts.fail({ errMsg: 'compressImage:fail' }); },
+    cloud: { uploadFile() { uploaded = true; return Promise.resolve({ fileID: 'x' }); } },
+  });
+  await assert.rejects(() => upload.uploadAvatar('wxfile://tmp/a.gif'), (err) => {
+    assert.strictEqual(err.message, '头像图片格式不支持，请选择 JPG 或 PNG');
+    assert.strictEqual(err.code, 'AVATAR_TYPE_INVALID');
+    assert.strictEqual(upload.isAvatarValidationError(err), true);
+    return true;
+  });
+  assert.strictEqual(compressed, false);
+  assert.strictEqual(uploaded, false);
+});
+
+test('uploadAvatar: 后缀大小写不敏感（.PNG 允许上传）', async () => {
+  let uploadOpts = null;
+  installWx({
+    getFileSystemManager: () => fsManager({ 'wxfile://tmp/A.PNG': 1024 }),
+    cloud: { uploadFile(opts) { uploadOpts = opts; return Promise.resolve({ fileID: 'cloud://env/avatars/u.png' }); } },
+  });
+  assert.strictEqual(await upload.uploadAvatar('wxfile://tmp/A.PNG'), 'cloud://env/avatars/u.png');
+  assert.strictEqual(uploadOpts.cloudPath, 'avatars/1794812400000-i.png');
+});
+
+test('uploadAvatar: 文件超过 2MB 拒绝上传', async () => {
+  let uploaded = false;
+  installWx({
+    getFileSystemManager: () => fsManager({ 'wxfile://tmp/big.png': upload.MAX_AVATAR_BYTES + 1 }),
+    cloud: { uploadFile() { uploaded = true; return Promise.resolve({ fileID: 'x' }); } },
+  });
+  await assert.rejects(() => upload.uploadAvatar('wxfile://tmp/big.png'), (err) => {
+    assert.strictEqual(err.message, '头像图片超过 2MB，请换一张');
+    assert.strictEqual(err.code, 'AVATAR_TOO_LARGE');
+    assert.strictEqual(upload.isAvatarValidationError(err), true);
+    return true;
+  });
+  assert.strictEqual(uploaded, false);
+});
+
+test('uploadAvatar: 恰好 2MB 允许上传（边界值不误伤）', async () => {
+  let uploaded = false;
+  installWx({
+    getFileSystemManager: () => fsManager({ 'wxfile://tmp/2mb.png': upload.MAX_AVATAR_BYTES }),
+    cloud: { uploadFile() { uploaded = true; return Promise.resolve({ fileID: 'cloud://env/avatars/2mb.png' }); } },
+  });
+  assert.strictEqual(await upload.uploadAvatar('wxfile://tmp/2mb.png'), 'cloud://env/avatars/2mb.png');
+  assert.strictEqual(uploaded, true);
+});
+
+test('uploadAvatar: 压缩后文件仍超 2MB 时按压缩后的文件拦截', async () => {
+  let uploaded = false;
+  installWx({
+    compressImage(opts) {
+      opts.success({ tempFilePath: 'wxfile://tmp/compressed.png' });
+    },
+    getFileSystemManager: () => fsManager({
+      'wxfile://tmp/original.png': 1024,
+      'wxfile://tmp/compressed.png': upload.MAX_AVATAR_BYTES + 1,
+    }),
+    cloud: { uploadFile() { uploaded = true; return Promise.resolve({ fileID: 'x' }); } },
+  });
+  await assert.rejects(() => upload.uploadAvatar('wxfile://tmp/original.png'), /超过 2MB/);
+  assert.strictEqual(uploaded, false);
+});
+
+test('uploadAvatar: stat 失败时回退 wx.getFileInfo，仍能拦住超限文件', async () => {
+  let infoPath = '';
+  installWx({
+    getFileSystemManager: () => fsManager({}),
+    getFileInfo(opts) {
+      infoPath = opts.filePath;
+      opts.success({ size: upload.MAX_AVATAR_BYTES + 1 });
+    },
+    cloud: { uploadFile() { return Promise.resolve({ fileID: 'x' }); } },
+  });
+  await assert.rejects(() => upload.uploadAvatar('wxfile://tmp/c.png'), (err) => {
+    assert.strictEqual(err.code, 'AVATAR_TOO_LARGE');
+    return true;
+  });
+  assert.strictEqual(infoPath, 'wxfile://tmp/c.png');
+});
+
+test('uploadAvatar: 取不到文件大小（stat 与 getFileInfo 都失败）时跳过大小校验，不误伤上传', async () => {
+  let uploaded = false;
+  installWx({
+    getFileSystemManager: () => fsManager({}),
+    getFileInfo(opts) { opts.fail({ errMsg: 'getFileInfo:fail' }); },
+    cloud: { uploadFile() { uploaded = true; return Promise.resolve({ fileID: 'cloud://env/avatars/ok.png' }); } },
+  });
+  assert.strictEqual(await upload.uploadAvatar('wxfile://tmp/ok.png'), 'cloud://env/avatars/ok.png');
+  assert.strictEqual(uploaded, true);
+});
+
+test('uploadAvatar: isAvatarValidationError 只识别类型/大小两类校验错误', () => {
+  assert.strictEqual(upload.isAvatarValidationError(null), false);
+  assert.strictEqual(upload.isAvatarValidationError(new Error('uploadFile:fail net')), false);
+  const typeErr = new Error('x');
+  typeErr.code = 'AVATAR_TYPE_INVALID';
+  const sizeErr = new Error('x');
+  sizeErr.code = 'AVATAR_TOO_LARGE';
+  assert.strictEqual(upload.isAvatarValidationError(typeErr), true);
+  assert.strictEqual(upload.isAvatarValidationError(sizeErr), true);
+});
+
+// 防御分支：stat 抛同步异常 / 返回字段不可用时要回退 getFileInfo，不能静默跳过大小校验。
+test('uploadAvatar: stat 同步抛异常时回退 wx.getFileInfo，仍能拦住超限文件', async () => {
+  let infoCalled = false;
+  installWx({
+    getFileSystemManager: () => ({ stat() { throw new Error('stat boom'); } }),
+    getFileInfo(opts) {
+      infoCalled = true;
+      opts.success({ size: upload.MAX_AVATAR_BYTES + 1 });
+    },
+    cloud: { uploadFile() { return Promise.resolve({ fileID: 'x' }); } },
+  });
+  await assert.rejects(() => upload.uploadAvatar('wxfile://tmp/throw.png'), (err) => {
+    assert.strictEqual(err.code, 'AVATAR_TOO_LARGE');
+    return true;
+  });
+  assert.strictEqual(infoCalled, true);
+});
+
+test('uploadAvatar: stat 返回的 stats.size 不是数字时回退 getFileInfo，不静默放行', async () => {
+  let infoPath = '';
+  installWx({
+    getFileSystemManager: () => ({ stat(opts) { opts.success({ stats: { size: '1048576' } }); } }),
+    getFileInfo(opts) {
+      infoPath = opts.filePath;
+      opts.success({ size: upload.MAX_AVATAR_BYTES + 1 });
+    },
+    cloud: { uploadFile() { return Promise.resolve({ fileID: 'x' }); } },
+  });
+  await assert.rejects(() => upload.uploadAvatar('wxfile://tmp/weird.png'), /超过 2MB/);
+  assert.strictEqual(infoPath, 'wxfile://tmp/weird.png');
+});
+

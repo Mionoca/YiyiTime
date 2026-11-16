@@ -177,7 +177,8 @@ Page({
       try {
         fileID = await this.uploadAvatar(tempUrl);
       } catch (uploadErr) {
-        throw new Error('头像上传失败，稍后再试');
+        // 类型/大小校验失败要把具体原因透给用户，其它上传失败仍用通用文案
+        throw upload.isAvatarValidationError(uploadErr) ? uploadErr : new Error('头像上传失败，稍后再试');
       }
       const res = await api.call('user.updateProfile', { avatarFileID: fileID });
       const user = res.user || {};

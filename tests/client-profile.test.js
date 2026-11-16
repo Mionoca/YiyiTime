@@ -237,3 +237,57 @@ test('profile: 下拉刷新静默刷新并收起转圈，改昵称中不覆盖�
     restoreWx();
   }
 });
+test('profile: 头像校验失败时提示具体原因，不覆盖原头像（文档 11.9）', async () => {
+  const shown = [];
+  const realShowError = api.showError;
+  const calls = [];
+  installWx({});
+  try {
+    api.call = async (action) => {
+      calls.push(action);
+      if (action !== 'home.get') throw new Error('unexpected action: ' + action);
+      return baseHome();
+    };
+    api.showError = (err) => shown.push(err);
+    const page = newPage();
+    await page.load();
+    page.data.avatarFileID = 'cloud://env/avatars/old.png';
+    page.data.avatarPreview = 'cloud://env/avatars/old.png';
+    const err = new Error('头像图片格式不支持，请选择 JPG 或 PNG');
+    err.code = 'AVATAR_TYPE_INVALID';
+    page.uploadAvatar = async () => {
+      throw err;
+    };
+    await page.onChooseAvatar({ detail: { avatarUrl: 'wxfile://tmp/a.gif' } });
+    assert.strictEqual(shown.length, 1);
+    assert.strictEqual(shown[0], err, '校验错误要原样交给 api.showError，不能换成通用文案');
+    assert.strictEqual(page.data.avatarPreview, 'cloud://env/avatars/old.png', '失败要回退到原头像');
+    assert.strictEqual(page.data.saving, false);
+    assert.deepStrictEqual(calls, ['home.get'], '校验失败不能提交 user.updateProfile');
+  } finally {
+    api.showError = realShowError;
+    restoreWx();
+  }
+});
+
+test('profile: 非校验类上传失败仍用通用文案', async () => {
+  const shown = [];
+  const realShowError = api.showError;
+  installWx({});
+  try {
+    api.call = async () => baseHome();
+    api.showError = (err) => shown.push(err);
+    const page = newPage();
+    await page.load();
+    page.uploadAvatar = async () => {
+      throw new Error('uploadFile:fail net');
+    };
+    await page.onChooseAvatar({ detail: { avatarUrl: 'wxfile://tmp/a.png' } });
+    assert.strictEqual(shown.length, 1);
+    assert.strictEqual(shown[0].message, '头像上传失败，稍后再试');
+  } finally {
+    api.showError = realShowError;
+    restoreWx();
+  }
+});
+
