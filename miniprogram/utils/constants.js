@@ -10,6 +10,9 @@ const ROUTES = {
   home: '/pages/home/index',
   bind: '/pages/bind/index',
   profile: '/pages/profile/index',
+  safety: '/pages/safety/index',
+  diary: '/pages/diary/index',
+  wish: '/pages/wish/index',
 };
 
 const LIMITS = {

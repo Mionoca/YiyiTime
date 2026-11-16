@@ -1,0 +1,23 @@
+<view wx:if="{{wish}}" class="wi {{done ? 'wi--done' : ''}} {{disabled ? 'wi--disabled' : ''}}">
+  <!-- 文档 8.9：热区 ≥88rpx，圆点视觉仍是 52rpx -->
+  <view
+    class="wi__check-hit"
+    catchtap="onToggle"
+    aria-label="{{done ? '标记为未完成' : '标记为完成'}}"
+  >
+    <view class="wi__check {{done ? 'wi__check--done' : ''}} {{bouncing ? 'wi__check--bounce' : ''}}">
+      <text wx:if="{{done}}" class="wi__tick">✓</text>
+    </view>
+  </view>
+
+  <view class="wi__body">
+    <view class="wi__title">{{title}}</view>
+    <view wx:if="{{note}}" class="wi__note">{{note}}</view>
+    <view wx:if="{{done}}" class="wi__done">已完成</view>
+  </view>
+
+  <view class="wi__ops">
+    <text class="wi__op" catchtap="onEdit">编辑</text>
+    <text class="wi__op wi__op--danger" catchtap="onRemove">删除</text>
+  </view>
+</view>

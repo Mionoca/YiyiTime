@@ -41,6 +41,22 @@ function boolean(value, field) {
   return value;
 }
 
+/**
+ * 可选整数参数：缺省返回 defaultValue，非整数/越界抛 INVALID_INPUT。
+ */
+function integer(value, { field, min = 0, max = 100, defaultValue }) {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue;
+  }
+  if (typeof value !== 'number' || !isFinite(value) || Math.floor(value) !== value) {
+    throw new AppError('INVALID_INPUT', field + '必须是整数');
+  }
+  if (value < min || value > max) {
+    throw new AppError('INVALID_INPUT', field + '超出范围');
+  }
+  return value;
+}
+
 function code(value) {
   // 先按「6 位数字」整体校验，长度不对也统一返回 INVALID_INPUT（错误码表 16.2）
   const v = typeof value === 'string' ? value.trim() : '';
@@ -50,4 +66,4 @@ function code(value) {
   return v;
 }
 
-module.exports = { asObject, string, oneOf, boolean, code };
+module.exports = { asObject, string, oneOf, boolean, integer, code };

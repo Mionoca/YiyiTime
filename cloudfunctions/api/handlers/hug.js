@@ -4,25 +4,15 @@ const crypto = require('crypto');
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
 const time = require('../lib/time');
+const relation = require('../lib/relation');
 
 const HUG_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天有效
 const HUG_ID_MAX = 64;
 
-function iso(value) {
-  const ms = time.toMillis(value);
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
-}
+const iso = relation.iso;
 
 function newHugId() {
   return 'h_' + crypto.randomBytes(8).toString('hex');
-}
-
-function coupleIdOf(ctx) {
-  return ctx.couple._id || ctx.user.coupleId;
-}
-
-function partnerOpenidOf(ctx) {
-  return (ctx.couple.memberOpenids || []).find((id) => id !== ctx.openid) || null;
 }
 
 function publicHug(hug) {
@@ -41,8 +31,8 @@ function publicHug(hug) {
  */
 async function send(payload, ctx) {
   ctx.requireBound();
-  const coupleId = coupleIdOf(ctx);
-  const toOpenid = partnerOpenidOf(ctx);
+  const coupleId = relation.coupleIdOf(ctx);
+  const toOpenid = relation.partnerOpenidOf(ctx);
   if (!toOpenid) {
     throw new AppError('NOT_BOUND', '还没有绑定');
   }
@@ -105,7 +95,7 @@ async function respond(payload, ctx) {
 
   const res = await ctx.db.collection('hugs').doc(hugId).get().catch(() => null);
   const hug = res && res.data;
-  if (!hug || hug.coupleId !== coupleIdOf(ctx)) {
+  if (!hug || hug.coupleId !== relation.coupleIdOf(ctx)) {
     throw new AppError('HUG_NOT_FOUND', '这次抱抱找不到了');
   }
   if (hug.toOpenid !== ctx.openid) {

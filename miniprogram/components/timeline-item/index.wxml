@@ -1,0 +1,10 @@
+<view wx:if="{{item}}" class="tl {{isMine ? 'tl--mine' : ''}}">
+  <image class="tl__avatar" src="{{avatar}}" mode="aspectFill" aria-label="{{nickname}}的头像"></image>
+  <view class="tl__main">
+    <view class="tl__meta">
+      <text class="tl__name">{{nickname}}</text>
+      <text class="tl__time">{{timeText}}</text>
+    </view>
+    <view class="tl__bubble {{note ? '' : 'tl__bubble--plain'}}">{{note || emptyText}}</view>
+  </view>
+</view>

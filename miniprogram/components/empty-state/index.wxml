@@ -1,0 +1,11 @@
+<view class="es">
+  <view class="es__icon" wx:if="{{icon}}">{{icon}}</view>
+  <view class="es__title">{{title}}</view>
+  <view class="es__desc" wx:if="{{desc}}">{{desc}}</view>
+  <view
+    class="es__action"
+    wx:if="{{actionText}}"
+    bindtap="onAction"
+    aria-label="{{actionText}}"
+  >{{actionText}}</view>
+</view>

@@ -1,0 +1,24 @@
+<view wx:if="{{item}}" class="dc {{isToday ? 'dc--today' : ''}} {{unlockedGlow ? 'dc--glow' : ''}}">
+  <view class="dc__head">
+    <text class="dc__date">{{dateLabel}}</text>
+    <text wx:if="{{partnerLocked}}" class="dc__lock" aria-label="TA 的日记还没解锁">🔒</text>
+  </view>
+
+  <view class="dc__block">
+    <view class="dc__who">
+      <text class="dc__tag">我</text>
+      <text wx:if="{{mineTimeText}}" class="dc__time">{{mineTimeText}}</text>
+    </view>
+    <view wx:if="{{mineText}}" class="dc__text">{{mineText}}</view>
+    <view wx:else class="dc__empty">{{mineEmptyText}}</view>
+  </view>
+
+  <view class="dc__block dc__block--partner">
+    <view class="dc__who">
+      <text class="dc__tag dc__tag--partner">TA</text>
+    </view>
+    <view wx:if="{{partnerLocked}}" class="dc__locktext">{{partnerLockText}}</view>
+    <view wx:elif="{{partnerText}}" class="dc__text">{{partnerText}}</view>
+    <view wx:else class="dc__empty">{{partnerEmptyText}}</view>
+  </view>
+</view>

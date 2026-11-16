@@ -1,0 +1,55 @@
+.bs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  /* 文档 9.8：页面级浮层在第 6 层 */
+  z-index: 60;
+}
+
+.bs__mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(63, 58, 54, 0.32);
+}
+
+.bs__sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24rpx 48rpx calc(48rpx + env(safe-area-inset-bottom));
+  border-radius: 32rpx 32rpx 0 0;
+  background: var(--card, #FFFDF9);
+  animation: bs-up 240ms ease-out;
+}
+
+@keyframes bs-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.bs__handle {
+  width: 64rpx;
+  height: 8rpx;
+  margin: 0 auto 16rpx;
+  border-radius: 999rpx;
+  background: var(--ink-faint, #C4B9AC);
+}
+
+.bs__title {
+  padding: 8rpx 0 16rpx;
+  text-align: center;
+  font-size: var(--font-lg, 40rpx);
+  font-weight: 600;
+  color: var(--ink, #3F3A36);
+}
+
+.bs__body {
+  max-height: 70vh;
+  overflow-y: auto;
+}

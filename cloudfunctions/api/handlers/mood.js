@@ -2,18 +2,11 @@
 
 const validate = require('../lib/validate');
 const time = require('../lib/time');
+const { isDocumentMissing } = require('../lib/db-util');
 
 /** 文档 7.6：四种心情，客户端不接受日期（日期一律服务端 todayKey） */
 const MOODS = ['sunny', 'cloudy', 'rainy', 'thunder'];
 const NOTE_MAX = 50;
-
-/** 云开发文档不存在时 get 会抛错；只把这种情况当 null，其余读错误继续抛 */
-function isDocumentMissing(err) {
-  if (!err) return false;
-  const code = err.errCode || err.code || '';
-  const message = String(err.message || err.errMsg || '');
-  return code === -1 || code === 'DATABASE_DOCUMENT_NOT_EXIST' || /not exist|not found|不存在/i.test(message);
-}
 
 /**
  * 心情打卡：按 _id = openid_date upsert，同一天重复调用是更新。

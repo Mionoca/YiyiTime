@@ -192,7 +192,7 @@
 .lamp {
   position: absolute;
   right: 7%;
-  bottom: 30%;
+  bottom: 34%;
   width: 14%;
   height: 34%;
 }
@@ -253,6 +253,18 @@
   background: #B99677;
 }
 
+/* TA 写了今天还没解锁：灯罩旁边的小光点（文档 9.10） */
+.lamp-dot {
+  position: absolute;
+  right: -8rpx;
+  top: 0;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #F7D48A;
+  box-shadow: 0 0 14rpx rgba(247, 212, 138, 0.9);
+}
+
 /* ---------- 地毯 ---------- */
 .rug {
   position: absolute;
@@ -263,6 +275,8 @@
   transform: translateX(-50%);
   border-radius: 999rpx;
   background: rgba(217, 142, 115, 0.22);
+  /* 纯装饰层不参与点击，否则会挡住台灯热区（文档 9.2） */
+  pointer-events: none;
 }
 
 /* ---------- 沙发 ---------- */
@@ -273,6 +287,8 @@
   width: 76%;
   height: 20%;
   transform: translateX(-50%);
+  /* 沙发本体不接点击，避免遮住台灯热区；两个座位上的可点区域单独放行（文档 9.2） */
+  pointer-events: none;
 }
 
 .sofa-back {
@@ -339,6 +355,7 @@
   flex-direction: column;
   align-items: center;
   margin: 0 12rpx;
+  pointer-events: auto;
 }
 
 .person-name {
@@ -360,6 +377,7 @@
   flex-direction: column;
   align-items: center;
   margin: 0 12rpx;
+  pointer-events: auto;
 }
 
 .empty-cushion {
@@ -379,6 +397,65 @@
 
 .phase-night .empty-text {
   color: #C9BCA9;
+}
+
+/* ---------- 桌子（愿望便签） ---------- */
+.table {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  width: 34%;
+  height: 16%;
+  transform: translateX(-50%);
+}
+
+.table-top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 42%;
+  height: 14%;
+  border-radius: 6rpx;
+  background: #C99C7C;
+  box-shadow: 0 6rpx 14rpx rgba(63, 58, 54, 0.14);
+}
+
+.table-leg {
+  position: absolute;
+  top: 56%;
+  width: 6rpx;
+  height: 44%;
+  background: #B98A6A;
+}
+
+.table-leg--left {
+  left: 12%;
+}
+
+.table-leg--right {
+  right: 12%;
+}
+
+.table-note {
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  top: 0;
+  max-height: 44%;
+  padding: 12rpx;
+  border-radius: 6rpx;
+  background: #FFF5D6;
+  box-shadow: 0 4rpx 10rpx rgba(63, 58, 54, 0.12);
+  transform: rotate(-2deg);
+  overflow: hidden;
+}
+
+.table-note-text {
+  display: block;
+  font-size: 20rpx;
+  line-height: 1.4;
+  color: #8A6A45;
+  word-break: break-all;
 }
 
 /* ---------- 冰箱 ---------- */
@@ -429,6 +506,19 @@
   height: 28%;
 }
 
+/* 冰箱贴纸：愿望进度 done/total（文档 9.10） */
+.fridge-progress {
+  position: absolute;
+  right: 14%;
+  bottom: 14%;
+  padding: 2rpx 10rpx;
+  border-radius: 999rpx;
+  background: var(--accent, #D98E73);
+  color: #FFFFFF;
+  font-size: 18rpx;
+  line-height: 1.6;
+}
+
 /* ---------- 门 ---------- */
 .door {
   position: absolute;
@@ -459,6 +549,29 @@
   height: 14rpx;
   border-radius: 50%;
   background: #F2CC8F;
+}
+
+/* 对方今天报过平安：门灯暖（文档 9.10） */
+.door--lit {
+  box-shadow: inset 0 0 0 4rpx #B98A6A, 0 0 40rpx rgba(247, 212, 138, 0.65);
+}
+
+/* 门牌：伴侣最近报平安状态（文档 9.10，partnerLastAt 为空显示「还没报平安」） */
+.door-label {
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  bottom: 9%;
+  padding: 2rpx 8rpx;
+  border-radius: 4rpx;
+  background: rgba(255, 253, 249, 0.92);
+  text-align: center;
+  font-size: 18rpx;
+  line-height: 1.5;
+  color: #8A5A45;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* ---------- 信封 ---------- */

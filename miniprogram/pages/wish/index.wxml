@@ -1,0 +1,81 @@
+<view class="page">
+  <!-- 进度（文档 9.10：冰箱贴纸 done/total） -->
+  <view class="stats">
+    <view class="stats__top">
+      <text class="stats__title">下次见面想做的事</text>
+      <text class="stats__num">{{progressText}}</text>
+    </view>
+    <view class="stats__bar">
+      <view class="stats__bar-in" style="width: {{percent}}%;"></view>
+    </view>
+    <view class="stats__hint" wx:if="{{stats.total}}">{{stats.done === stats.total ? '全都完成啦，真厉害' : '还有想一起做的事在等着'}}</view>
+    <view class="stats__hint" wx:else>写下第一件想一起做的事吧</view>
+  </view>
+
+  <view class="add {{canAdd ? '' : 'add--disabled'}}" bindtap="onAdd" aria-label="写一个愿望">
+    <text class="add__plus">＋</text>
+    <text>写一个愿望</text>
+  </view>
+  <view wx:if="{{!canAdd}}" class="limit-hint">已经存满 {{limitMax}} 条，先完成或删掉一些吧</view>
+
+  <view wx:if="{{loading}}" class="hint">正在打开冰箱…</view>
+
+  <empty-state
+    wx:elif="{{error}}"
+    title="{{error}}"
+    action-text="再试一次"
+    bind:action="onRetry"
+  />
+
+  <block wx:else>
+    <wish-item
+      wx:for="{{items}}"
+      wx:key="wishId"
+      wish="{{item}}"
+      disabled="{{pendingId === item.wishId}}"
+      bind:toggle="onToggle"
+      bind:edit="onEdit"
+      bind:remove="onRemove"
+    />
+
+    <empty-state wx:if="{{!items.length}}" icon="📝" title="还没有愿望，写下下次见面想做的事吧" />
+  </block>
+
+  <!-- 新增 / 编辑共用底部弹层（文档 8.3.4 / 8.4） -->
+  <bottom-sheet
+    show="{{showEditor}}"
+    title="{{editing ? '编辑愿望' : '新的愿望'}}"
+    mask-closable="{{false}}"
+    bind:close="onEditorClose"
+  >
+    <view class="form">
+      <input
+        class="form__input"
+        value="{{form.title}}"
+        maxlength="{{titleMax}}"
+        placeholder="想和 TA 一起做的事"
+        placeholder-class="form__placeholder"
+        bindinput="onTitleInput"
+        aria-label="愿望标题"
+      />
+      <view class="form__count">{{form.title.length}}/{{titleMax}}</view>
+      <textarea
+        class="form__textarea"
+        value="{{form.note}}"
+        maxlength="{{noteMax}}"
+        placeholder="补充一句（可选）"
+        placeholder-class="form__placeholder"
+        auto-height
+        bindinput="onNoteInput"
+        aria-label="愿望备注"
+      ></textarea>
+      <view class="form__count">{{form.note.length}}/{{noteMax}}</view>
+      <view class="form__actions">
+        <view class="form__cancel" bindtap="onEditorClose" aria-label="取消编辑">取消</view>
+        <view class="form__save {{saving ? 'form__save--disabled' : ''}}" bindtap="onSaveWish">
+          {{saving ? '保存中…' : '保存'}}
+        </view>
+      </view>
+    </view>
+  </bottom-sheet>
+</view>

@@ -1,0 +1,193 @@
+.page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
+  background: var(--bg, #FBF6EE);
+}
+
+/* ---------- 进度 ---------- */
+.stats {
+  padding: 28rpx 32rpx;
+  border-radius: var(--radius-lg, 32rpx);
+  background: var(--card, #FFFDF9);
+  box-shadow: 0 8rpx 32rpx rgba(63, 58, 54, 0.08);
+}
+
+.stats__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.stats__title {
+  font-size: var(--font-md, 28rpx);
+  color: var(--ink, #3F3A36);
+  font-weight: 600;
+}
+
+.stats__num {
+  font-size: var(--font-lg, 40rpx);
+  color: var(--accent, #D98E73);
+  font-weight: 600;
+}
+
+.stats__bar {
+  height: 12rpx;
+  margin: 20rpx 0 12rpx;
+  border-radius: 999rpx;
+  background: var(--wall, #F3E8D8);
+  overflow: hidden;
+}
+
+.stats__bar-in {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #F2CC8F 0%, #D98E73 100%);
+  transition: width 300ms ease;
+}
+
+.stats__hint {
+  font-size: var(--font-xs, 22rpx);
+  color: var(--muted, #8C837A);
+}
+
+/* ---------- 新增按钮 ---------- */
+.add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 24rpx 0 8rpx;
+  padding: 26rpx 0;
+  border-radius: var(--radius-lg, 32rpx);
+  border: 2rpx dashed var(--accent, #D98E73);
+  color: var(--accent-ink, #8A5A45);
+  font-size: var(--font-md, 28rpx);
+}
+
+.add--disabled {
+  opacity: 0.45;
+  border-color: var(--ink-faint, #C4B9AC);
+  color: var(--muted, #8C837A);
+}
+
+.add__plus {
+  margin-right: 8rpx;
+  font-size: 30rpx;
+}
+
+.limit-hint {
+  padding: 8rpx 8rpx 16rpx;
+  font-size: var(--font-xs, 22rpx);
+  color: var(--danger, #C25B4E);
+  text-align: center;
+}
+
+/* ---------- 状态 ---------- */
+.hint {
+  padding: 32rpx 0;
+  text-align: center;
+  font-size: var(--font-sm, 24rpx);
+  color: var(--muted, #8C837A);
+}
+
+.state {
+  padding: 120rpx 48rpx;
+  text-align: center;
+}
+
+.state__text {
+  margin-bottom: 40rpx;
+  font-size: var(--font-md, 28rpx);
+  color: var(--muted, #8C837A);
+}
+
+.state__btn {
+  display: inline-flex;
+  height: 80rpx;
+  padding: 0 56rpx;
+}
+
+.empty {
+  padding: 96rpx 48rpx;
+  text-align: center;
+}
+
+.empty__icon {
+  font-size: 64rpx;
+}
+
+.empty__text {
+  margin-top: 16rpx;
+  font-size: var(--font-md, 28rpx);
+  color: var(--muted, #8C837A);
+}
+
+/* ---------- 弹层表单 ---------- */
+.form__input {
+  height: 96rpx;
+  padding: 0 28rpx;
+  border-radius: var(--radius-md, 20rpx);
+  background: var(--bg, #FBF6EE);
+  font-size: var(--font-md, 28rpx);
+  color: var(--ink, #3F3A36);
+}
+
+.form__placeholder {
+  color: var(--ink-faint, #C4B9AC);
+}
+
+.form__textarea {
+  width: 100%;
+  min-height: 160rpx;
+  margin-top: 24rpx;
+  padding: 20rpx 28rpx;
+  border-radius: var(--radius-md, 20rpx);
+  background: var(--bg, #FBF6EE);
+  font-size: var(--font-md, 28rpx);
+  line-height: 1.6;
+  color: var(--ink, #3F3A36);
+}
+
+.form__count {
+  padding: 8rpx 8rpx 0;
+  text-align: right;
+  font-size: var(--font-xs, 22rpx);
+  color: var(--ink-faint, #C4B9AC);
+}
+
+.form__actions {
+  display: flex;
+  align-items: center;
+  margin-top: 32rpx;
+}
+
+/* 遮罩不可点是防误触，但必须留一个明确的取消出口 */
+.form__cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 176rpx;
+  height: 96rpx;
+  margin-right: 20rpx;
+  border-radius: 48rpx;
+  background: var(--bg, #FBF6EE);
+  color: var(--muted, #8C837A);
+  font-size: 28rpx;
+}
+
+.form__save {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96rpx;
+  border-radius: 48rpx;
+  background: var(--accent, #D98E73);
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 500;
+  letter-spacing: 2rpx;
+}
+
+.form__save--disabled {
+  opacity: 0.5;
+}

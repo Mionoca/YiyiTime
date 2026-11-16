@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "台灯下的日记",
+  "navigationBarBackgroundColor": "#FBF6EE",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#FBF6EE",
+  "usingComponents": {
+    "diary-card": "/components/diary-card/index",
+    "empty-state": "/components/empty-state/index"
+  }
+}

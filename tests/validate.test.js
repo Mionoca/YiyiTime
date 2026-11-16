@@ -56,6 +56,23 @@ test('oneOf / boolean', () => {
   assert.strictEqual(codeOf(() => validate.boolean('true', 'done')), 'INVALID_INPUT');
 });
 
+test('integer: 缺省取默认值，非整数/越界报 INVALID_INPUT', () => {
+  const opts = { field: 'limit', min: 1, max: 50, defaultValue: 20 };
+  assert.strictEqual(validate.integer(undefined, opts), 20);
+  assert.strictEqual(validate.integer(null, opts), 20);
+  assert.strictEqual(validate.integer('', opts), 20);
+  assert.strictEqual(codeOf(() => validate.integer(0, opts)), 'INVALID_INPUT', '0 不是缺省值，且低于 min');
+  assert.strictEqual(validate.integer(0, { field: 'n', min: 0, max: 5, defaultValue: 1 }), 0);
+  assert.strictEqual(validate.integer(1, opts), 1);
+  assert.strictEqual(validate.integer(50, opts), 50);
+  assert.strictEqual(codeOf(() => validate.integer(51, opts)), 'INVALID_INPUT');
+  assert.strictEqual(codeOf(() => validate.integer(1.5, opts)), 'INVALID_INPUT');
+  assert.strictEqual(codeOf(() => validate.integer(NaN, opts)), 'INVALID_INPUT');
+  assert.strictEqual(codeOf(() => validate.integer(Infinity, opts)), 'INVALID_INPUT');
+  assert.strictEqual(codeOf(() => validate.integer('10', opts)), 'INVALID_INPUT');
+  assert.strictEqual(codeOf(() => validate.integer({}, opts)), 'INVALID_INPUT');
+});
+
 test('code: 必须是 6 位数字', () => {
   assert.strictEqual(validate.code('012345'), '012345');
   assert.strictEqual(codeOf(() => validate.code('12345')), 'INVALID_INPUT');

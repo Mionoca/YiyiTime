@@ -1,0 +1,43 @@
+<view class="page">
+  <!-- 固定顶部编辑器（文档 8.3.3 / 10.7） -->
+  <view class="editor">
+    <textarea
+      class="editor__input"
+      value="{{content}}"
+      placeholder="今天想对 TA 说的一句话，明天 TA 才能看到"
+      placeholder-class="editor__placeholder"
+      maxlength="{{contentMax}}"
+      auto-height
+      cursor-spacing="24"
+      bindinput="onContentInput"
+      aria-label="今天的日记"
+    ></textarea>
+    <view class="editor__bar">
+      <text class="editor__count">{{content.length}}/{{contentMax}}</text>
+      <view
+        class="editor__save {{canSave && !saving ? '' : 'editor__save--disabled'}}"
+        bindtap="onSave"
+        aria-label="保存今天日记"
+        aria-disabled="{{!canSave || saving}}"
+      >{{saving ? '保存中…' : '保存'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="hint">正在打开台灯…</view>
+
+  <empty-state
+    wx:elif="{{error}}"
+    title="{{error}}"
+    action-text="再试一次"
+    bind:action="onRetry"
+  />
+
+  <block wx:else>
+    <diary-card wx:for="{{items}}" wx:key="date" item="{{item}}" today-key="{{todayKey}}" />
+
+    <empty-state wx:if="{{!items.length}}" icon="🕯️" title="还没有日记，今天先写一句吧" />
+
+    <view wx:if="{{loadingMore}}" class="hint">正在翻页…</view>
+    <view wx:elif="{{!hasMore && items.length > 1}}" class="hint hint--faint">没有更多啦</view>
+  </block>
+</view>

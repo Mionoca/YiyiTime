@@ -1,0 +1,11 @@
+{
+  "navigationBarTitleText": "下次见面想做的事",
+  "navigationBarBackgroundColor": "#FBF6EE",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#FBF6EE",
+  "usingComponents": {
+    "wish-item": "/components/wish-item/index",
+    "bottom-sheet": "/components/bottom-sheet/index",
+    "empty-state": "/components/empty-state/index"
+  }
+}

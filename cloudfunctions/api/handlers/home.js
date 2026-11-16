@@ -69,8 +69,14 @@ async function get(payload, ctx) {
       : { openid: partnerOpenid, nickname: '', avatarFileID: '' };
   }
 
-  const mood = await blocks.optionalBlock(ctx, 'mood', () => blocks.loadMood(ctx, coupleId, todayKey, partnerOpenid));
-  const hug = await blocks.optionalBlock(ctx, 'hug', () => blocks.loadHug(ctx, coupleId));
+  // 五个区块互不依赖，并行读取；单个区块失败只降级自己（文档 10.3）
+  const [mood, hug, safety, diary, wish] = await Promise.all([
+    blocks.optionalBlock(ctx, 'mood', () => blocks.loadMood(ctx, coupleId, todayKey, partnerOpenid)),
+    blocks.optionalBlock(ctx, 'hug', () => blocks.loadHug(ctx, coupleId)),
+    blocks.optionalBlock(ctx, 'safety', () => blocks.loadSafety(ctx, coupleId, todayKey, partnerOpenid)),
+    blocks.optionalBlock(ctx, 'diary', () => blocks.loadDiary(ctx, coupleId, todayKey, partnerOpenid)),
+    blocks.optionalBlock(ctx, 'wish', () => blocks.loadWish(ctx, coupleId)),
+  ]);
 
   return Object.assign({}, base, {
     bind: { state: 'bound', pending: null },
@@ -83,10 +89,9 @@ async function get(payload, ctx) {
     partner,
     mood,
     hug,
-    // 报平安 / 日记 / 愿望：M4 接入后替换为真实聚合
-    safety: null,
-    diary: null,
-    wish: null,
+    safety,
+    diary,
+    wish,
   });
 }
 

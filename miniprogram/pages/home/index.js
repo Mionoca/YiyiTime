@@ -48,6 +48,14 @@ Page({
     hugHint: '',
     hugSending: false,
     hugCelebrate: false,
+    // 报平安 / 日记 / 愿望（文档 7.8 / 9.10）
+    doorLit: false,
+    safetyLabel: '还没报平安',
+    lampDim: true,
+    lampDot: false,
+    wishPreviewTitle: '',
+    wishTotal: 0,
+    wishDone: 0,
   },
 
   onLoad() {
@@ -119,6 +127,10 @@ Page({
     const partner = home.partner;
     const mood = home.mood || {};
     const hug = home.hug || {};
+    // 三个区块可能是 null（查询失败降级，文档 10.3），这里按「没有数据」渲染
+    const safety = home.safety || null;
+    const diary = home.diary || null;
+    const wish = home.wish || null;
     const patch = {
       phase: home.phase || 'day',
       // 上限用服务端 todayKey（文档 13.5：日期规则以服务端为准），取不到再退回本机
@@ -134,6 +146,16 @@ Page({
       moodPartner: mood.partner || null,
       hugIncoming: hug.incoming || null,
       hugOutgoing: hug.outgoing || null,
+      // 门：对方今天报平安门灯暖（文档 9.10）
+      doorLit: !!(safety && safety.partnerToday),
+      safetyLabel: safety && safety.partnerToday ? 'TA 到家了' : '还没报平安',
+      // 台灯：我写了今天灯亮；TA 写了未解锁旁边小光点（文档 9.10）
+      lampDim: !home.couple || !diary || diary.mineWritten === false,
+      lampDot: !!(diary && diary.partnerWritten && !diary.partnerUnlocked),
+      // 冰箱贴纸 done/total，桌子便签第一条未完成（文档 9.10）
+      wishPreviewTitle: (wish && wish.previewTitle) || '',
+      wishTotal: (wish && wish.total) || 0,
+      wishDone: (wish && wish.done) || 0,
     };
     if (home.couple) {
       patch.daysText = '第 ' + home.couple.daysTogether + ' 天';
@@ -421,8 +443,30 @@ Page({
     }
   },
 
-  onTapComingSoon() {
-    this.toast('还在装修中，下个版本见');
+  /** 场景里的三个房间入口（文档 9.3 / 10.6-10.8）：没绑定先引导绑定 */
+  openRoomPage(route) {
+    const home = this.data.home;
+    if (!home || !home.couple) {
+      this.toast('等 TA 住进来，这里就开门啦');
+      return;
+    }
+    wx.navigateTo({ url: route });
+  },
+
+  onTapLamp() {
+    this.openRoomPage(constants.ROUTES.diary);
+  },
+
+  onTapFridge() {
+    this.openRoomPage(constants.ROUTES.wish);
+  },
+
+  onTapTableNote() {
+    this.openRoomPage(constants.ROUTES.wish);
+  },
+
+  onTapDoor() {
+    this.openRoomPage(constants.ROUTES.safety);
   },
 
   noop() {},

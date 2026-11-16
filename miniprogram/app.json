@@ -2,7 +2,10 @@
   "pages": [
     "pages/home/index",
     "pages/bind/index",
-    "pages/profile/index"
+    "pages/profile/index",
+    "pages/safety/index",
+    "pages/diary/index",
+    "pages/wish/index"
   ],
   "window": {
     "backgroundColor": "#FBF6EE",

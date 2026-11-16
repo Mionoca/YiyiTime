@@ -50,16 +50,21 @@
     </view>
 
     <!-- 相框 -->
-    <view class="frame" bindtap="onTapProfile" aria-label="我的资料">
+    <view class="frame" bindtap="onTapProfile" aria-label="我的">
       <image class="frame-avatar" src="{{myAvatar}}" mode="aspectFill" />
     </view>
 
-    <!-- 落地灯 -->
-    <view class="lamp {{home.couple ? '' : 'dim'}}">
+    <!-- 落地灯（日记，文档 9.10：我写了今天灯亮，TA 写了未解锁旁边小光点） -->
+    <view
+      class="lamp {{lampDim ? 'dim' : ''}}"
+      bindtap="onTapLamp"
+      aria-label="日记"
+    >
       <view class="lamp-glow"></view>
       <view class="lamp-shade"></view>
       <view class="lamp-pole"></view>
       <view class="lamp-base"></view>
+      <view class="lamp-dot" wx:if="{{lampDot}}"></view>
     </view>
 
     <!-- 地毯 -->
@@ -98,20 +103,32 @@
       </view>
     </view>
 
-    <!-- 冰箱（愿望） -->
-    <view class="fridge" bindtap="onTapComingSoon" aria-label="愿望清单">
+    <!-- 冰箱（愿望进度，文档 9.10 / 10.8） -->
+    <view class="fridge" bindtap="onTapFridge" aria-label="愿望清单">
       <view class="fridge-door">
         <view class="fridge-handle"></view>
         <view class="fridge-note"></view>
+        <view class="fridge-progress" wx:if="{{wishTotal > 0}}">{{wishDone}}/{{wishTotal}}</view>
       </view>
       <view class="fridge-bottom"></view>
     </view>
 
-    <!-- 门（报平安） -->
-    <view class="door" bindtap="onTapComingSoon" aria-label="报平安">
+    <!-- 桌子便签（愿望预览，文档 9.10） -->
+    <view class="table" bindtap="onTapTableNote" aria-label="愿望">
+      <view class="table-note">
+        <text class="table-note-text">{{wishPreviewTitle || '下次见面想做的事'}}</text>
+      </view>
+      <view class="table-top"></view>
+      <view class="table-leg table-leg--left"></view>
+      <view class="table-leg table-leg--right"></view>
+    </view>
+
+    <!-- 门（报平安，文档 9.10：对方今天报平安门灯暖） -->
+    <view class="door {{doorLit ? 'door--lit' : ''}}" bindtap="onTapDoor" aria-label="报平安">
       <view class="door-panel">
         <view class="door-knob"></view>
       </view>
+      <view class="door-label">{{safetyLabel}}</view>
     </view>
 
     <!-- 门垫信封：邀请状态 -->

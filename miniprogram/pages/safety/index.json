@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "我到家了",
+  "navigationBarBackgroundColor": "#FBF6EE",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#FBF6EE",
+  "usingComponents": {
+    "timeline-item": "/components/timeline-item/index",
+    "empty-state": "/components/empty-state/index"
+  }
+}
