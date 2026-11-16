@@ -122,6 +122,7 @@ test('发布预检：当前仓库静态检查全部通过', () => {
     '云函数 config.json 权限/触发器格式正确',
     'project.config.json 的根目录 / appid / compileType / 基础库 ≥ 2.32.3 正确',
     '图片资源与包体符合 8.8',
+    '客户端 api.call 都已被 await / .then / .catch / return 处理',
   ].forEach((needle) => {
     assert.ok(passText.includes(needle), '缺少检查项：' + needle);
   });
@@ -631,5 +632,177 @@ test('发布预检：只有真正的负索引截尾才算脱敏（substring / sl
   ];
   for (const expr of safe) {
     assert.deepStrictEqual(scanConsoleStatement(asStatement(expr)), [], expr + ' 是安全的脱敏写法，不应误报');
+  }
+});
+
+test('发布预检：客户端悬空的 api.call 会被拦下（13.11 未处理的 Promise）', () => {
+  const passText = (result) => result.lines.filter((l) => l.level === 'PASS').map((l) => l.msg).join('\n');
+  const hasPromisePass = (result) => passText(result).includes('客户端 api.call 都已被 await / .then / .catch / return 处理');
+
+  // 没有 api.call 时只提示 WARN，不能让预检失败
+  const empty = makeFixture();
+  try {
+    const result = runChecks(empty);
+    assert.deepStrictEqual(failMessages(result), [], '没有 api.call 时不该 FAIL');
+    assert.strictEqual(
+      result.warnings.filter((w) => w.includes('没有扫描到客户端 api.call')).length,
+      1,
+      '没有 api.call 时应提示一次 WARN',
+    );
+  } finally {
+    cleanup(empty);
+  }
+
+  // 各种「已处理」写法都必须放过：await / return / 同行与跨行链式 /
+  // 注释与字符串（含反引号模板串里的 //）里的 api.call 不算调用 / 多行 await Promise.all / 先存 promise 后 await
+  const handled = makeFixture();
+  try {
+    writeFixtureFile(handled, 'miniprogram/utils/http.js', [
+      "'use strict';",
+      'async function load() {',
+      "  await api.call('home.get');",
+      "  return api.call('user.get');",
+      "  api.call('mood.set').catch(() => {});",
+      "  api.call('hug.send')",
+      '    .then(() => {})',
+      '    .catch(() => {});',
+      "  // api.call('line.comment');",
+      "  const noop = 1; // api.call('tail.comment');",
+      "  /* api.call('block.comment'); */",
+      "  const s1 = 'a // b'; // 字符串里的 // 不是注释",
+      "  const s2 = \"api.call('str.inside')\";",
+      "  const s3 = \u0060https://a.b\u0060; await api.call('template.after');",
+      '  /*',
+      "   * api.call('jsdoc.body');",
+      '   */',
+      '  const many = await Promise.all([',
+      "    api.call('a.one'),",
+      "    api.call('a.two'),",
+      '  ]);',
+      "  const pending = api.call('later.init');",
+      '  await pending;',
+      "  api.call('chain.cmt')",
+      '    // 中间夹注释',
+      '',
+      '    .then(() => {})',
+      '    .catch(() => {});',
+      "  api.call('multi.arg', {",
+      '    id: 1,',
+      '  }).then(() => {});',
+      "  api.call('multi.arg2', {",
+      '    id: 2,',
+      '  })',
+      '    .catch(() => {});',
+      "  const pair = await Promise.all([api.call('pair.one', { limit: 20 }), api.call('pair.two')]);",
+      "  const longOne = await Promise.all([api.call('long.pad', '" + 'x'.repeat(1500) + "'), api.call('long.second')]);",
+      '  let late;',
+      "  late = api.call('late.assign');",
+      '  await late;',
+      "  const origin = api.call('alias.origin');",
+      '  const aliasRef = origin;',
+      '  aliasRef.then(() => {});',
+      "  const arrow = () => api.call('arrow.return');",
+      "  api?.call('optional.chain').then(() => {});",
+      "  const p1 = api.call('stored.one');",
+      "  const p2 = api.call('stored.two');",
+      '  await Promise.all([p1, p2]);',
+      "  const p3 = api.call('stored.three');",
+      "  const origin2 = api.call('alias.await');",
+      '  const ref2 = origin2;',
+      '  await Promise.all([ref2]);',
+      '  return Promise.allSettled([p3]);',
+      '}',
+      'module.exports = { load, many };',
+    ].join('\n') + '\n');
+    const result = runChecks(handled);
+    assert.deepStrictEqual(failMessages(result), [], '已处理的 api.call 不该误报：' + failMessages(result).join('\n'));
+    assert.ok(
+      hasPromisePass(result) && passText(result).includes('（23 个调用 / 21 行，无未处理 Promise）'),
+      '注释/字符串不该计入，23 个真实调用应全部放行（含对象参数 Promise.all / 多行参数 .then / 长语句 / 先声明后赋值 / 别名 / 箭头隐式返回 / 可选链 / 存进变量后 Promise.all）：' + passText(result),
+    );
+  } finally {
+    cleanup(handled);
+  }
+
+  // 悬空调用必须 FAIL 并指出文件与行号；同行无关 await、行尾注释里的 .then 都不算已处理
+  const dangling = makeFixture();
+  try {
+    writeFixtureFile(dangling, 'miniprogram/pages/home/extra.js', [
+      'async function load() {',
+      "  api.call('home.get');",
+      "  const a = await foo(); api.call('after.await');",
+      "  api.call('cmt.tail'); // .then(() => {})",
+      '}',
+      'module.exports = { load };',
+      '',
+    ].join('\n'));
+    const result = runChecks(dangling);
+    const fails = failMessages(result).join('\n');
+    assert.strictEqual(result.ok, false, '悬空 api.call 应让预检失败');
+    [2, 3, 4].forEach((line) => {
+      assert.ok(
+        fails.includes('miniprogram/pages/home/extra.js:' + line + ' 的 api.call 没有被 await / .then / .catch 处理（13.11 未处理的 Promise）'),
+        '第 ' + line + ' 行应报未处理：' + fails,
+      );
+    });
+    assert.ok(!hasPromisePass(result), '有 FAIL 时不应再输出 api.call PASS 文案');
+  } finally {
+    cleanup(dangling);
+  }
+
+  // 语句回扫超过上限时必须 WARN，不能静默漏掉更前面的 await
+  const far = makeFixture();
+  try {
+    writeFixtureFile(
+      far,
+      'miniprogram/utils/far.js',
+      'async function f() {\n  const far = await Promise.all([' + ' '.repeat(6000) + "api.call('far.one'), api.call('far.two')]);\n}\n",
+    );
+    const result = runChecks(far);
+    assert.strictEqual(result.ok, false, '回扫截断后找不到 await，该调用应 FAIL');
+    assert.strictEqual(
+      result.warnings.filter((w) => w.includes('语句回扫达到 5000 字符上限')).length,
+      1,
+      '回扫截断必须 WARN，且同一行多个调用只报一次',
+    );
+  } finally {
+    cleanup(far);
+  }
+  // 调用偏移恰好等于回扫上限、前面已扫到文件头：不应误报「截断」WARN
+  const edge = makeFixture();
+  try {
+    writeFixtureFile(edge, 'miniprogram/utils/edge.js', ' '.repeat(5000) + "api.call('edge.dangling')\n");
+    const result = runChecks(edge);
+    assert.strictEqual(result.ok, false, '悬空调用仍应 FAIL');
+    assert.strictEqual(
+      result.warnings.filter((w) => w.includes('语句回扫达到 5000 字符上限')).length,
+      0,
+      '扫到文件头时不应误报截断',
+    );
+  } finally {
+    cleanup(edge);
+  }
+  // 超大文件被 readText 跳过后不能静默：至少 WARN 提示未检查
+  const huge = makeFixture();
+  try {
+    writeFixtureFile(
+      huge,
+      'miniprogram/utils/huge.js',
+      '// filler\n'.repeat(120000) + "api.call('huge.dangling');\n",
+    );
+    writeFixtureFile(huge, 'miniprogram/utils/ok.js', "async function f() { await api.call('ok.get'); }\n");
+    const result = runChecks(huge);
+    assert.strictEqual(result.ok, true, '超大文件应跳过而不是 FAIL：' + failMessages(result).join(' | '));
+    assert.strictEqual(
+      result.warnings.filter((w) => w.includes('跳过无法读取的客户端文件')).length,
+      1,
+      '跳过大文件必须 WARN',
+    );
+    assert.ok(
+      passText(result).includes('（已跳过 1 个无法读取的文件）'),
+      'PASS 文案要注明跳过的文件数，不能过度声称全部检查过：' + passText(result),
+    );
+  } finally {
+    cleanup(huge);
   }
 });

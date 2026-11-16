@@ -721,6 +721,159 @@ function checkConsole(root, lines, warnings) {
   }
 }
 
+// 文档 13.11 DoD「没有未处理的 Promise rejection」：客户端调用 api.call 必须被 await / return 或
+// 紧跟的 .then / .catch 链处理。悬空调用在真机上表现为「点了没反应」，或直接冒未捕获 rejection。
+// 判定前先用 maskCommentsAndStrings 遮掉注释与字符串，注释里的 api.call 不会误报、
+// 行尾注释里的 .then 也不会让悬空调用漏报；只扫 miniprogram 下的生产代码（测试用自己的桩，不在此列）。
+// 已知限制（当前仓库不触发，记录以便评审）：
+//   - 模板串插值里的调用（__api.call() 写在反引号内）会被整段遮掉；
+//   - 「语句里出现过 await」按整条语句近似判断，同一数组里其它悬空调用可能被放过；
+//   - 只认 api.call / api?.call 形式，api['call'] 不识别。
+//   - 赋值 lookahead 里 await foo(name) 会把仅作参数出现的 name 当作已处理（低风险近似）。
+const STATEMENT_SCAN_MAX = 5000; // 回溯语句起点的上限，防御压缩成超长单行的代码
+const ASSIGN_SCAN_MAX = 3000; // 赋值后查找 await/return/.then 的范围
+
+// 从 open（'(' 的下标）找到同层 ')' 之后的位置，跳过参数里的对象/数组/嵌套调用
+function findParenEnd(flat, open) {
+  let depth = 0;
+  for (let k = open; k < flat.length; k += 1) {
+    const ch = flat[k];
+    if (ch === '(') depth += 1;
+    else if (ch === ')') {
+      depth -= 1;
+      if (depth === 0) return k + 1;
+    }
+  }
+  return -1;
+}
+
+// 调用表达式结束后是否紧跟 .then / .catch（允许换行、中间夹 .then 等方法链）
+function followedByCatch(flat, from) {
+  let p = from;
+  while (p < flat.length) {
+    while (p < flat.length && /\s/.test(flat[p])) p += 1;
+    if (flat[p] !== '.') return false;
+    const m = /^\.\s*([A-Za-z_$][\w$]*)\s*\(/.exec(flat.slice(p, p + 80));
+    if (!m) return false;
+    const open = p + m[0].length - 1;
+    const callEnd = findParenEnd(flat, open);
+    if (callEnd === -1) return false;
+    if (m[1] === 'then' || m[1] === 'catch') return true;
+    p = callEnd;
+  }
+  return false;
+}
+
+// 从调用位置向前找语句起点：跳过配对的 () [] {}，只在同层 ';' 或块 '{' 处截止；
+// 已知限制：对象字面量被当成块边界时（await Promise.all([{ p: api.call() }])）
+// 可能误报，真实仓库无此写法，保留为近似。
+function findStatementStart(flat, pos) {
+  let depth = 0;
+  let scanned = 0;
+  let truncated = false;
+  for (let k = pos - 1; k >= 0 && scanned < STATEMENT_SCAN_MAX; k -= 1, scanned += 1) {
+    const ch = flat[k];
+    if (ch === ')' || ch === ']' || ch === '}') depth += 1;
+    else if (ch === '(' || ch === '[') {
+      if (depth > 0) depth -= 1;
+    } else if (ch === '{') {
+      if (depth > 0) depth -= 1;
+      else return { start: k + 1, truncated: false };
+    } else if (ch === ';' && depth === 0) return { start: k + 1, truncated: false };
+  }
+  if (scanned >= STATEMENT_SCAN_MAX && pos - scanned > 0) truncated = true;
+  return { start: Math.max(0, pos - scanned), truncated };
+}
+
+function checkPromiseHandling(root, lines, warnings) {
+  const files = [];
+  const walkErrors = [];
+  walk(root, 'miniprogram', files, walkErrors);
+  for (const err of walkErrors) lines.push({ level: 'WARN', msg: err });
+  let calls = 0;
+  let callLines = 0;
+  let bad = 0;
+  let skipped = 0;
+  const truncatedWarned = new Set();
+  for (const rel of files) {
+    if (!rel.endsWith('.js')) continue;
+    const text = readText(path.join(root, rel));
+    if (text === null) {
+      skipped += 1;
+      warnings.push('跳过无法读取的客户端文件（>1MB 或非文本），未检查未处理 Promise：' + rel);
+      continue;
+    }
+    const masked = maskCommentsAndStrings(text);
+    const rows = masked.split(/\r?\n/);
+    // rows 用 \n 重新拼成 flat，行号与字符位置一一对应，便于跨行判断 await 与链式调用
+    const starts = [];
+    let acc = 0;
+    for (const row of rows) {
+      starts.push(acc);
+      acc += row.length + 1;
+    }
+    const flat = rows.join('\n');
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      const re = /\bapi\??\.call\s*\(/g;
+      let match;
+      let lineHasCall = false;
+      while ((match = re.exec(row))) {
+        calls += 1;
+        lineHasCall = true;
+        const callAbs = starts[i] + match.index;
+        const open = callAbs + match[0].length - 1;
+        const callEnd = findParenEnd(flat, open);
+        // ① 调用表达式之后紧跟 .then / .catch（含多行参数、换行后的链式调用）
+        let handled = callEnd !== -1 && followedByCatch(flat, callEnd);
+        if (!handled) {
+          // ② 同一语句前面的 await / return：覆盖 await Promise.all([...]) 换行、
+          //    const x = await Promise.all([api.call(.., { 参数 }), ...]) 等写法
+          const st = findStatementStart(flat, callAbs);
+          if (st.truncated) {
+            const warnKey = rel + ':' + (i + 1);
+            if (!truncatedWarned.has(warnKey)) {
+              truncatedWarned.add(warnKey);
+              warnings.push('语句回扫达到 ' + STATEMENT_SCAN_MAX + ' 字符上限，可能有未检查的 await：' + warnKey);
+            }
+          }
+          const statement = flat.slice(st.start, callAbs);
+          if (/\b(?:await|return)\b/.test(statement)) handled = true;
+          // ③ 箭头函数隐式返回（const f = () => api.call(...)）
+          if (!handled && /=>\s*$/.test(statement)) handled = true;
+          // ④ 先存进变量、后面再 await / return / .then / .catch（支持先声明后赋值与一层别名）
+          if (!handled) {
+            const assigned = /([A-Za-z_$][\w$]*)\s*=\s*$/.exec(statement);
+            if (assigned && statement.slice(0, assigned.index).trim() !== '==') {
+              const name = assigned[1];
+              const look = flat.slice(callEnd === -1 ? callAbs : callEnd, (callEnd === -1 ? callAbs : callEnd) + ASSIGN_SCAN_MAX);
+              const used = new RegExp('\\b(?:await|return)\\b[^;]{0,300}?\\b' + name + '\\b|\\b' + name + '\\s*\\.\\s*(?:then|catch)\\s*\\(').test(look);
+              let aliased = false;
+              if (!used) {
+                const alias = new RegExp('\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*' + name + '\\b').exec(look);
+                if (alias) {
+                  aliased = new RegExp('\\b(?:await|return)\\b[^;]{0,300}?\\b' + alias[1] + '\\b|\\b' + alias[1] + '\\s*\\.\\s*(?:then|catch)\\s*\\(').test(look);
+                }
+              }
+              if (used || aliased) handled = true;
+            }
+          }
+        }
+        if (!handled) {
+          bad += 1;
+          lines.push({ level: 'FAIL', msg: rel + ':' + (i + 1) + ' 的 api.call 没有被 await / .then / .catch 处理（13.11 未处理的 Promise）' });
+        }
+      }
+      if (lineHasCall) callLines += 1;
+    }
+  }
+  if (!calls) warnings.push('没有扫描到客户端 api.call 调用（目录为空？），请确认 miniprogram 路径');
+  else if (!bad) {
+    const skippedTip = skipped ? '（已跳过 ' + skipped + ' 个无法读取的文件）' : '';
+    lines.push({ level: 'PASS', msg: '客户端 api.call 都已被 await / .then / .catch / return 处理（' + calls + ' 个调用 / ' + callLines + ' 行，无未处理 Promise）' + skippedTip });
+  }
+}
+
 function checkGit(root, lines, warnings) {
   const probe = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd: root, encoding: 'utf8', timeout: 10000 });
   if (probe.error || probe.status !== 0) {
@@ -764,6 +917,7 @@ function runChecks(root) {
   checkPackageBudget(root, lines, warnings);
   checkPrivacy(app, root, lines);
   checkConsole(root, lines, warnings);
+  checkPromiseHandling(root, lines, warnings);
   checkSecrets(root, lines);
   checkGit(root, lines, warnings);
 
@@ -800,6 +954,7 @@ module.exports = {
   checkStructure,
   checkDeployConfig,
   checkPackageBudget,
+  checkPromiseHandling,
   versionAtLeast,
   scanTextForSecrets,
   scanConsoleStatement,
