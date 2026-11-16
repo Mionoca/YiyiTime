@@ -52,6 +52,7 @@ const proxyDb = {
     in: (values) => fake.db.command.in(values),
     lt: (value) => fake.db.command.lt(value),
     lte: (value) => fake.db.command.lte(value),
+    inc: (value) => fake.db.command.inc(value),
   },
   runTransaction: (fn) => fake.db.runTransaction(fn),
 };
