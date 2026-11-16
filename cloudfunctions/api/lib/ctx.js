@@ -69,7 +69,7 @@ async function buildContext({ openid }) {
 
 function requireBound(ctx) {
   if (!ctx.user.coupleId || !ctx.couple || ctx.couple.status !== 'active') {
-    throw new AppError('NOT_BOUND', '还没有绑定');
+    throw new AppError('NOT_BOUND', '先邀请 TA 住进来吧');
   }
   if (!(ctx.couple.memberOpenids || []).includes(ctx.openid)) {
     throw new AppError('FORBIDDEN', '你们还没有绑定');

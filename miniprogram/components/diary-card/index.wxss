@@ -40,7 +40,7 @@
 }
 
 .dc--today .dc__date {
-  color: var(--accent-ink, #8A5A45);
+  color: var(--accent-ink, #6E4433);
   font-weight: 600;
 }
 
@@ -66,7 +66,7 @@
   padding: 2rpx 14rpx;
   border-radius: 999rpx;
   background: var(--accent-soft, #F4C9B8);
-  color: var(--accent-ink, #8A5A45);
+  color: var(--accent-ink, #6E4433);
   font-size: var(--font-xs, 22rpx);
 }
 

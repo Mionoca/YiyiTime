@@ -177,8 +177,19 @@
   font-size: 36rpx;
 }
 
+/* 文档 8.3.6：P1 占位项统一禁用态（灰字、不响应点击） */
+.list-item--disabled {
+  color: var(--muted);
+}
+
+.list-version {
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+
 .footer {
   text-align: center;
   font-size: var(--font-sm);
-  color: #C4B9AC;
+  /* 文档 8.9：提示文字 ≥4.5:1（--muted 在 --bg 上 5.11:1） */
+  color: var(--muted);
 }

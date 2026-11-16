@@ -6,6 +6,8 @@ const DEFAULT_AVATAR = constants.DEFAULT_AVATAR;
 const MOODS = constants.MOODS;
 const HUG_SEEN_KEY = 'hug_seen_ids';
 const HUG_SEEN_MAX = 20;
+// 文档 9.7：心形上浮 1400ms；多留 40ms 余量，避免定时器先于动画结束
+const HUG_FLOAT_MS = 1440;
 
 const BIND_HINTS = {
   code_created: '等 TA 输入邀请码',
@@ -182,13 +184,21 @@ Page({
       wishPreviewTitle: (wish && wish.previewTitle) || '',
       wishTotal: (wish && wish.total) || 0,
       wishDone: (wish && wish.done) || 0,
+      // 文档 9.3：资料没填完时相框显示「+ 我的」占位
+      profileIncomplete: !user.profileComplete,
+      // 文档 9.3 / 9.10：纪念日临近时墙历高亮并提示还有几天
+      calendarSoon: !!(home.couple && home.couple.anniversary && home.couple.anniversary.daysLeft <= 30),
+      calendarSub: home.couple && home.couple.anniversary && home.couple.anniversary.daysLeft <= 30
+        ? '纪念日还有 ' + home.couple.anniversary.daysLeft + ' 天'
+        : '',
     };
     if (home.couple) {
-      patch.daysText = '第 ' + home.couple.daysTogether + ' 天';
-      patch.startDateText = timeUtil.formatDateCN(home.couple.startDate);
+      // 服务端在 couple.startDate 脏数据时会降级成 null，这里不能拼出「第 null 天」
+      patch.daysText = home.couple.daysTogether ? '第 ' + home.couple.daysTogether + ' 天' : '';
+      patch.startDateText = home.couple.startDate ? timeUtil.formatDateCN(home.couple.startDate) : '';
       patch.anniversaryText = home.couple.anniversary
         ? timeUtil.formatDateCN(home.couple.anniversary.date) + ' · 还有 ' + home.couple.anniversary.daysLeft + ' 天'
-        : '开始那天就是纪念日';
+        : (home.couple.startDate ? '开始那天就是纪念日' : '');
     } else {
       patch.daysText = '';
       patch.startDateText = '';
@@ -276,7 +286,8 @@ Page({
       this._celebrateTimer = setTimeout(() => {
         if (this._unloaded) return;
         this.setData({ hugCelebrate: false });
-      }, 1200);
+        // 文档 9.7 心形上浮 1.4s：必须等动画播完再摘 class，否则尾巴被剪掉
+      }, HUG_FLOAT_MS);
     }, 16);
   },
 

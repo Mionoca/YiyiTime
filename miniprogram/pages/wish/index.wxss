@@ -59,7 +59,7 @@
   padding: 26rpx 0;
   border-radius: var(--radius-lg, 32rpx);
   border: 2rpx dashed var(--accent, #D98E73);
-  color: var(--accent-ink, #8A5A45);
+  color: var(--accent-ink, #6E4433);
   font-size: var(--font-md, 28rpx);
 }
 

@@ -12,7 +12,7 @@
     <view class="stats__hint" wx:else>写下第一件想一起做的事吧</view>
   </view>
 
-  <view class="add {{canAdd ? '' : 'add--disabled'}}" bindtap="onAdd" aria-label="写一个愿望">
+  <view class="add {{canAdd ? '' : 'add--disabled'}}" bindtap="onAdd" aria-label="写一个愿望" aria-disabled="{{!canAdd}}">
     <text class="add__plus">＋</text>
     <text>写一个愿望</text>
   </view>
@@ -72,7 +72,7 @@
       <view class="form__count">{{form.note.length}}/{{noteMax}}</view>
       <view class="form__actions">
         <view class="form__cancel" bindtap="onEditorClose" aria-label="取消编辑">取消</view>
-        <view class="form__save {{saving ? 'form__save--disabled' : ''}}" bindtap="onSaveWish">
+        <view class="form__save {{saving ? 'form__save--disabled' : ''}}" bindtap="onSaveWish" aria-disabled="{{saving}}">
           {{saving ? '保存中…' : '保存'}}
         </view>
       </view>

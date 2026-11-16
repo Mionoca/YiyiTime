@@ -110,22 +110,52 @@ function windowActive(user, now) {
   return Number.isFinite(resetAt) && now.getTime() - resetAt < BIND_FAIL_WINDOW_MS;
 }
 
+/**
+ * 读最新失败计数：ctx.user 是请求开始时的快照，并发/连续请求会读到旧值，
+ * 直接拿它做限流判断会被绕过（文档 6.9 / 11.5）。
+ * 读库失败时退回快照（可用性优先，不因为计数读失败把绑定入口打挂）。
+ */
+async function readFailureState(ctx) {
+  try {
+    const res = await ctx.db.collection('users').doc(ctx.openid).get();
+    return res && res.data ? res.data : ctx.user;
+  } catch (err) {
+    // 文档缺失或读故障都退回快照：限流是防滥用，不因为一次读失败把绑定入口打挂
+    return ctx.user;
+  }
+}
+
 async function assertNotRateLimited(ctx) {
-  if ((ctx.user.bindFailCount || 0) >= BIND_FAIL_LIMIT && windowActive(ctx.user, ctx.now)) {
+  const user = await readFailureState(ctx);
+  // 同步回 ctx.user，供 recordFailure 判断窗口是否有效
+  ctx.user = Object.assign({}, ctx.user, {
+    bindFailCount: user.bindFailCount,
+    bindFailResetAt: user.bindFailResetAt,
+  });
+  if ((user.bindFailCount || 0) >= BIND_FAIL_LIMIT && windowActive(user, ctx.now)) {
     throw new AppError('BIND_RATE_LIMITED', '试太多次了，1 小时后再试');
   }
 }
 
-/** 记录一次失败（窗口内累加，窗口过期重新计数） */
+/**
+ * 记录一次失败（窗口内累加，窗口过期重新计数）。
+ * 窗口内用 db.command.inc(1) 原子自增，避免并发「读-改-写」互相覆盖丢计数；
+ * 窗口刚过期时写 1（这一步并发下仍可能被覆盖，只影响计数精度，不影响鉴权与主流程）。
+ */
 async function recordFailure(ctx) {
   const active = windowActive(ctx.user, ctx.now);
-  const nextCount = active ? (ctx.user.bindFailCount || 0) + 1 : 1;
-  const resetAt = active ? ctx.user.bindFailResetAt : ctx.now;
-  ctx.user.bindFailCount = nextCount;
-  ctx.user.bindFailResetAt = resetAt;
-  await ctx.db.collection('users').doc(ctx.openid).update({
-    data: { bindFailCount: nextCount, bindFailResetAt: resetAt },
-  }).catch(() => {});
+  if (active) {
+    await ctx.db.collection('users').doc(ctx.openid).update({
+      data: { bindFailCount: ctx.db.command.inc(1), updatedAt: ctx.now },
+    }).catch(() => {});
+    ctx.user.bindFailCount = (ctx.user.bindFailCount || 0) + 1;
+  } else {
+    await ctx.db.collection('users').doc(ctx.openid).update({
+      data: { bindFailCount: 1, bindFailResetAt: ctx.now, updatedAt: ctx.now },
+    }).catch(() => {});
+    ctx.user.bindFailCount = 1;
+    ctx.user.bindFailResetAt = ctx.now;
+  }
 }
 
 async function clearFailures(db, openid, now) {
@@ -152,15 +182,21 @@ async function loadJoinableInvite(ctx, code) {
   if (invite.creatorOpenid === ctx.openid) {
     await failWith(ctx, 'INVITE_SELF', '不能和自己绑定哦');
   }
-  if (invite.status === 'confirmed' || invite.status === 'cancelled' || invite.status === 'expired') {
+  // 已确认 / 已取消优先：文档 14.3 要求「已确认码预览 → INVITE_USED」，
+  // 否则确认成功超过 24h 后，第三方点旧码会被误导成「邀请码过期了」。
+  if (invite.status === 'confirmed' || invite.status === 'cancelled') {
     await failWith(ctx, 'INVITE_USED', '这个邀请码已经用过了');
+  }
+  // 再判过期：已被惰性置 expired 的码也要给 INVITE_EXPIRED，
+  // 否则同一个「过期」语义会因为「是否被 status 读过」返回 INVITE_USED（文档 14.3）。
+  if (invite.status === 'expired'
+    || !Number.isFinite(msOf(invite.expiresAt))
+    || msOf(invite.expiresAt) <= ctx.now.getTime()) {
+    await expireInvite(ctx.db, invite, ctx.now);
+    await failWith(ctx, 'INVITE_EXPIRED', '邀请码过期了，让 TA 重新生成');
   }
   if (invite.status !== 'open') {
     await failWith(ctx, 'INVITE_USED', '这个邀请码已经用过了');
-  }
-  if (!Number.isFinite(msOf(invite.expiresAt)) || msOf(invite.expiresAt) <= ctx.now.getTime()) {
-    await expireInvite(ctx.db, invite, ctx.now);
-    await failWith(ctx, 'INVITE_EXPIRED', '邀请码过期了，让 TA 重新生成');
   }
   const creator = await getUserDocStrict(ctx.db, invite.creatorOpenid);
   if (!creator) {
@@ -176,7 +212,7 @@ async function create(payload, ctx) {
   const p = validate.asObject(payload);
   const regenerate = p.regenerate === undefined
     ? false
-    : validate.boolean(p.regenerate, 'regenerate');
+    : validate.boolean(p.regenerate, '重新生成');
 
   if (!ctx.user.nickname) {
     throw new AppError('PROFILE_REQUIRED', '先给自己起个名字吧');
@@ -191,7 +227,7 @@ async function create(payload, ctx) {
   const startDate = p.startDate;
   const todayKey = time.dateKeyOf(ctx.now);
   if (typeof startDate !== 'string' || startDate.length !== 10 || !time.isValidStartDate(startDate, todayKey)) {
-    throw new AppError('START_DATE_INVALID', '开始日期要选 2000 年以后、今天之前');
+    throw new AppError('START_DATE_INVALID', '选一个合适的开始日期');
   }
 
   const existing = await findCreatorInvite(ctx);
@@ -246,7 +282,7 @@ async function create(payload, ctx) {
     }
   }
 
-  throw new AppError('INTERNAL_ERROR', '邀请码生成失败，请稍后再试');
+  throw new AppError('INTERNAL_ERROR', '服务开小差了，稍后再试');
 }
 
 async function preview(payload, ctx) {
@@ -277,33 +313,41 @@ async function apply(payload, ctx) {
       // 旧申请已过期：先惰性置 expired，再允许申请新码
       await expireInvite(ctx.db, existingApply, ctx.now);
     } else {
-      throw new AppError('BIND_ALREADY_APPLIED', '你已经申请过啦，先取消再试');
+      throw new AppError('BIND_ALREADY_APPLIED', '你已经申请过啦，先取消');
     }
   }
 
   const { invite, creator } = await loadJoinableInvite(ctx, code);
 
-  await ctx.db.runTransaction(async (transaction) => {
-    // 事务内重读，避免两个人同时确认同一个码
-    const inviteNow = (await transaction.collection('bind_invites').doc(code).get()).data;
-    if (!inviteNow || inviteNow.status !== 'open') {
-      throw new AppError('INVITE_USED', '这个邀请码已经用过了');
-    }
-    if (msOf(inviteNow.expiresAt) <= ctx.now.getTime()) {
-      throw new AppError('INVITE_EXPIRED', '邀请码过期了，让 TA 重新生成');
-    }
-    const me = (await transaction.collection('users').doc(ctx.openid).get()).data;
-    if (!me || me.coupleId) {
-      throw new AppError('ALREADY_BOUND', '你们已经绑定啦');
-    }
-    const creatorNow = (await transaction.collection('users').doc(inviteNow.creatorOpenid).get()).data;
-    if (!creatorNow || creatorNow.coupleId) {
-      throw new AppError('INVITE_USED', '这个邀请码已经用过了');
-    }
-    await transaction.collection('bind_invites').doc(code).update({
-      data: { status: 'applied', applicantOpenid: ctx.openid, appliedAt: ctx.now, updatedAt: ctx.now },
+  try {
+    await ctx.db.runTransaction(async (transaction) => {
+      // 事务内重读，避免两个人同时确认同一个码
+      const inviteNow = (await transaction.collection('bind_invites').doc(code).get()).data;
+      if (!inviteNow || inviteNow.status !== 'open') {
+        throw new AppError('INVITE_USED', '这个邀请码已经用过了');
+      }
+      if (msOf(inviteNow.expiresAt) <= ctx.now.getTime()) {
+        throw new AppError('INVITE_EXPIRED', '邀请码过期了，让 TA 重新生成');
+      }
+      const me = (await transaction.collection('users').doc(ctx.openid).get()).data;
+      if (!me || me.coupleId) {
+        throw new AppError('ALREADY_BOUND', '你们已经绑定啦');
+      }
+      const creatorNow = (await transaction.collection('users').doc(inviteNow.creatorOpenid).get()).data;
+      if (!creatorNow || creatorNow.coupleId) {
+        throw new AppError('INVITE_USED', '这个邀请码已经用过了');
+      }
+      await transaction.collection('bind_invites').doc(code).update({
+        data: { status: 'applied', applicantOpenid: ctx.openid, appliedAt: ctx.now, updatedAt: ctx.now },
+      });
     });
-  });
+  } catch (err) {
+    // 文档 6.9：被他人抢先（事务内发现码已不可用）也要计一次失败，防并发枚举
+    if (err instanceof AppError && err.code === 'INVITE_USED') {
+      await recordFailure(ctx);
+    }
+    throw err;
+  }
 
   await clearFailures(ctx.db, ctx.openid, ctx.now);
 
@@ -343,12 +387,19 @@ async function confirm(payload, ctx) {
     };
   }
 
-  if (invite.status !== 'applied') {
+  // 已取消的码不属于「待确认」，先按 INVITE_NOT_APPLIED 返回，不因过期与否改变语义
+  if (invite.status === 'cancelled') {
     throw new AppError('INVITE_NOT_APPLIED', 'TA 还没有申请');
   }
-  if (msOf(invite.expiresAt) <= ctx.now.getTime()) {
+  // 先判过期：被惰性置 expired、或 status 还是 applied 但已过期的码，都按 INVITE_EXPIRED 返回
+  if (invite.status === 'expired'
+    || !Number.isFinite(msOf(invite.expiresAt))
+    || msOf(invite.expiresAt) <= ctx.now.getTime()) {
     await expireInvite(ctx.db, invite, ctx.now);
-    throw new AppError('INVITE_EXPIRED', '邀请码过期了，重新生成一个吧');
+    throw new AppError('INVITE_EXPIRED', '邀请码过期了，让 TA 重新生成');
+  }
+  if (invite.status !== 'applied') {
+    throw new AppError('INVITE_NOT_APPLIED', 'TA 还没有申请');
   }
 
   // coupleId 在事务外生成，避免事务内随机数冲突
@@ -358,17 +409,17 @@ async function confirm(payload, ctx) {
     // 事务内先读后写，全部成功才提交
     const inviteNow = (await transaction.collection('bind_invites').doc(code).get()).data;
     if (!inviteNow || inviteNow.status !== 'applied') {
-      throw new AppError('INVITE_USED', '这个邀请码状态已经变了');
+      throw new AppError('INVITE_USED', '这个邀请码已经用过了');
     }
     if (msOf(inviteNow.expiresAt) <= ctx.now.getTime()) {
-      throw new AppError('INVITE_EXPIRED', '邀请码过期了');
+      throw new AppError('INVITE_EXPIRED', '邀请码过期了，让 TA 重新生成');
     }
 
     const creator = (await transaction.collection('users').doc(ctx.openid).get()).data;
     const applicant = (await transaction.collection('users').doc(inviteNow.applicantOpenid).get()).data;
 
     if (!creator || creator.coupleId) {
-      throw new AppError('ALREADY_BOUND', '你已经绑定了');
+      throw new AppError('ALREADY_BOUND', '你们已经绑定啦');
     }
     if (!applicant || applicant.coupleId) {
       throw new AppError('APPLICANT_ALREADY_BOUND', 'TA 已经和别人绑定了');
@@ -392,7 +443,7 @@ async function confirm(payload, ctx) {
       data: { coupleId, updatedAt: now },
     });
     await transaction.collection('bind_invites').doc(code).update({
-      data: { status: 'confirmed', coupleId, confirmedAt: now },
+      data: { status: 'confirmed', coupleId, confirmedAt: now, updatedAt: now },
     });
 
     return { coupleId, applicantOpenid: inviteNow.applicantOpenid, startDate: inviteNow.startDate };
@@ -510,7 +561,10 @@ async function computeStatus(ctx) {
 }
 
 async function status(payload, ctx) {
-  return computeStatus(ctx);
+  const res = await computeStatus(ctx);
+  // 文档 1.5 / 10.9：picker 上限用服务端 todayKey，设备时钟超前也不能选到未来
+  res.todayKey = time.dateKeyOf(ctx.now);
+  return res;
 }
 
 module.exports = { create, preview, apply, confirm, cancel, status, computeStatus };

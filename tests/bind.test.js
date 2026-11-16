@@ -148,6 +148,7 @@ test('绑定全链路：create → preview → apply → status → confirm → 
       expiresAt: created.expiresAt,
       other: { nickname: '阿安', avatarFileID: '' },
     },
+    todayKey: TODAY,
   });
   const statusB = await bind.status({}, ctxB);
   assert.strictEqual(statusB.state, 'applied_by_me');
@@ -178,8 +179,8 @@ test('绑定全链路：create → preview → apply → status → confirm → 
   assert.ok(invite.confirmedAt instanceof Date);
 
   // 下一次请求要重新读库：用新 ctx
-  assert.deepStrictEqual(await bind.status({}, refreshCtx(fake, 'oA')), { state: 'bound', pending: null });
-  assert.deepStrictEqual(await bind.status({}, refreshCtx(fake, 'oB')), { state: 'bound', pending: null });
+  assert.deepStrictEqual(await bind.status({}, refreshCtx(fake, 'oA')), { state: 'bound', pending: null, todayKey: TODAY });
+  assert.deepStrictEqual(await bind.status({}, refreshCtx(fake, 'oB')), { state: 'bound', pending: null, todayKey: TODAY });
   assert.strictEqual(fake.get('users', 'oA').bindFailCount, 0);
   assert.strictEqual(fake.get('users', 'oA').bindFailResetAt, null);
   assert.strictEqual(fake.get('users', 'oB').bindFailCount, 0);
@@ -242,7 +243,7 @@ test('过期邀请：预览报 INVITE_EXPIRED 并惰性置 expired，creator 状
 
   await assert.rejects(() => bind.preview({ code: '111111' }, ctxB), { code: 'INVITE_EXPIRED' });
   assert.strictEqual(fake.get('bind_invites', '111111').status, 'expired');
-  assert.deepStrictEqual(await bind.status({}, ctxA), { state: 'unbound', pending: null });
+  assert.deepStrictEqual(await bind.status({}, ctxA), { state: 'unbound', pending: null, todayKey: TODAY });
 
   const created = await bind.create({ startDate: '2024-05-20' }, ctxA);
   assert.strictEqual(created.state, 'code_created');
@@ -393,7 +394,7 @@ test('bind.cancel：creator 可取消、applicant 可取消，第三方 FORBIDDE
   const cancelled = await bind.cancel({ code: '121212' }, ctxA);
   assert.deepStrictEqual(cancelled, { state: 'unbound' });
   assert.strictEqual(fake.get('bind_invites', '121212').status, 'cancelled');
-  assert.deepStrictEqual(await bind.status({}, ctxB), { state: 'unbound', pending: null });
+  assert.deepStrictEqual(await bind.status({}, ctxB), { state: 'unbound', pending: null, todayKey: TODAY });
 
   // applicant 取消自己的申请
   const fake2 = makeFakeDb({
@@ -425,7 +426,7 @@ test('bind.status 自愈：couples 文档丢失时清掉 user.coupleId 并回到
   console.error = () => {};
   try {
     const res = await bind.status({}, ctxA);
-    assert.deepStrictEqual(res, { state: 'unbound', pending: null });
+    assert.deepStrictEqual(res, { state: 'unbound', pending: null, todayKey: TODAY });
   } finally {
     console.error = originalError;
   }
@@ -637,7 +638,7 @@ test('confirm 事务内重校验：预检后邀请过期不再生成 couple', as
 
   await assert.rejects(() => bind.confirm({ code: '939393' }, ctxA), {
     code: 'INVITE_EXPIRED',
-    message: '邀请码过期了',
+    message: '邀请码过期了，让 TA 重新生成',
   });
   assert.strictEqual(fake.all('couples').length, 0);
   assert.strictEqual(fake.get('users', 'oA').coupleId, null);
@@ -726,7 +727,7 @@ test('create 连续 5 次邀请码冲突后返回 INTERNAL_ERROR，不产生脏�
   try {
     await assert.rejects(() => bind.create({ startDate: '2024-05-20' }, makeCtx(fake, 'oB')), {
       code: 'INTERNAL_ERROR',
-      message: '邀请码生成失败，请稍后再试',
+      message: '服务开小差了，稍后再试',
     });
   } finally {
     restore();
@@ -857,4 +858,126 @@ test('bind.preview / bind.confirm / bind.cancel: 邀请文档读故障要上抛�
   fake.db.collection = realCollection;
   const applied = await bind.apply({ code: '999999' }, ctxB);
   assert.strictEqual(applied.state, 'applied_by_me');
+});
+
+test('惰性 expired 的邀请码：preview/apply/confirm 都报 INVITE_EXPIRED（文档 14.3）', async () => {
+  const fake = makeFakeDb({
+    users: [userDoc('oA'), userDoc('oB')],
+    bind_invites: [seedInvite({
+      _id: '123123',
+      code: '123123',
+      creatorOpenid: 'oA',
+      applicantOpenid: 'oB',
+      status: 'applied',
+      expiresAt: new Date(NOW.getTime() - HOUR_MS),
+    })],
+  });
+  const ctxA = makeCtx(fake, 'oA');
+  const ctxB = makeCtx(fake, 'oB');
+
+  // 先让 creator 打开首页：过期邀请被惰性置 expired，状态从 applied 变成 expired
+  await bind.status({}, ctxA);
+  assert.strictEqual(fake.get('bind_invites', '123123').status, 'expired');
+
+  // 不能因为「状态已经是 expired」就退回 INVITE_USED，语义仍是过期
+  await assert.rejects(() => bind.preview({ code: '123123' }, ctxB), { code: 'INVITE_EXPIRED' });
+  await assert.rejects(() => bind.apply({ code: '123123' }, ctxB), { code: 'INVITE_EXPIRED' });
+  await assert.rejects(() => bind.confirm({ code: '123123' }, ctxA), { code: 'INVITE_EXPIRED' });
+});
+
+test('失败计数并发下不丢更新：8 个并发错码每个都计一次，之后立刻限流', async () => {
+  const fake = makeFakeDb({ users: [userDoc('oB', { bindFailCount: 4, bindFailResetAt: NOW })] });
+
+  // 8 个请求同时进来（每个都重新读库）；并发窗口内都通过预检，但每次失败都要落一次计数
+  const results = await Promise.allSettled(Array.from({ length: 8 }, () => (
+    bind.preview({ code: '000000' }, makeCtx(fake, 'oB'))
+  )));
+  assert.strictEqual(results.filter((r) => r.status === 'rejected').length, 8);
+  results.forEach((r) => assert.strictEqual(r.reason.code, 'INVITE_NOT_FOUND'));
+
+  // 4 + 8：没有丢更新（读-改-写实现下会只剩 5）
+  assert.strictEqual(fake.get('users', 'oB').bindFailCount, 12);
+
+  // 下一次请求读到最新计数，直接被限流
+  await assert.rejects(() => bind.preview({ code: '000000' }, makeCtx(fake, 'oB')),
+    { code: 'BIND_RATE_LIMITED' });
+
+  // 事务里被他人抢先（码已不可用）也计一次失败（文档 6.9）
+  const fake2 = makeFakeDb({
+    users: [userDoc('oA'), userDoc('oC')],
+    bind_invites: [seedInvite({ _id: '454545', code: '454545', creatorOpenid: 'oA' })],
+  });
+  const ctxC = makeCtx(fake2, 'oC');
+  const realRun = fake2.db.runTransaction;
+  fake2.db.runTransaction = async (fn) => {
+    // 预检之后、事务提交之前，邀请码被第三人申请走
+    await fake2.db.collection('bind_invites').doc('454545').update({ data: { status: 'applied' } });
+    return realRun(fn);
+  };
+  await assert.rejects(() => bind.apply({ code: '454545' }, ctxC), { code: 'INVITE_USED' });
+  assert.strictEqual(fake2.get('users', 'oC').bindFailCount, 1, '被他人抢先要计失败');
+});
+
+test('bind.preview: 已确认的邀请码过了 24h 仍报 INVITE_USED，不被惰性过期覆盖（14.3）', async () => {
+  const fake = makeFakeDb({
+    users: [userDoc('oA'), userDoc('oB'), userDoc('oC')],
+    bind_invites: [seedInvite({
+      status: 'confirmed',
+      applicantOpenid: 'oB',
+      coupleId: 'c_9',
+      confirmedAt: new Date(NOW.getTime() - 2 * HOUR_MS),
+      expiresAt: new Date(NOW.getTime() - HOUR_MS),
+    })],
+  });
+  await assert.rejects(() => bind.preview({ code: '482913' }, makeCtx(fake, 'oC')), { code: 'INVITE_USED' });
+  assert.strictEqual(fake.get('bind_invites', '482913').status, 'confirmed', '不能把已确认码覆写成 expired');
+  assert.strictEqual(fake.get('users', 'oC').bindFailCount, 1, '预览失败按 6.9 计一次');
+});
+
+test('bind.preview/confirm: 已取消的邀请码按 INVITE_USED / INVITE_NOT_APPLIED 返回，不因过期改语义', async () => {
+  const fake = makeFakeDb({
+    users: [userDoc('oA'), userDoc('oB'), userDoc('oC')],
+    bind_invites: [seedInvite({
+      status: 'cancelled',
+      applicantOpenid: 'oB',
+      expiresAt: new Date(NOW.getTime() - HOUR_MS),
+    })],
+  });
+  await assert.rejects(() => bind.preview({ code: '482913' }, makeCtx(fake, 'oC')), { code: 'INVITE_USED' });
+  await assert.rejects(() => bind.confirm({ code: '482913' }, makeCtx(fake, 'oA')), { code: 'INVITE_NOT_APPLIED' });
+  assert.strictEqual(fake.get('bind_invites', '482913').status, 'cancelled', '不覆写 cancelled 状态');
+});
+
+test('限流：拿旧 ctx 快照的请求也必须读到库内最新失败计数', async () => {
+  const fake = makeFakeDb({ users: [userDoc('oB', { bindFailCount: 4, bindFailResetAt: NOW })] });
+  const first = makeCtx(fake, 'oB');
+  const stale = makeCtx(fake, 'oB');
+  assert.strictEqual(stale.user.bindFailCount, 4, '两个快照都是 4，模拟同一瞬间进入');
+
+  await assert.rejects(() => bind.preview({ code: '000000' }, first), { code: 'INVITE_NOT_FOUND' });
+  assert.strictEqual(fake.get('users', 'oB').bindFailCount, 5);
+  assert.strictEqual(stale.user.bindFailCount, 4, '旧快照本身不会自动更新');
+
+  // 若实现直接拿 ctx.user 判限流就会放行；必须读库才拦得住（审查 P3-3）
+  await assert.rejects(() => bind.preview({ code: '111111' }, stale), { code: 'BIND_RATE_LIMITED' });
+  assert.strictEqual(fake.get('users', 'oB').bindFailCount, 5, '被限流的请求不再累加');
+});
+
+test('bind.confirm: 事务内更新邀请码时刷新 updatedAt（审查 P3-6）', async () => {
+  const oldAt = new Date(NOW.getTime() - 2 * HOUR_MS);
+  const fake = makeFakeDb({
+    users: [userDoc('oA'), userDoc('oB')],
+    bind_invites: [seedInvite({ status: 'applied', applicantOpenid: 'oB', appliedAt: oldAt, updatedAt: oldAt })],
+  });
+  const res = await bind.confirm({ code: '482913' }, makeCtx(fake, 'oA'));
+  assert.ok(res.coupleId, '确认成功应返回 coupleId');
+  const invite = fake.get('bind_invites', '482913');
+  assert.strictEqual(invite.status, 'confirmed');
+  assert.strictEqual(invite.updatedAt.getTime(), NOW.getTime());
+});
+
+test('bind.create: regenerate 非布尔时用中文字段提示（16.2）', async () => {
+  const fake = makeFakeDb({ users: [userDoc('oA', { nickname: '小怡' })] });
+  await assert.rejects(() => bind.create({ startDate: TODAY, regenerate: 'true' }, makeCtx(fake, 'oA')),
+    { code: 'INVALID_INPUT', message: '重新生成必须是布尔值' });
 });

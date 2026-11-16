@@ -35,8 +35,9 @@ const SENSITIVE_CONSOLE = [
   // 只截尾部（.slice(-6)）或取长度（.length）不算泄露，故排除这两种安全用法。
   { name: '完整 openid', regex: /(\(|,)\s*openid\s*[,)]/i },
   { name: '完整 coupleId', regex: /(\(|,)\s*coupleId\s*[,)]/i },
-  { name: '完整 openid', regex: /\.openid\b(?!\s*\)?\s*\.\s*(slice|substr|substring|length)\b)/i },
-  { name: '完整 coupleId', regex: /\.coupleId\b(?!\s*\)?\s*\.\s*(slice|substr|substring|length)\b)/i },
+  // 属性形式同样只放过「真截尾」：slice/substr 且负索引；substring 不支持负索引、slice(-0) 返回整串，都要报
+  { name: '完整 openid', regex: /\.openid\b(?!\s*(?:\)\s*)?\.\s*(?:(?:slice|substr)\s*\(\s*-\s*[1-9]\d*\s*\)|length\b))/i },
+  { name: '完整 coupleId', regex: /\.coupleId\b(?!\s*(?:\)\s*)?\.\s*(?:(?:slice|substr)\s*\(\s*-\s*[1-9]\d*\s*\)|length\b))/i },
   { name: '手机号', regex: /\b1[3-9]\d{9}\b/ },
   { name: '密钥', regex: /AppSecret|SecretKey|PRIVATE KEY/i },
 ];
@@ -170,7 +171,9 @@ function extractConsoleStatements(text) {
  */
 function maskDesensitizedProps(statement) {
   return statement.replace(
-    /String\(\s*[\w.$]*\.(?:openid|coupleId)\b[^)]*\)\s*\.\s*(?:slice|substr|substring|length)\s*\(/gi,
+    // 只认「真的只取尾部」的写法：slice/substr 且负索引且不是 -0；
+    // substring 不支持负索引（substring(-6) 返回整串）、slice(-0) 也返回整串，都不能当脱敏。
+    /String\(\s*(?:[\w.$]*\.)?(?:openid|coupleId)\b[^)]*\)\s*\.\s*(?:(?:slice|substr)\s*\(\s*-\s*[1-9]\d*\s*\)|length\b)/gi,
     'MASKED'
   );
 }

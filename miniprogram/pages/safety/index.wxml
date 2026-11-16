@@ -7,6 +7,7 @@
       class="checkin__btn {{checking ? 'checkin__btn--busy' : ''}}"
       bindtap="onCheckin"
       aria-label="我到家了"
+      aria-disabled="{{checking}}"
     >{{checking ? '记录中…' : '我到家了'}}</view>
     <input
       class="checkin__input"
@@ -37,6 +38,7 @@
         wx:key="checkinId"
         item="{{item}}"
         is-mine="{{item.openid === myOpenid}}"
+        today-key="{{todayKey}}"
       />
     </view>
 

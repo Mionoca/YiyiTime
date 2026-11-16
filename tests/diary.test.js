@@ -255,3 +255,45 @@ test('diary.list: 未绑定报 NOT_BOUND', async () => {
   const { ctx } = makeCtx({ bound: false });
   await expectCode(diary.list({}, ctx), 'NOT_BOUND');
 });
+// 文档 1.5 / 10.9：客户端不自己算「今天」，避免设备时钟偏差把昨天解锁的正文覆盖进今天
+test('diary.list: 返回服务端 todayKey，空列表也带 todayKey', async () => {
+  const { ctx } = makeCtx();
+  const res = await diary.list({}, ctx);
+  assert.strictEqual(res.todayKey, TODAY);
+  assert.deepStrictEqual(res.items, []);
+  assert.strictEqual(res.nextBeforeDate, null);
+});
+
+test('diary.list: todayKey 只跟服务端 ctx.now 走，与查询参数无关', async () => {
+  const { ctx } = makeCtx();
+  // 把设备/请求里的日期字段塞进 payload 也不影响 todayKey
+  const res = await diary.list({ todayKey: '1999-01-01', beforeDate: '1999-01-01' }, ctx);
+  assert.strictEqual(res.todayKey, TODAY);
+});
+
+test('diary: 超长正文、非法分页参数用中文字段提示（16.2）', async () => {
+  const { ctx } = makeCtx();
+  await assert.rejects(() => diary.save({ content: '字'.repeat(201) }, ctx),
+    { code: 'TEXT_TOO_LONG', message: '内容最多 200 字' });
+  await assert.rejects(() => diary.list({ limit: 1.5 }, ctx),
+    { code: 'INVALID_INPUT', message: '分页条数必须是整数' });
+  await assert.rejects(() => diary.list({ limit: 99 }, ctx),
+    { code: 'INVALID_INPUT', message: '分页条数超出范围' });
+});
+
+test('diary.save: 已解锁的今日记录不能再改（16.2 文案）', async () => {
+  const { ctx } = makeCtx({
+    data: {
+      diaries: [dayDoc({
+        id: 'oA_' + TODAY,
+        author: 'oA',
+        date: TODAY,
+        content: '昨晚写的',
+        unlockAt: '2026-11-15T16:00:00.000Z',
+      })],
+    },
+  });
+  await assert.rejects(() => diary.save({ content: '想改一下' }, ctx),
+    { code: 'DIARY_LOCKED', message: '这篇日记已经解锁，不能再改了' });
+});
+

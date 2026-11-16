@@ -1,7 +1,6 @@
 'use strict';
 
 const api = require('../../utils/api');
-const meUtil = require('../../utils/me');
 const constants = require('../../utils/constants');
 const format = require('../../utils/format');
 
@@ -20,7 +19,6 @@ Page({
     noteMax: LIMITS.wishNote,
     saving: false,
     pendingId: '',
-    myOpenid: '',
     progressText: '0/0',
     percent: 0,
     canAdd: true,
@@ -30,14 +28,6 @@ Page({
   onLoad() {
     this._firstShow = true;
     this.load();
-    meUtil
-      .getMe()
-      .then((user) => {
-        if (user && user.openid) this.setData({ myOpenid: user.openid });
-      })
-      .catch(() => {
-        // 失败的只是展示层「我/TA」的区分，不影响增删改
-      });
   },
 
   onShow() {

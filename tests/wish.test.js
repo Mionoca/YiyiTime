@@ -267,3 +267,21 @@ test('wish: 未绑定报 NOT_BOUND', async () => {
   await expectCode(wish.list({}, ctx), 'NOT_BOUND');
   await expectCode(wish.remove({ wishId: 'w_1' }, ctx), 'NOT_BOUND');
 });
+
+test('wish: 空愿望、非法 done 用中文字段提示（16.2）', async () => {
+  const { ctx } = makeCtx();
+  await assert.rejects(() => wish.add({ title: '   ' }, ctx),
+    { code: 'INVALID_INPUT', message: '愿望不能为空' });
+  await assert.rejects(() => wish.setDone({ wishId: 'w_1', done: 'true' }, ctx),
+    { code: 'INVALID_INPUT', message: '已完成必须是布尔值' });
+});
+
+test('wish.add: 愿望到达上限用 16.2 文案', async () => {
+  const seeded = Array.from({ length: 100 }, (_, i) => wishDoc({
+    _id: 'w_seed' + String(i).padStart(2, '0'),
+    title: '愿望' + i,
+  }));
+  const { ctx } = makeCtx({ data: { wishes: seeded } });
+  await assert.rejects(() => wish.add({ title: '再来一个' }, ctx),
+    { code: 'WISH_LIMIT_REACHED', message: '愿望太多啦，先完成几个吧' });
+});

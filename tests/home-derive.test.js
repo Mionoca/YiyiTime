@@ -352,3 +352,26 @@ test('分享：已绑定分享小屋，未绑定分享邀请（带码时直达�
     path: '/pages/bind/index',
   });
 });
+
+test('derive: 服务端把脏 startDate 降级为 null 时，天数/开始日/纪念日都不渲染（不出现「第 null 天」）', () => {
+  const page = instantiate(config);
+  const patch = page.derive(baseHome({
+    couple: { coupleId: 'c_1', startDate: null, daysTogether: null, anniversary: null },
+  }));
+  assert.strictEqual(patch.daysText, '');
+  assert.strictEqual(patch.startDateText, '');
+  assert.strictEqual(patch.anniversaryText, '');
+  // startDate 为 null 时选择器回显也是 null（wxml 的 picker value 接受 null/空）
+  assert.strictEqual(patch.startDateSelect, null);
+  assert.strictEqual(String(patch.hugHint || '').includes('null'), false);
+  assert.strictEqual(String(patch.calendarSub || '').includes('null'), false);
+});
+
+test('derive: 只有 startDate 没有纪念日时仍提示「开始那天就是纪念日」', () => {
+  const page = instantiate(config);
+  const patch = page.derive(baseHome({
+    couple: { coupleId: 'c_1', startDate: '2026-11-16', daysTogether: 1, anniversary: null },
+  }));
+  assert.strictEqual(patch.daysText, '第 1 天');
+  assert.strictEqual(patch.anniversaryText, '开始那天就是纪念日');
+});

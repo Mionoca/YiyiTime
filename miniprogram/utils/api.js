@@ -21,7 +21,7 @@ function call(action, payload) {
     .then((res) => {
       const result = res && res.result;
       if (!result || typeof result.ok !== 'boolean') {
-        throw new ApiError('EMPTY_RESPONSE', '服务没有正常响应，稍后再试');
+        throw new ApiError('EMPTY_RESPONSE', '服务没有返回结果');
       }
       if (!result.ok) {
         throw new ApiError(result.code, result.message, result.requestId);
@@ -33,7 +33,7 @@ function call(action, payload) {
       const errMsg = (err && (err.errMsg || err.message)) || '';
       // 超时也归入 NETWORK_ERROR（错误码表里没有 TIMEOUT）
       const slow = errMsg.indexOf('timeout') >= 0 || errMsg.indexOf('超时') >= 0;
-      throw new ApiError('NETWORK_ERROR', slow ? '网络有点慢，稍后再试' : '网络不太好，稍后再试');
+      throw new ApiError('NETWORK_ERROR', slow ? '网络有点慢，稍后再试' : '网络不太好，请稍后再试');
     });
 }
 

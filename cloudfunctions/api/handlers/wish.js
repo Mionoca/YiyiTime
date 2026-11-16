@@ -88,14 +88,14 @@ async function add(payload, ctx) {
   ctx.requireBound();
 
   const title = validate.string(p.title, {
-    field: 'title', min: 1, max: TITLE_MAX, required: true,
+    field: '愿望', min: 1, max: TITLE_MAX, required: true,
   });
-  const note = validate.string(p.note, { field: 'note', max: NOTE_MAX });
+  const note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
   const coupleId = relation.coupleIdOf(ctx);
 
   const docs = await loadAll(ctx, coupleId);
   if (docs.length >= WISH_MAX) {
-    throw new AppError('WISH_LIMIT_REACHED', '愿望最多存 ' + WISH_MAX + ' 条');
+    throw new AppError('WISH_LIMIT_REACHED', '愿望太多啦，先完成几个吧');
   }
 
   const wishId = newWishId();
@@ -143,11 +143,11 @@ async function update(payload, ctx) {
   const data = { updatedAt: ctx.now };
   if (hasTitle) {
     data.title = validate.string(p.title, {
-      field: 'title', min: 1, max: TITLE_MAX, required: true,
+      field: '愿望', min: 1, max: TITLE_MAX, required: true,
     });
   }
   if (hasNote) {
-    data.note = validate.string(p.note, { field: 'note', max: NOTE_MAX });
+    data.note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
   }
 
   await ctx.db.collection('wishes').doc(wishId).update({ data });
@@ -160,7 +160,7 @@ async function setDone(payload, ctx) {
   const p = validate.asObject(payload);
   ctx.requireBound();
   const wishId = wishIdOf(p);
-  const done = validate.boolean(p.done, 'done');
+  const done = validate.boolean(p.done, '已完成');
   const doc = await loadOwned(ctx, wishId);
 
   const data = { done, updatedAt: ctx.now };

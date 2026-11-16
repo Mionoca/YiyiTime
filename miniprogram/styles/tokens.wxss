@@ -10,7 +10,8 @@ page {
   --accent: #D98E73;
   /* 按钮底色：白字在 #D98E73 上只有 2.6:1，改用加深一档的 #A85C42（4.91:1，文档 8.9） */
   --accent-strong: #A85C42;
-  --accent-ink: #8A5A45;
+  /* 强调文字：在 --accent-soft 上 5.47:1、在 --card 上 8.15:1（文档 8.9；#8A5A45 只有 3.83:1） */
+  --accent-ink: #6E4433;
   --accent-soft: #F4C9B8;
   --card: #FFFDF9;
   --danger: #C25B4E;

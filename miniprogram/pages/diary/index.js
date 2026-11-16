@@ -56,7 +56,8 @@ Page({
       const res = await api.call('diary.list', { limit: PAGE_SIZE });
       const items = (res && res.items) || [];
       this._beforeDate = (res && res.nextBeforeDate) || '';
-      const todayKey = timeUtil.todayKey();
+      // 文档 1.5 / 10.9：今天是哪天由服务端给；设备改时间不能影响跨天判断
+      const todayKey = (res && res.todayKey) || timeUtil.todayKey();
       const today = items.filter((item) => item.date === todayKey)[0] || null;
       // 跨天（文档 10.7 跨天重拉）：编辑器要按新的一天重新初始化，否则昨晚草稿会被存成今天的日记
       const dayChanged = !!this.data.todayKey && this.data.todayKey !== todayKey;
@@ -137,7 +138,8 @@ Page({
   /** 保存成功先把今天这张卡片改成最新内容，列表顺序保持按日期倒序 */
   applyTodayDiary(diary) {
     const items = this.data.items.slice();
-    const todayKey = this.data.todayKey || timeUtil.todayKey();
+    // 用列表接口下发的服务端日期，取不到时退回这条日记自己的日期
+    const todayKey = this.data.todayKey || diary.date;
     const index = items.findIndex((item) => item.date === diary.date);
     const mine = { content: diary.content, updatedAt: diary.updatedAt };
     if (index >= 0) {

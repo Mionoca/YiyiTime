@@ -34,7 +34,7 @@ async function send(payload, ctx) {
   const coupleId = relation.coupleIdOf(ctx);
   const toOpenid = relation.partnerOpenidOf(ctx);
   if (!toOpenid) {
-    throw new AppError('NOT_BOUND', '还没有绑定');
+    throw new AppError('NOT_BOUND', '先邀请 TA 住进来吧');
   }
 
   const res = await ctx.db.collection('hugs')

@@ -57,6 +57,16 @@ async function get(payload, ctx) {
   }
 
   const coupleId = couple._id || ctx.user.coupleId;
+  // 脏 startDate 不能让整页 500：降级为「没有天数/纪念日」，用户仍可在资料页重设
+  // 不只看格式：未来日期/2000 年前会让 daysTogether 变负数或溢出，按脏数据降级
+  const startDateOk = time.isValidStartDate(couple.startDate, todayKey);
+  if (!startDateOk) {
+    console.error('[home.get] couple.startDate invalid', JSON.stringify({
+      openidTail: String(ctx.openid).slice(-6),
+      coupleIdTail: String(coupleId || '').slice(-6),
+      startDateType: typeof couple.startDate,
+    }));
+  }
   const partnerOpenid = (couple.memberOpenids || []).find((id) => id !== ctx.openid) || null;
   let partner = null;
   if (partnerOpenid) {
@@ -82,9 +92,9 @@ async function get(payload, ctx) {
     bind: { state: 'bound', pending: null },
     couple: {
       coupleId,
-      startDate: couple.startDate,
-      daysTogether: time.daysTogether(couple.startDate, todayKey),
-      anniversary: time.nextAnniversary(couple.startDate, todayKey),
+      startDate: startDateOk ? couple.startDate : null,
+      daysTogether: startDateOk ? time.daysTogether(couple.startDate, todayKey) : null,
+      anniversary: startDateOk ? time.nextAnniversary(couple.startDate, todayKey) : null,
     },
     partner,
     mood,

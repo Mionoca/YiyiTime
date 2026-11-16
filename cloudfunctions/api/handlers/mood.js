@@ -16,8 +16,8 @@ async function set(payload, ctx) {
   const p = validate.asObject(payload);
   ctx.requireBound();
 
-  const mood = validate.oneOf(p.mood, MOODS, 'mood');
-  const note = validate.string(p.note, { field: 'note', max: NOTE_MAX });
+  const mood = validate.oneOf(p.mood, MOODS, '心情');
+  const note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
   const coupleId = ctx.couple._id || ctx.user.coupleId;
   const date = time.dateKeyOf(ctx.now);
   const id = `${ctx.openid}_${date}`;

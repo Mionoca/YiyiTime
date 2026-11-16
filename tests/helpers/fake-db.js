@@ -53,6 +53,8 @@ function makeFakeDb(initial) {
     in: (values) => ({ $in: values.slice() }),
     lt: (value) => ({ $lt: value }),
     lte: (value) => ({ $lte: value }),
+    // 真实云开发 db.command.inc(n)：原子自增，用于避免读改写丢计数
+    inc: (value) => ({ $inc: value }),
   };
 
   function collection(name) {
@@ -73,7 +75,18 @@ function makeFakeDb(initial) {
             const doc = storeOf(name).get(id);
             // 真实云开发 update 文档不存在时返回 stats.updated=0 而不抛错
             if (!doc) return { stats: { updated: 0 } };
-            Object.assign(doc, data);
+            Object.keys(data || {}).forEach((key) => {
+              const value = data[key];
+              if (value && typeof value === 'object' && typeof value.$inc === 'number') {
+                // 与真实 MongoDB 一致：对非数字字段 $inc 会报错（不存在按 0 处理）
+                if (doc[key] !== undefined && typeof doc[key] !== 'number') {
+                  throw new Error('Cannot apply $inc to a value of non-numeric type');
+                }
+                doc[key] = (doc[key] || 0) + value.$inc;
+              } else {
+                doc[key] = value;
+              }
+            });
             return { stats: { updated: 1 } };
           },
           async set({ data }) {

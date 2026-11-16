@@ -153,3 +153,13 @@ test('mood.set: 忽略客户端传的 date，日期一律用服务端 todayKey',
   assert.strictEqual(res.mood.date, TODAY);
   assert.ok(fake.get('moods', 'oA_' + TODAY));
 });
+
+test('mood.set: 非法心情/备注用中文字段提示，不出现中英混排（16.2）', async () => {
+  const { ctx } = makeCtx();
+  await assert.rejects(() => set({ mood: 'storm' }, ctx),
+    { code: 'INVALID_INPUT', message: '心情不在允许范围内' });
+  await assert.rejects(() => set({ mood: 'sunny', note: '备'.repeat(51) }, ctx),
+    { code: 'TEXT_TOO_LONG', message: '备注最多 50 字' });
+  await assert.rejects(() => set({ mood: 'sunny', note: 123 }, ctx),
+    { code: 'INVALID_INPUT', message: '备注格式不对' });
+});

@@ -27,7 +27,7 @@ async function checkin(payload, ctx) {
   const p = validate.asObject(payload);
   ctx.requireBound();
 
-  const note = validate.string(p.note, { field: 'note', max: NOTE_MAX });
+  const note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
   const coupleId = relation.coupleIdOf(ctx);
   const todayKey = time.dateKeyOf(ctx.now);
   const nowMs = ctx.now.getTime();
@@ -98,10 +98,11 @@ async function list(payload, ctx) {
   ctx.requireBound();
 
   const limit = validate.integer(p.limit, {
-    field: 'limit', min: 1, max: LIMIT_MAX, defaultValue: LIMIT_DEFAULT,
+    field: '分页条数', min: 1, max: LIMIT_MAX, defaultValue: LIMIT_DEFAULT,
   });
 
   const coupleId = relation.coupleIdOf(ctx);
+  const todayKey = time.dateKeyOf(ctx.now);
   let cursor = null;
   if (p.cursor !== undefined && p.cursor !== null && p.cursor !== '') {
     cursor = parseCursor(p.cursor);
@@ -160,7 +161,8 @@ async function list(payload, ctx) {
     ? relation.iso(last.createdAt) + CURSOR_SEP + last._id
     : null;
 
-  return { items, nextCursor };
+  // 同 diary.list：服务端下发 todayKey，时间线里「今天 HH:mm」不再用设备时钟判断
+  return { items, nextCursor, todayKey };
 }
 
 module.exports = { checkin, list, NOTE_MAX, DEDUPE_MS, CURSOR_SEP };

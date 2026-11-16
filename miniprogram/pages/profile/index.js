@@ -24,6 +24,7 @@ Page({
     maxStartDate: '',
     startDateSaving: false,
     defaultAvatar: DEFAULT_AVATAR,
+    appVersion: '',
   },
 
   onShow() {
@@ -56,13 +57,17 @@ Page({
         // 上限用服务端 todayKey（文档 13.5：日期规则以服务端为准），取不到再退回本机
         maxStartDate: home.todayKey || timeUtil.todayKey(),
         startDateSelect: home.couple ? home.couple.startDate : '',
+        appVersion: this.getAppVersion(),
       };
       if (home.couple) {
-        patch.daysText = '第 ' + home.couple.daysTogether + ' 天';
-        patch.startDateText = timeUtil.formatDateCN(home.couple.startDate);
-        patch.anniversaryText = home.couple.anniversary
-          ? timeUtil.formatDateCN(home.couple.anniversary.date) + ' · 还有 ' + home.couple.anniversary.daysLeft + ' 天'
-          : '开始那天就是纪念日';
+        // 脏 startDate 时服务端会把 daysTogether/anniversary 降级为 null（home.get），
+        // 这里不能拼出「第 null 天」，与首页 derive 保持同一守卫
+        const couple = home.couple;
+        patch.daysText = couple.daysTogether ? '第 ' + couple.daysTogether + ' 天' : '';
+        patch.startDateText = couple.startDate ? timeUtil.formatDateCN(couple.startDate) : '';
+        patch.anniversaryText = couple.anniversary
+          ? timeUtil.formatDateCN(couple.anniversary.date) + ' · 还有 ' + couple.anniversary.daysLeft + ' 天'
+          : (couple.startDate ? '开始那天就是纪念日' : '');
       } else {
         patch.daysText = '';
         patch.startDateText = '';
@@ -74,6 +79,20 @@ Page({
     } catch (err) {
       this.setData({ loading: false, error: (err && err.message) || '小屋暂时打不开' });
     }
+  },
+
+  /** 关于里显示版本号（文档 8.3.6）；开发者工具/体验版取不到时退回「内测版」 */
+  getAppVersion() {
+    try {
+      if (wx.getAccountInfoSync) {
+        const info = wx.getAccountInfoSync();
+        const v = info && info.miniProgram && info.miniProgram.version;
+        if (v) return 'v' + v;
+      }
+    } catch (err) {
+      // 取不到不影响页面
+    }
+    return '内测版';
   },
 
   bindText(bind) {
@@ -203,7 +222,4 @@ Page({
     this.toast('可以在「微信 - 设置 - 隐私」里查看');
   },
 
-  onTapComingSoon() {
-    this.toast('这个功能还在装修中，下个版本见');
-  },
 });

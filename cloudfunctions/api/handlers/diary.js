@@ -29,7 +29,7 @@ async function save(payload, ctx) {
   ctx.requireBound();
 
   const content = validate.string(p.content, {
-    field: 'content', min: 1, max: CONTENT_MAX, required: true, emptyCode: 'DIARY_EMPTY',
+    field: '内容', min: 1, max: CONTENT_MAX, required: true, emptyCode: 'DIARY_EMPTY',
   });
   const coupleId = relation.coupleIdOf(ctx);
   const date = time.dateKeyOf(ctx.now);
@@ -48,7 +48,7 @@ async function save(payload, ctx) {
   if (existing) {
     const unlockMs = time.toMillis(existing.unlockAt);
     if (Number.isFinite(unlockMs) && ctx.now.getTime() >= unlockMs) {
-      throw new AppError('DIARY_LOCKED', '今天的日记已经解锁，不能再改了');
+      throw new AppError('DIARY_LOCKED', '这篇日记已经解锁，不能再改了');
     }
     await ctx.db.collection('diaries').doc(id).update({
       data: { coupleId, content, unlockAt, updatedAt: ctx.now },
@@ -96,7 +96,7 @@ async function list(payload, ctx) {
   ctx.requireBound();
 
   const limit = validate.integer(p.limit, {
-    field: 'limit', min: 1, max: LIMIT_MAX, defaultValue: LIMIT_DEFAULT,
+    field: '分页条数', min: 1, max: LIMIT_MAX, defaultValue: LIMIT_DEFAULT,
   });
   const todayKey = time.dateKeyOf(ctx.now);
   let beforeDate = time.addDays(todayKey, 1);
@@ -152,7 +152,9 @@ async function list(payload, ctx) {
   }
 
   const nextBeforeDate = items.length === limit ? items[items.length - 1].date : null;
-  return { items, nextBeforeDate };
+  // 文档 1.5 / 10.9：客户端不自己算「今天」，服务端把 todayKey 一起下发，
+  // 避免设备时钟偏差时把昨天已解锁的正文灌进今天的编辑器（10.7 跨天规则）
+  return { items, nextBeforeDate, todayKey };
 }
 
 module.exports = { save, list, CONTENT_MAX };

@@ -51,7 +51,7 @@
 .privacy__link {
   margin-top: 24rpx;
   font-size: var(--font-sm, 24rpx);
-  color: var(--accent-ink, #8A5A45);
+  color: var(--accent-ink, #6E4433);
   text-decoration: underline;
 }
 

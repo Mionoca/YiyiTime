@@ -126,6 +126,10 @@ test('发布预检：敏感日志按整条 console 语句扫描（多行负载�
   assert.deepStrictEqual(scanConsoleStatement('console.log(openid.slice(-6))'), []);
   assert.deepStrictEqual(scanConsoleStatement('console.log(entry.content.length)'), []);
   assert.deepStrictEqual(scanConsoleStatement("console.log('openidTail', { openidTail: x })"), []);
+  // 本地变量（无前缀点）走脱敏写法也不能误报，例如 coupleIdTail: coupleId ? String(coupleId).slice(-6) : ''
+  assert.deepStrictEqual(scanConsoleStatement("console.log({ coupleIdTail: coupleId ? String(coupleId).slice(-6) : '' })"), []);
+  // 但 String(coupleId) 没截尾时仍是完整值泄露
+  assert.ok(scanConsoleStatement('console.log(String(coupleId))').includes('完整 coupleId'));
 
   // 多行 JSON.stringify 负载（仓库里 cloudfunctions 的主流写法）
   const multiline = [
@@ -262,5 +266,35 @@ test('发布预检：本地 .env / .pem / env.js 不会被当成待提交密钥'
     assert.deepStrictEqual(failMessages(result), []);
   } finally {
     cleanup(dir);
+  }
+});
+
+test('发布预检：脱敏只认负索引，slice(0) 仍算泄露', () => {
+  const leak = extractConsoleStatements('console.log(String(coupleId).slice(0));')[0].text;
+  const ok = extractConsoleStatements('console.log(String(coupleId).slice(-6));')[0].text;
+  assert.ok(scanConsoleStatement(leak).includes('完整 coupleId'), 'slice(0) 不是脱敏，必须报');
+  assert.deepStrictEqual(scanConsoleStatement(ok), []);
+});
+
+test('发布预检：只有真正的负索引截尾才算脱敏（substring / slice(-0) 会返回整串）', () => {
+  const asStatement = (expr) => extractConsoleStatements('console.log(' + expr + ');')[0].text;
+  const leaks = [
+    ['String(coupleId).substring(-6)', 'substring 不支持负索引，返回整串'],
+    ['String(coupleId).slice(-0)', 'slice(-0) 等于 slice(0)，返回整串'],
+    ['String(ctx.openid).substring(-6)', '属性形式同样不能放行'],
+  ];
+  for (const [expr, why] of leaks) {
+    assert.ok(
+      scanConsoleStatement(asStatement(expr)).includes('完整 ' + (expr.indexOf('openid') !== -1 ? 'openid' : 'coupleId')),
+      expr + ' 会泄露完整值（' + why + '），必须报',
+    );
+  }
+  const safe = [
+    'String(coupleId).slice(-6)',
+    'String(ctx.user.coupleId || "").substr(-6)',
+    'String(coupleId).length',
+  ];
+  for (const expr of safe) {
+    assert.deepStrictEqual(scanConsoleStatement(asStatement(expr)), [], expr + ' 是安全的脱敏写法，不应误报');
   }
 });

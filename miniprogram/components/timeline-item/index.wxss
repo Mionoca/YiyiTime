@@ -62,7 +62,7 @@
 
 .tl--mine .tl__bubble {
   background: var(--accent-soft, #F4C9B8);
-  color: var(--accent-ink, #8A5A45);
+  color: var(--accent-ink, #6E4433);
 }
 
 .tl__bubble--plain {

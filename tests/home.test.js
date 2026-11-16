@@ -577,3 +577,46 @@ test('home.get: lastActiveAt 写库失败被吞掉，首页仍正常返回', asy
   assert.strictEqual(res.bind.state, 'unbound');
   assert.deepStrictEqual(fake.get('users', 'oA').lastActiveAt, last, '写失败保持原值');
 });
+
+// 文档 7.8 / 5.8：一条脏 startDate 不能把双方首页永久打成 INTERNAL_ERROR
+test('home.get: couple.startDate 缺失或非法时降级为 null，不整页失败也不渲染 NaN', async () => {
+  const ME = 'oABCDEF123456';
+  // 后两个（未来日期 / 2000 年前）格式合法但范围非法，必须一起降级（审查 P3-7）
+  for (const dirty of [undefined, '', 12345, 'garbage', '2099-01-01', '1999-12-31']) {
+    const { ctx } = makeCtx({
+      users: [{ _id: ME, coupleId: 'c_1' }],
+      couples: [{ _id: 'c_1', status: 'active', memberOpenids: [ME, 'oB'], startDate: dirty }],
+    });
+    ctx.openid = ME;
+    ctx.user = { _id: ME, coupleId: 'c_1' };
+    ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: [ME, 'oB'], startDate: dirty };
+    ctx.partner = { _id: 'oB' };
+
+    const logs = [];
+    const originalError = console.error;
+    console.error = (...args) => { logs.push(args); };
+    let res;
+    try {
+      res = await homeHandler.get({}, ctx);
+    } finally {
+      console.error = originalError;
+    }
+    assert.strictEqual(res.bind.state, 'bound', '绑定关系本身有效，只是日期脏');
+    assert.strictEqual(res.couple.coupleId, 'c_1');
+    assert.strictEqual(res.couple.startDate, null);
+    assert.strictEqual(res.couple.daysTogether, null);
+    assert.strictEqual(res.couple.anniversary, null);
+    assert.strictEqual(res.partner.openid, 'oB', '其他区块照常返回');
+
+    // 只记日志：类型可以记，完整 openid / 具体日期值不落日志
+    assert.strictEqual(logs.length, 1);
+    assert.strictEqual(logs[0][0], '[home.get] couple.startDate invalid');
+    const logged = JSON.parse(logs[0][1]);
+    assert.strictEqual(logged.startDateType, typeof dirty);
+    assert.strictEqual(logged.openidTail, '123456');
+    assert.strictEqual(JSON.stringify(logged).includes(ME), false);
+    if (typeof dirty === 'string' && dirty !== '') {
+      assert.strictEqual(JSON.stringify(logged).includes(dirty), false, '完整脏日期值不落日志');
+    }
+  }
+});

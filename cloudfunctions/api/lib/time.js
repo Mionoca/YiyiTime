@@ -27,8 +27,9 @@ function addDays(dateKey, n) {
   return dateKeyOf(new Date(start.getTime() + n * DAY_MS));
 }
 
-/** 在一起第几天；startDate 当天为 1 */
+/** 在一起第几天；startDate 当天为 1；日期不合法返回 null（调用方负责降级） */
 function daysTogether(startDate, todayKey) {
+  if (!isValidDateKey(startDate) || !isValidDateKey(todayKey)) return null;
   return Math.floor((startOfDateKey(todayKey) - startOfDateKey(startDate)) / DAY_MS) + 1;
 }
 
@@ -51,8 +52,9 @@ function daysInMonth(year, month) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-/** 下一个纪念日；2 月 29 日按当年 2 月最后一天处理 */
+/** 下一个纪念日；2 月 29 日按当年 2 月最后一天处理；日期不合法返回 null */
 function nextAnniversary(startDate, todayKey) {
+  if (!isValidDateKey(startDate) || !isValidDateKey(todayKey)) return null;
   const [sy, sm, sd] = startDate.split('-').map(Number);
   const [ty] = todayKey.split('-').map(Number);
 

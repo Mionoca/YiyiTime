@@ -12,6 +12,7 @@ const { buildContext } = require('./lib/ctx');
 exports.main = async (event) => {
   const action = event && event.action;
   let openid = '';
+  let coupleId = '';
   const rawPayload = event && event.payload;
   const payload = rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
     ? rawPayload
@@ -26,10 +27,11 @@ exports.main = async (event) => {
     const { OPENID } = cloud.getWXContext();
     openid = OPENID || '';
     if (!OPENID) {
-      throw new AppError('UNAUTHORIZED', '无法识别当前用户');
+      throw new AppError('UNAUTHORIZED', '请重新进入小程序');
     }
 
     const ctx = await buildContext({ openid: OPENID });
+    coupleId = ctx.user.coupleId || '';
     const data = await handlers[action](payload, ctx);
     return { ok: true, data };
   } catch (err) {
@@ -41,6 +43,8 @@ exports.main = async (event) => {
       code: String((err && (err.code || err.errCode)) || 'INTERNAL_ERROR'),
       message: err && err.message,
       openidTail: openid ? openid.slice(-6) : '',
+      // 文档 6.11：coupleId 只记后 6 位，不记完整值
+      coupleIdTail: coupleId ? String(coupleId).slice(-6) : '',
     }));
     return toErrorResponse(err, requestId);
   }

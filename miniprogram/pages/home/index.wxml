@@ -47,15 +47,17 @@
     </view>
 
     <!-- 墙历 -->
-    <view class="calendar" bindtap="onTapCalendar" aria-label="我们的日子" aria-role="button">
+    <view class="calendar {{calendarSoon ? 'calendar-soon' : ''}}" bindtap="onTapCalendar" aria-label="我们的日子" aria-role="button">
       <view class="calendar-top">我们的日子</view>
       <view class="calendar-days" wx:if="{{home.couple}}">{{daysText}}</view>
       <view class="calendar-days calendar-days-empty" wx:else>从今天开始</view>
+      <view class="calendar-sub" wx:if="{{calendarSub}}">{{calendarSub}}</view>
     </view>
 
     <!-- 相框 -->
-    <view class="frame" bindtap="onTapProfile" aria-label="我的" aria-role="button">
+    <view class="frame {{profileIncomplete ? 'frame--todo' : ''}}" bindtap="onTapProfile" aria-label="我的" aria-role="button">
       <image class="frame-avatar" src="{{myAvatar}}" mode="aspectFill" />
+      <view class="frame-tip" wx:if="{{profileIncomplete}}">+ 我的</view>
     </view>
 
     <!-- 落地灯（日记，文档 9.10：我写了今天灯亮，TA 写了未解锁旁边小光点） -->

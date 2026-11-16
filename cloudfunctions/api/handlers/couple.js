@@ -17,7 +17,7 @@ async function updateStartDate(payload, ctx) {
   const startDate = p.startDate;
   const todayKey = time.dateKeyOf(ctx.now);
   if (typeof startDate !== 'string' || startDate.length !== 10 || !time.isValidStartDate(startDate, todayKey)) {
-    throw new AppError('START_DATE_INVALID', '开始日期要选 2000 年以后、今天之前');
+    throw new AppError('START_DATE_INVALID', '选一个合适的开始日期');
   }
 
   const coupleId = ctx.couple._id || ctx.user.coupleId;

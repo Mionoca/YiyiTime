@@ -71,7 +71,7 @@ test('OPENID 为空或缺失时返回 UNAUTHORIZED，且不自动建用户文档
     const res = await h.main({ action: 'system.ping' });
     assert.deepStrictEqual(
       { ok: res.ok, code: res.code, message: res.message },
-      { ok: false, code: 'UNAUTHORIZED', message: '无法识别当前用户' },
+      { ok: false, code: 'UNAUTHORIZED', message: '请重新进入小程序' },
     );
     assert.match(res.requestId, REQUEST_ID);
     assert.strictEqual(h.fake().all('users').length, 0);
@@ -155,7 +155,7 @@ test('handler 抛非 AppError 时对客户端返回 INTERNAL_ERROR，不泄露�
 
   // 服务端日志：只有 openid 后 6 位，其余字段可解析
   const logged = JSON.parse(logs[0][1]);
-  assert.deepStrictEqual(Object.keys(logged).sort(), ['action', 'code', 'message', 'openidTail', 'requestId']);
+  assert.deepStrictEqual(Object.keys(logged).sort(), ['action', 'code', 'coupleIdTail', 'message', 'openidTail', 'requestId']);
   assert.strictEqual(logged.action, 'test.boom');
   assert.strictEqual(logged.code, 'INTERNAL_ERROR');
   assert.strictEqual(logged.openidTail, '123456');

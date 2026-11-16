@@ -41,7 +41,7 @@ test('call: 响应不是 {ok:boolean} 时抛 EMPTY_RESPONSE', async () => {
     await assert.rejects(() => api.call('x'), (err) => {
       assert.ok(err instanceof api.ApiError);
       assert.strictEqual(err.code, 'EMPTY_RESPONSE');
-      assert.strictEqual(err.message, '服务没有正常响应，稍后再试');
+      assert.strictEqual(err.message, '服务没有返回结果');
       return true;
     });
   }
@@ -82,7 +82,7 @@ test('call: 云函数调用失败的 errMsg 映射成 NETWORK_ERROR', async () =
   stubWx(() => Promise.reject({ errMsg: 'cloud.callFunction:fail network error' }));
   await assert.rejects(() => api.call('x'), (err) => {
     assert.strictEqual(err.code, 'NETWORK_ERROR');
-    assert.strictEqual(err.message, '网络不太好，稍后再试');
+    assert.strictEqual(err.message, '网络不太好，请稍后再试');
     return true;
   });
 });
@@ -92,7 +92,7 @@ test('call: 网络失败没有 errMsg 时（字符串/空对象 reject）也归�
     stubWx(() => Promise.reject(failure));
     await assert.rejects(() => api.call('x'), (err) => {
       assert.strictEqual(err.code, 'NETWORK_ERROR');
-      assert.strictEqual(err.message, '网络不太好，稍后再试');
+      assert.strictEqual(err.message, '网络不太好，请稍后再试');
       return true;
     });
   }

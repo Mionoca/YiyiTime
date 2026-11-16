@@ -126,3 +126,18 @@ test('toMillis: Date / ISO 字符串 / 时间戳 / 对象 / 非法值', () => {
   assert.ok(Number.isNaN(time.toMillis(null)));
   assert.ok(Number.isNaN(time.toMillis('not-a-date')));
 });
+test('daysTogether / nextAnniversary: 非法或缺失日期返回 null，不抛也不产生 NaN（脏 startDate 降级）', () => {
+  assert.strictEqual(time.daysTogether(undefined, '2026-11-16'), null);
+  assert.strictEqual(time.daysTogether('garbage', '2026-11-16'), null);
+  assert.strictEqual(time.daysTogether(12345, '2026-11-16'), null);
+  assert.strictEqual(time.daysTogether('2026-11-10', '2026-13-01'), null);
+  // 合法输入仍然正常，确认防御没把正常路径关掉
+  assert.strictEqual(time.daysTogether('2026-11-10', '2026-11-16'), 7);
+  assert.strictEqual(time.nextAnniversary(undefined, '2026-11-16'), null);
+  assert.strictEqual(time.nextAnniversary('garbage', '2026-11-16'), null);
+  assert.strictEqual(time.nextAnniversary('2026-11-10', null), null);
+  assert.deepStrictEqual(time.nextAnniversary('2026-11-10', '2026-11-16'), {
+    date: '2027-11-10', daysLeft: 359, years: 1,
+  });
+});
+

@@ -18,6 +18,7 @@ Page({
     loadingMore: false,
     error: '',
     myOpenid: '',
+    todayKey: '',
   },
 
   onLoad() {
@@ -88,6 +89,8 @@ Page({
       this._loaded = true;
       this.setData({
         items,
+        // 服务端今天（文档 1.5）：只用于时间线的「今天 HH:mm」展示
+        todayKey: reset ? ((res && res.todayKey) || this.data.todayKey) : this.data.todayKey,
         nextCursor: (res && res.nextCursor) || null,
         loading: false,
         loadingMore: false,
@@ -126,7 +129,10 @@ Page({
       const res = await api.call('safety.checkin', payload);
       this.setData({ checking: false });
       if (res && res.deduped) {
+        // 文档 8.3.5：成功（含去重命中）都要清空备注并刷新第一页
+        this.setData({ note: '' });
         wx.showToast({ title: '刚刚已经报过平安', icon: 'none', duration: 1800 });
+        await this.load(true, true);
         return;
       }
       this.setData({ note: '' });

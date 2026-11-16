@@ -240,3 +240,20 @@ test('safety.list: 未绑定报 NOT_BOUND', async () => {
   const { ctx } = makeCtx({ bound: false });
   await expectCode(safety.list({}, ctx), 'NOT_BOUND');
 });
+// 同 diary.list：时间线「今天 HH:mm」用服务端日期判断，不依赖设备时钟（10.9）
+test('safety.list: 返回服务端 todayKey，空列表也带 todayKey', async () => {
+  const { ctx } = makeCtx();
+  const res = await safety.list({}, ctx);
+  assert.strictEqual(res.todayKey, TODAY);
+  assert.deepStrictEqual(res.items, []);
+  assert.strictEqual(res.nextCursor, null);
+});
+
+test('safety: 超长备注、非法分页参数用中文字段提示（16.2）', async () => {
+  const { ctx } = makeCtx();
+  await assert.rejects(() => safety.checkin({ note: '备'.repeat(51) }, ctx),
+    { code: 'TEXT_TOO_LONG', message: '备注最多 50 字' });
+  await assert.rejects(() => safety.list({ limit: '2' }, ctx),
+    { code: 'INVALID_INPUT', message: '分页条数必须是整数' });
+});
+

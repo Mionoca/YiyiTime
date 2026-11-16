@@ -17,7 +17,6 @@ Page({
     startDate: '',
     startDateText: '',
     maxDate: '',
-    expiresText: '',
     code: '',
     codeInput: '',
     preview: null,
@@ -116,6 +115,16 @@ Page({
         patch.codeInput = this.shareCode;
       }
 
+      if (status.todayKey) {
+        // 文档 1.5 / 10.9：日期上限用服务端今天，设备时钟超前也选不到未来
+        patch.todayKey = status.todayKey;
+        patch.maxDate = status.todayKey;
+        if (!this._startDateTouched && patch.step === 'invite') {
+          patch.startDate = status.todayKey;
+          patch.startDateText = timeUtil.formatDateCN(status.todayKey);
+        }
+      }
+
       this.setData(patch);
       if (patch.step === 'enter') this.doPreview(this.shareCode);
     } catch (err) {
@@ -134,7 +143,6 @@ Page({
       bindState: state,
       startDate,
       startDateText: timeUtil.formatDateCN(startDate),
-      expiresText: p ? timeUtil.formatTime(p.expiresAt) : '',
     };
   },
 
@@ -142,6 +150,9 @@ Page({
     if (!this.ready || this.data.submitting) return 'busy';
     try {
       const status = await api.call('bind.status');
+      if (status.todayKey && status.todayKey !== this.data.maxDate) {
+        this.setData({ maxDate: status.todayKey, todayKey: status.todayKey });
+      }
       if (status.state === 'bound') {
         wx.reLaunch({ url: constants.ROUTES.home });
         return 'bound';
@@ -151,7 +162,7 @@ Page({
       }
       if (status.state === 'unbound') {
         if (STEP_WITH_PENDING.indexOf(this.data.step) >= 0) {
-          this.setData({ step: 'invite', bindState: 'unbound', pending: null, code: '', expiresText: '' });
+          this.setData({ step: 'invite', bindState: 'unbound', pending: null, code: '' });
         }
         return 'unbound';
       }
@@ -227,6 +238,7 @@ Page({
 
   onStartDateChange(e) {
     const startDate = e.detail.value;
+    this._startDateTouched = true;
     this.setData({ startDate, startDateText: timeUtil.formatDateCN(startDate) });
   },
 
@@ -399,7 +411,6 @@ Page({
         bindState: 'unbound',
         pending: null,
         code: '',
-        expiresText: '',
       });
       wx.showToast({ title: '已取消', icon: 'none' });
     } catch (err) {

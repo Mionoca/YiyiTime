@@ -90,7 +90,7 @@
     <view class="section-title">邀请码准备好了</view>
     <view class="card code-card">
       <view class="code-value">{{pending.code}}</view>
-      <view class="code-expire">有效期至 {{expiresText}}</view>
+      <view class="code-expire">24 小时内有效</view>
     </view>
     <view class="section-sub">把它发给 TA，等 TA 输入</view>
 

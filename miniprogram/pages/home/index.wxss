@@ -238,6 +238,21 @@
   font-weight: 400;
 }
 
+/* 文档 9.3 / 9.10：纪念日临近时墙历高亮并提示还有几天 */
+.calendar-soon {
+  box-shadow: 0 6rpx 16rpx rgba(168, 92, 66, 0.28);
+}
+
+.calendar-soon .calendar-days {
+  color: var(--accent-strong);
+}
+
+.calendar-sub {
+  margin-top: 4rpx;
+  font-size: 18rpx;
+  color: var(--accent-ink);
+}
+
 /* ---------- 相框 ---------- */
 .frame {
   position: absolute;
@@ -259,6 +274,25 @@
   height: 100%;
   border-radius: 4rpx;
   background: var(--wall);
+}
+
+/* 文档 9.3：资料没填完时相框显示「+ 我的」占位 */
+.frame--todo .frame-avatar {
+  opacity: 0.35;
+}
+
+.frame-tip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 4rpx 0;
+  font-size: 18rpx;
+  text-align: center;
+  /* 白字压在深色蒙层上 ≈6.9:1（文档 8.9） */
+  color: #FFFDF9;
+  background: rgba(75, 58, 46, 0.88);
+  border-radius: 0 0 4rpx 4rpx;
 }
 
 /* ---------- 落地灯（文档 9.2：台灯在左） ---------- */
@@ -453,16 +487,22 @@
 
 .person-name {
   margin-top: 8rpx;
-  max-width: 140rpx;
+  max-width: 160rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 999rpx;
   font-size: 20rpx;
-  color: #6B5B4E;
+  /* 文档 8.9：沙发上的名字要 ≥4.5:1，加浅色名牌底（#4A3A2E on #FFF6EC = 10.2:1） */
+  color: #4A3A2E;
+  background: #FFF6EC;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .phase-night .person-name {
-  color: #EFE6D8;
+  /* 夜间深底浅字（#F6ECDF on #4B3A2E = 9.3:1） */
+  color: #F6ECDF;
+  background: #4B3A2E;
 }
 
 .empty-seat {
@@ -483,13 +523,19 @@
 
 .empty-text {
   margin-top: 8rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 999rpx;
   font-size: 20rpx;
-  color: #9C8B7A;
+  /* 文档 8.9 / 9.6：未绑定的唯一提示不能靠淡色压沙发（#5A4A3D on #FFF6EC = 7.9:1） */
+  color: #5A4A3D;
+  background: #FFF6EC;
   white-space: nowrap;
 }
 
 .phase-night .empty-text {
-  color: #C9BCA9;
+  /* 夜间深底浅字（#EFE6D8 on #4B3A2E = 10.3:1） */
+  color: #EFE6D8;
+  background: #4B3A2E;
 }
 
 /* ---------- 桌子（愿望便签） ---------- */
@@ -545,10 +591,15 @@
 }
 
 .table-note-text {
-  display: block;
+  /* 文档 9.9：愿望标题最多 30 字，便签只有两行高度，超出必须省略而不是硬裁 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-size: 20rpx;
   line-height: 1.4;
-  color: #8A6A45;
+  /* 文档 8.9：#6E4433 on #FFF5D6 = 7.6:1（原来的 #8A6A45 只有 4.56:1，压线） */
+  color: var(--accent-ink);
   word-break: break-all;
 }
 
@@ -610,7 +661,7 @@
   padding: 2rpx 10rpx;
   border-radius: 999rpx;
   /* 白字压在 --accent 上只有 2.6:1，改用 --accent-ink（5.8:1，文档 8.9） */
-  background: var(--accent-ink, #8A5A45);
+  background: var(--accent-ink, #6E4433);
   color: #FFFFFF;
   font-size: 18rpx;
   line-height: 1.6;
