@@ -4,6 +4,7 @@
 // 说明：node --test 每个测试文件独立子进程，所以 global.wx / global.Page 不会跨文件串味；
 // 同一文件内需要还原时调用 restoreWx()。installWx 只替换 wx，不合并默认桩。
 const path = require('node:path');
+const Module = require('node:module');
 
 let savedWx;
 let saved = false;
@@ -46,7 +47,6 @@ function instantiate(config) {
   return page;
 }
 
-module.exports = { installWx, restoreWx, loadPage, instantiate };
 /** require 一个小程序组件文件，返回传给 Component() 的配置对象。 */
 function loadComponent(relPath) {
   let config = null;
@@ -118,4 +118,49 @@ function instantiateComponent(config, props) {
   return instance;
 }
 
-module.exports = { installWx, restoreWx, loadPage, instantiate, loadComponent, instantiateComponent };
+/**
+ * require miniprogram/app.js 并返回传给 App() 的配置对象。
+ * options.envMissing: 模拟本机没有 config/env.js（require 抛 MODULE_NOT_FOUND）；
+ * options.env: 覆盖 require('./config/env') 的返回值（默认 { ENV_ID: 'test-env-id' }）。
+ * options.envError: 让 require('./config/env') 抛指定错误（模拟 env.js 语法写错等）。
+ * 只在加载 app.js 期间替换 Module._load，加载完立即还原并清缓存，不影响别的模块。
+ */
+function loadApp(options) {
+  const opts = options || {};
+  let config = null;
+  global.App = (cfg) => {
+    config = cfg;
+  };
+  const appPath = path.resolve(__dirname, '../..', 'miniprogram/app.js');
+  const originalLoad = Module._load;
+  let intercepted = 0;
+  Module._load = function patchedLoad(request, parent, isMain) {
+    if (request === './config/env' && parent && /[\\/]app\.js$/.test(parent.filename)) {
+      intercepted += 1;
+      if (opts.envError) {
+        throw opts.envError;
+      }
+      if (opts.envMissing) {
+        const err = new Error("Cannot find module './config/env'");
+        err.code = 'MODULE_NOT_FOUND';
+        throw err;
+      }
+      return opts.env === undefined ? { ENV_ID: 'test-env-id' } : opts.env;
+    }
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  delete require.cache[require.resolve(appPath)];
+  try {
+    require(appPath);
+  } finally {
+    Module._load = originalLoad;
+    delete require.cache[require.resolve(appPath)];
+  }
+  // 自检：app.js 若改了 require 路径，夹具会静默失效并让「缺 env.js」用例假通过。
+  if (intercepted === 0) {
+    throw new Error('loadApp: 没有拦截到 app.js 对 ./config/env 的 require，app.js 的 require 路径可能变了');
+  }
+  return config;
+}
+
+module.exports = { installWx, restoreWx, loadPage, instantiate, loadComponent, instantiateComponent, loadApp };
