@@ -874,6 +874,99 @@ function checkPromiseHandling(root, lines, warnings) {
   }
 }
 
+// 文档 11.9「客户端全局搜索 wx.cloud.database，结果为空」「唯一云函数入口」：
+// 客户端直连数据库会绕过云函数的成员校验与限流，直调别的云函数会绕开 utils/api.js 的错误归一，
+// 文档 11.9 要求「客户端全局搜索 wx.cloud.database，结果为空」，另有架构约定「云函数调用只经 utils/api.js」。
+// 只扫 miniprogram 下的生产代码；注释与字符串先遮掉（示例代码不该误报），再按整段文本匹配并换算行号。
+// 点号与括号写法（wx.cloud['database'] / wx.cloud['callFunction']）都算；括号里的键从原文取——遮蔽后引号与内容会变成空格。
+// 动态键（wx.cloud[expr]）无法静态判断，给 WARN 而不是放过；扫描不到客户端 JS 直接 FAIL，避免检查静默失效。
+// 覆盖范围：wx.cloud 的点号 / 括号（普通字符串键，含转义键还原）直接写法；可选链、括号化 wx.cloud、别名、模板键、动态键只给 WARN，不阻断发布。
+const CLIENT_ENTRY = 'miniprogram/utils/api.js';
+
+function lineOf(text, index) {
+  let line = 1;
+  for (let i = 0; i < index; i += 1) if (text[i] === '\n') line += 1;
+  return line;
+}
+
+// 遮蔽后的括号里只剩空格，键名要从原文同一区间取回来
+function bracketKey(text, start, end) {
+  // 括号里可能夹注释（wx.cloud[ /* 兼容 */ 'database' ]），先去掉注释再取键
+  const raw = text.slice(start, end).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+  const m = /\[\s*['\"]([^'\"]*)['\"]\s*\]/.exec(raw);
+  // 转义键（wx.cloud['\u0064atabase']）先还原，避免用转义绕过检查
+  return (m ? m[1] : '').replace(/\\u([0-9a-fA-F]{4})/g, (s, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+function checkClientCloudBoundary(root, lines, warnings) {
+  const files = [];
+  const walkErrors = [];
+  walk(root, 'miniprogram', files, walkErrors);
+  for (const err of walkErrors) lines.push({ level: 'WARN', msg: err });
+  const DOT = /\bwx\s*\.\s*cloud\s*\.\s*(database|callFunction)\b/g;
+  const BRACKET = /\bwx\s*\.\s*cloud\s*\[\s*\]/g;
+  const DYNAMIC = /\bwx\s*\.\s*cloud\s*\[\s*[^\s\]]/g;
+  let scanned = 0;
+  let skipped = 0;
+  let bad = 0;
+  let callFunctionHits = 0;
+  const report = (rel, masked, index, key) => {
+    if (key === 'database') {
+      lines.push({ level: 'FAIL', msg: rel + ':' + lineOf(masked, index) + ' 客户端直接访问云数据库 wx.cloud.database（文档 11.9 要求全局搜索为空）' });
+      bad += 1;
+      return;
+    }
+    if (key === 'callFunction') {
+      callFunctionHits += 1;
+      if (rel === CLIENT_ENTRY) return;
+      lines.push({ level: 'FAIL', msg: rel + ':' + lineOf(masked, index) + ' 在 utils/api.js 之外直接调用 wx.cloud.callFunction（客户端云函数入口唯一，只允许 utils/api.js）' });
+      bad += 1;
+    }
+  };
+  for (const rel of files) {
+    if (!rel.endsWith('.js')) continue;
+    const text = readText(path.join(root, rel));
+    if (text === null) {
+      skipped += 1;
+      warnings.push('云访问边界：跳过无法读取的客户端文件（>1MB 或非文本）：' + rel);
+      continue;
+    }
+    scanned += 1;
+    const masked = maskCommentsAndStrings(text);
+    // 点号与括号命中统一收集后按出现位置排序，保证 FAIL 日志是源码行序
+    const hits = [];
+    let m;
+    DOT.lastIndex = 0;
+    while ((m = DOT.exec(masked))) hits.push({ index: m.index, key: m[1] });
+    BRACKET.lastIndex = 0;
+    while ((m = BRACKET.exec(masked))) hits.push({ index: m.index, key: bracketKey(text, m.index, BRACKET.lastIndex) });
+    hits.sort((a, b) => a.index - b.index);
+    for (const hit of hits) {
+      if (!hit.key) {
+        warnings.push(rel + ':' + lineOf(masked, hit.index) + ' 无法静态解析 wx.cloud[...] 的键（模板字面量或变量键？），请人工确认是否绕过 utils/api.js');
+        continue;
+      }
+      report(rel, masked, hit.index, hit.key);
+    }
+    DYNAMIC.lastIndex = 0;
+    while ((m = DYNAMIC.exec(masked))) {
+      warnings.push(rel + ':' + lineOf(masked, m.index) + ' 有动态键的 wx.cloud[...]，静态检查无法判断是否绕过 utils/api.js，请人工确认');
+    }
+  }
+  if (!scanned) {
+    lines.push({ level: 'FAIL', msg: '没有扫描到客户端 JS 文件（miniprogram 目录为空或路径不对？），无法确认客户端云访问边界（文档 11.9）' });
+  }
+  if (!callFunctionHits) {
+    warnings.push('没有在客户端发现 wx.cloud.callFunction，云函数入口检查可能失效：请确认 miniprogram/utils/api.js 仍是唯一入口');
+  }
+  if (callFunctionHits && files.indexOf(CLIENT_ENTRY) === -1) {
+    warnings.push('白名单入口 ' + CLIENT_ENTRY + ' 不存在（改名或移动了？），外部 wx.cloud.callFunction 会被判 FAIL，请确认仍是唯一入口');
+  }
+  if (scanned && !bad && callFunctionHits) {
+    const skippedTip = skipped ? '（已跳过 ' + skipped + ' 个无法读取的文件）' : '';
+    lines.push({ level: 'PASS', msg: '客户端未直连数据库、云函数调用只经 utils/api.js（文档 11.9 全局搜索 wx.cloud.database 为空；检查了 ' + scanned + ' 个客户端 JS' + skippedTip + '）' });
+  }
+}
 function checkGit(root, lines, warnings) {
   const probe = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd: root, encoding: 'utf8', timeout: 10000 });
   if (probe.error || probe.status !== 0) {
@@ -918,6 +1011,7 @@ function runChecks(root) {
   checkPrivacy(app, root, lines);
   checkConsole(root, lines, warnings);
   checkPromiseHandling(root, lines, warnings);
+  checkClientCloudBoundary(root, lines, warnings);
   checkSecrets(root, lines);
   checkGit(root, lines, warnings);
 
@@ -955,6 +1049,7 @@ module.exports = {
   checkDeployConfig,
   checkPackageBudget,
   checkPromiseHandling,
+  checkClientCloudBoundary,
   versionAtLeast,
   scanTextForSecrets,
   scanConsoleStatement,

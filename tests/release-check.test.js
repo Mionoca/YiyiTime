@@ -69,6 +69,7 @@ function makeFixture() {
     writeFixtureFile(dir, 'miniprogram/' + page + '.js', 'Page({});\n');
   }
   writeFixtureFile(dir, 'miniprogram/utils/constants.js', "const DEFAULT_AVATAR = '/images/avatars/default.png';\nmodule.exports = { DEFAULT_AVATAR };\n");
+  writeFixtureFile(dir, 'miniprogram/utils/api.js', "function call(action) {\n  return wx.cloud.callFunction({ name: 'api', data: { action } });\n}\nmodule.exports = { call };\n");
   writeFixtureFile(dir, 'miniprogram/images/avatars/default.png', pngBytes(200, 200));
   writeFixtureFile(dir, 'miniprogram/config/env.example.js', 'module.exports = { ENV_ID: \'\' };\n');
   for (const ext of ['js', 'json', 'wxml']) {
@@ -123,6 +124,7 @@ test('发布预检：当前仓库静态检查全部通过', () => {
     'project.config.json 的根目录 / appid / compileType / 基础库 ≥ 2.32.3 正确',
     '图片资源与包体符合 8.8',
     '客户端 api.call 都已被 await / .then / .catch / return 处理',
+    '客户端未直连数据库、云函数调用只经 utils/api.js',
   ].forEach((needle) => {
     assert.ok(passText.includes(needle), '缺少检查项：' + needle);
   });
@@ -794,9 +796,14 @@ test('发布预检：客户端悬空的 api.call 会被拦下（13.11 未处理�
     const result = runChecks(huge);
     assert.strictEqual(result.ok, true, '超大文件应跳过而不是 FAIL：' + failMessages(result).join(' | '));
     assert.strictEqual(
-      result.warnings.filter((w) => w.includes('跳过无法读取的客户端文件')).length,
+      result.warnings.filter((w) => w.includes('未检查未处理 Promise')).length,
       1,
-      '跳过大文件必须 WARN',
+      '跳过大文件必须 WARN（未处理 Promise 检查）',
+    );
+    assert.strictEqual(
+      result.warnings.filter((w) => w.includes('云访问边界：跳过无法读取的客户端文件')).length,
+      1,
+      '跳过大文件必须 WARN（云访问边界检查）',
     );
     assert.ok(
       passText(result).includes('（已跳过 1 个无法读取的文件）'),
@@ -804,5 +811,305 @@ test('发布预检：客户端悬空的 api.call 会被拦下（13.11 未处理�
     );
   } finally {
     cleanup(huge);
+  }
+});
+
+test('发布预检：客户端不直连数据库、云函数入口唯一（11.9）', () => {
+  const passText = (result) => result.lines.filter((l) => l.level === 'PASS').map((l) => l.msg).join('\n');
+  const warnText = (result) => result.warnings.join('\n');
+  const boundaryPass = (result) => passText(result).includes('客户端未直连数据库、云函数调用只经 utils/api.js');
+
+  // 健康夹具：检查项给出 PASS，且不误报
+  const healthy = makeFixture();
+  try {
+    const result = runChecks(healthy);
+    assert.deepStrictEqual(failMessages(result), [], '健康夹具不应有 FAIL 项');
+    assert.ok(boundaryPass(result), '缺少客户端云访问边界 PASS：' + passText(result));
+    assert.ok(!warnText(result).includes('云函数入口检查可能失效'), '有入口时不应提示检查失效');
+    assert.ok(!warnText(result).includes('白名单入口'), '入口存在时不应提示入口缺失');
+  } finally {
+    cleanup(healthy);
+  }
+
+  // 页面绕过 api.js：直连数据库 + 直调云函数，两处都要 FAIL 并带文件:行号
+  const bypass = makeFixture();
+  try {
+    writeFixtureFile(
+      bypass,
+      'miniprogram/pages/home/extra.js',
+      ['const db = wx.cloud.database();', "wx.cloud.callFunction({ name: 'api' });", 'module.exports = {};', ''].join('\n'),
+    );
+    const result = runChecks(bypass);
+    const fails = failMessages(result).join('\n');
+    assert.strictEqual(result.ok, false, '绕过 utils/api.js 应让预检失败');
+    assert.ok(
+      fails.includes('miniprogram/pages/home/extra.js:1 客户端直接访问云数据库 wx.cloud.database（文档 11.9 要求全局搜索为空）'),
+      '直连数据库应报文件:1：' + fails,
+    );
+    assert.ok(
+      fails.includes('miniprogram/pages/home/extra.js:2 在 utils/api.js 之外直接调用 wx.cloud.callFunction（客户端云函数入口唯一，只允许 utils/api.js）'),
+      '绕过入口应报文件:2：' + fails,
+    );
+    assert.ok(!boundaryPass(result), '有 FAIL 时不应再打印云访问边界 PASS');
+  } finally {
+    cleanup(bypass);
+  }
+
+  // 括号写法同样要拦（遮蔽后括号里的键要从原文取回来）
+  const bracket = makeFixture();
+  try {
+    writeFixtureFile(
+      bracket,
+      'miniprogram/pages/home/extra.js',
+      [
+        "const db = wx.cloud['database']();",
+        "wx.cloud['callFunction']({ name: 'api' });",
+        "const db2 = wx.cloud[ /* 兼容旧写法 */ 'database' ]();",
+        'module.exports = {};',
+        '',
+      ].join('\n'),
+    );
+    const result = runChecks(bracket);
+    const fails = failMessages(result).join('\n');
+    assert.strictEqual(result.ok, false, "wx.cloud['database'] / wx.cloud['callFunction'] 也要让预检失败");
+    assert.ok(
+      fails.includes('miniprogram/pages/home/extra.js:1 客户端直接访问云数据库 wx.cloud.database'),
+      '括号直连数据库应报文件:1：' + fails,
+    );
+    assert.ok(
+      fails.includes('miniprogram/pages/home/extra.js:2 在 utils/api.js 之外直接调用 wx.cloud.callFunction'),
+      '括号绕过入口应报文件:2：' + fails,
+    );
+    assert.ok(
+      fails.includes('miniprogram/pages/home/extra.js:3 客户端直接访问云数据库 wx.cloud.database'),
+      '括号里夹注释也要拦住（第 3 行）：' + fails,
+    );
+  } finally {
+    cleanup(bracket);
+  }
+
+  // 白名单只认精确路径：同名 pages/api.js 不算；入口文件自己直连数据库也要 FAIL
+  const sameName = makeFixture();
+  try {
+    writeFixtureFile(sameName, 'miniprogram/pages/api.js', "wx.cloud.callFunction({ name: 'api' });\n");
+    const fails = failMessages(runChecks(sameName)).join('\n');
+    assert.ok(
+      fails.includes('miniprogram/pages/api.js:1 在 utils/api.js 之外直接调用 wx.cloud.callFunction'),
+      '只有精确路径才算入口：' + fails,
+    );
+  } finally {
+    cleanup(sameName);
+  }
+
+  const entryDb = makeFixture();
+  try {
+    writeFixtureFile(
+      entryDb,
+      'miniprogram/utils/api.js',
+      "const db = wx.cloud.database();\nfunction call(action) {\n  return wx.cloud.callFunction({ name: 'api', data: { action } });\n}\nmodule.exports = { call };\n",
+    );
+    const fails = failMessages(runChecks(entryDb)).join('\n');
+    assert.ok(
+      fails.includes('miniprogram/utils/api.js:1 客户端直接访问云数据库 wx.cloud.database'),
+      '入口文件自己直连数据库也要 FAIL：' + fails,
+    );
+  } finally {
+    cleanup(entryDb);
+  }
+
+  // 注释 / 字符串里的示例不误报；api.js 里跨行的 wx.cloud 换行 .callFunction 属于允许写法
+  const subtle = makeFixture();
+  try {
+    writeFixtureFile(
+      subtle,
+      'miniprogram/pages/home/comment.js',
+      [
+        '// wx.cloud.database() 只是示例',
+        "const tip = 'wx.cloud.database';",
+        '/* wx.cloud.callFunction */',
+        'const note = "wx.cloud.callFunction";',
+        'module.exports = { tip, note };',
+        '',
+      ].join('\n'),
+    );
+    writeFixtureFile(
+      subtle,
+      'miniprogram/utils/api.js',
+      [
+        'function call(action) {',
+        '  return wx.cloud',
+        "    .callFunction({ name: 'api', data: { action } });",
+        '}',
+        'module.exports = { call };',
+        '',
+      ].join('\n'),
+    );
+    const result = runChecks(subtle);
+    assert.deepStrictEqual(failMessages(result), [], '注释/字符串里的示例不应误报');
+    assert.ok(boundaryPass(result), '跨行入口写法应当放行：' + passText(result));
+  } finally {
+    cleanup(subtle);
+  }
+
+  // CRLF 与多命中：行号要准，两处违规要各报一条
+  const crlf = makeFixture();
+  try {
+    writeFixtureFile(
+      crlf,
+      'miniprogram/pages/home/crlf.js',
+      [
+        'module.exports = {};',
+        'wx.cloud.database();',
+        'module.exports = {};',
+        'module.exports = {};',
+        "wx.cloud.callFunction({ name: 'api' });",
+        '',
+      ].join('\r\n'),
+    );
+    const fails = failMessages(runChecks(crlf));
+    assert.strictEqual(fails.length, 2, '两处违规应各报一条：' + fails.join(' | '));
+    assert.ok(fails[0].startsWith('miniprogram/pages/home/crlf.js:2 '), 'CRLF 第 2 行：' + fails[0]);
+    assert.ok(fails[1].startsWith('miniprogram/pages/home/crlf.js:5 '), 'CRLF 第 5 行：' + fails[1]);
+  } finally {
+    cleanup(crlf);
+  }
+
+  // 点号与括号混合命中：FAIL 必须按源码行序输出
+  const mixed = makeFixture();
+  try {
+    writeFixtureFile(
+      mixed,
+      'miniprogram/pages/home/mixed.js',
+      [
+        'module.exports = {};',
+        'wx.cloud.database();',
+        "wx.cloud['database']();",
+        'module.exports = {};',
+        'module.exports = {};',
+        "wx.cloud.callFunction({ name: 'api' });",
+        '',
+      ].join('\n'),
+    );
+    const fails = failMessages(runChecks(mixed));
+    assert.strictEqual(fails.length, 3, '三处违规应各报一条：' + fails.join(' | '));
+    assert.ok(fails[0].startsWith('miniprogram/pages/home/mixed.js:2 '), '第 2 行点号直连：' + fails[0]);
+    assert.ok(fails[1].startsWith('miniprogram/pages/home/mixed.js:3 '), '第 3 行括号直连：' + fails[1]);
+    assert.ok(fails[2].startsWith('miniprogram/pages/home/mixed.js:6 '), '第 6 行绕过入口：' + fails[2]);
+  } finally {
+    cleanup(mixed);
+  }
+
+  // 入口文件用括号写法调 callFunction 属于允许写法：放行且仍算入口调用
+  const entryBracket = makeFixture();
+  try {
+    writeFixtureFile(
+      entryBracket,
+      'miniprogram/utils/api.js',
+      "function call(action) {\n  return wx.cloud['callFunction']({ name: 'api', data: { action } });\n}\nmodule.exports = { call };\n",
+    );
+    const result = runChecks(entryBracket);
+    assert.deepStrictEqual(failMessages(result), [], '入口括号写法不应 FAIL：' + failMessages(result).join(' | '));
+    assert.ok(boundaryPass(result), '入口括号写法应放行：' + passText(result));
+    assert.ok(!warnText(result).includes('白名单入口'), '入口存在时不应提示入口缺失：' + warnText(result));
+  } finally {
+    cleanup(entryBracket);
+  }
+
+  // 转义键（'\\u0064atabase'）先还原再比对，不能靠转义绕过
+  const escaped = makeFixture();
+  try {
+    writeFixtureFile(
+      escaped,
+      'miniprogram/pages/home/escaped.js',
+      "const db = wx.cloud['\\u0064atabase']();\nmodule.exports = {};\n",
+    );
+    const fails = failMessages(runChecks(escaped)).join('\n');
+    assert.ok(
+      fails.includes('miniprogram/pages/home/escaped.js:1 客户端直接访问云数据库 wx.cloud.database'),
+      '转义键应还原后 FAIL：' + fails,
+    );
+  } finally {
+    cleanup(escaped);
+  }
+
+  // 模板字面量键无法静态解析：WARN 提示人工确认，不直接判 FAIL
+  const templated = makeFixture();
+  try {
+    writeFixtureFile(
+      templated,
+      'miniprogram/pages/home/templated.js',
+      'const db = wx.cloud[`database`]();\nmodule.exports = {};\n',
+    );
+    const result = runChecks(templated);
+    assert.deepStrictEqual(failMessages(result), [], '模板键不直接判 FAIL：' + failMessages(result).join(' | '));
+    assert.ok(warnText(result).includes('无法静态解析 wx.cloud[...] 的键'), '模板键必须 WARN：' + warnText(result));
+    assert.ok(boundaryPass(result), '存在入口调用时整体仍可 PASS：' + passText(result));
+  } finally {
+    cleanup(templated);
+  }
+
+  // 动态键无法静态判断：给 WARN 而不是放过
+  const dynamic = makeFixture();
+  try {
+    writeFixtureFile(dynamic, 'miniprogram/pages/home/dyn.js', "const key = 'database';\nmodule.exports = wx.cloud[key];\n");
+    const result = runChecks(dynamic);
+    assert.deepStrictEqual(failMessages(result), [], '动态键不直接判 FAIL：' + failMessages(result).join(' | '));
+    assert.ok(warnText(result).includes('有动态键的 wx.cloud[...]'), '动态键必须 WARN：' + warnText(result));
+    assert.ok(boundaryPass(result), '存在入口调用时整体仍可 PASS：' + passText(result));
+  } finally {
+    cleanup(dynamic);
+  }
+
+  // 入口整个消失：没有 callFunction 时必须 WARN，不能静默绿成 PASS
+  const noEntry = makeFixture();
+  try {
+    fs.rmSync(path.join(noEntry, 'miniprogram/utils/api.js'));
+    const result = runChecks(noEntry);
+    assert.strictEqual(result.ok, true, '缺入口不是 FAIL（结构检查另有职责）：' + failMessages(result).join(' | '));
+    assert.ok(
+      result.warnings.some((w) => w.includes('云函数入口检查可能失效')),
+      '没有 callFunction 时必须 WARN，否则检查静默失效',
+    );
+    assert.ok(!boundaryPass(result), '没有可检查的调用时不应假 PASS');
+  } finally {
+    cleanup(noEntry);
+  }
+
+  // 改名 / 移动入口：外部调用判 FAIL，并额外提示白名单入口不存在
+  const renamed = makeFixture();
+  try {
+    fs.rmSync(path.join(renamed, 'miniprogram/utils/api.js'));
+    writeFixtureFile(
+      renamed,
+      'miniprogram/utils/cloud-api.js',
+      "function call(action) {\n  return wx.cloud.callFunction({ name: 'api', data: { action } });\n}\nmodule.exports = { call };\n",
+    );
+    const result = runChecks(renamed);
+    const fails = failMessages(result).join('\n');
+    assert.ok(
+      fails.includes('miniprogram/utils/cloud-api.js:2 在 utils/api.js 之外直接调用 wx.cloud.callFunction'),
+      '改名后入口调用应 FAIL：' + fails,
+    );
+    assert.ok(warnText(result).includes('白名单入口 miniprogram/utils/api.js 不存在'), '改名应额外 WARN：' + warnText(result));
+  } finally {
+    cleanup(renamed);
+  }
+
+  // 一个客户端 JS 都扫不到：FAIL，不能因为「没东西可查」而静默通过
+  const noJs = makeFixture();
+  try {
+    const entries = fs.readdirSync(path.join(noJs, 'miniprogram'), { recursive: true });
+    for (const rel of entries) {
+      if (String(rel).endsWith('.js')) fs.rmSync(path.join(noJs, 'miniprogram', String(rel)));
+    }
+    const result = runChecks(noJs);
+    assert.strictEqual(result.ok, false, '扫不到客户端 JS 应 FAIL');
+    assert.ok(
+      failMessages(result).join('\n').includes('没有扫描到客户端 JS 文件'),
+      '应给出明确 FAIL 文案：' + failMessages(result).join(' | '),
+    );
+    assert.ok(!boundaryPass(result), '空目录不应假 PASS');
+  } finally {
+    cleanup(noJs);
   }
 });
