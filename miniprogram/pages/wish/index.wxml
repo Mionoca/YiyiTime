@@ -6,7 +6,7 @@
       <text class="stats__num">{{progressText}}</text>
     </view>
     <view class="stats__bar">
-      <view class="stats__bar-in" style="width: {{percent}}%;"></view>
+      <view class="stats__bar-in" style="transform: scaleX({{ratio}});"></view>
     </view>
     <view class="stats__hint" wx:if="{{stats.total}}">{{stats.done === stats.total ? '全都完成啦，真厉害' : '还有想一起做的事在等着'}}</view>
     <view class="stats__hint" wx:else>写下第一件想一起做的事吧</view>

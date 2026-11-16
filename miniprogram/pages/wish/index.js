@@ -20,7 +20,7 @@ Page({
     saving: false,
     pendingId: '',
     progressText: '0/0',
-    percent: 0,
+    ratio: 0,
     canAdd: true,
     limitMax: LIMITS.wishCount,
   },
@@ -80,7 +80,7 @@ Page({
     return {
       stats: { total, done },
       progressText: done + '/' + total,
-      percent: format.wishPercent(done, total),
+      ratio: format.wishRatio(done, total),
       canAdd: total < LIMITS.wishCount,
     };
   },

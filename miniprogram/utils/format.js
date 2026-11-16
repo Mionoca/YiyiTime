@@ -5,10 +5,14 @@ function truncate(text, max) {
   return str.slice(0, max - 1) + '…';
 }
 
-/** 愿望完成百分比，0–100 整数 */
-function wishPercent(done, total) {
+/**
+ * 愿望完成比例 0–1，用于 transform: scaleX() 进度条（8.9 只允许 transform/opacity 动画）。
+ * 保留 4 位小数，避免 setData 字符串抖动。
+ */
+function wishRatio(done, total) {
   if (!total || total <= 0) return 0;
-  return Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+  const ratio = Math.max(0, Math.min(1, done / total));
+  return Math.round(ratio * 10000) / 10000;
 }
 
-module.exports = { truncate, wishPercent };
+module.exports = { truncate, wishRatio };

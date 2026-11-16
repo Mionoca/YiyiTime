@@ -50,7 +50,7 @@ test('wish: 首屏用服务端 stats 计算进度，未满时可新增', async (
     await page.load();
     assert.strictEqual(page.data.loading, false);
     assert.strictEqual(page.data.progressText, '1/3');
-    assert.strictEqual(page.data.percent, 33);
+    assert.strictEqual(page.data.ratio, 0.3333);
     assert.strictEqual(page.data.canAdd, true);
     assert.strictEqual(page.data.error, '');
   } finally {
@@ -296,4 +296,14 @@ test('wish: 下拉刷新静默重拉并收起转圈', async () => {
   } finally {
     restoreWx();
   }
+});
+
+test('wish: 进度比例 wishRatio 的边界值（无愿望 / 超额完成 / 负数）', () => {
+  const format = require('../miniprogram/utils/format');
+  assert.strictEqual(format.wishRatio(1, 3), 0.3333);
+  assert.strictEqual(format.wishRatio(0, 0), 0);
+  assert.strictEqual(format.wishRatio(0, -1), 0);
+  assert.strictEqual(format.wishRatio(5, 3), 1, '完成数超过总数时钳到 1');
+  assert.strictEqual(format.wishRatio(-2, 5), 0, '负数完成数钳到 0');
+  assert.strictEqual(format.wishRatio(3, 3), 1);
 });
