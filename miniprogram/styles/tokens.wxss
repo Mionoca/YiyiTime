@@ -1,0 +1,35 @@
+page {
+  /* 颜色 */
+  --bg: #FBF6EE;
+  --wall: #F3E8D8;
+  --floor: #E7D3B8;
+  --ink: #3F3A36;
+  --muted: #8C837A;
+  --accent: #D98E73;
+  --accent-soft: #F4C9B8;
+  --card: #FFFDF9;
+  --danger: #C25B4E;
+  --success: #7A9B76;
+  --sunny: #F2CC8F;
+  --cloudy: #B8C0CC;
+  --rainy: #7A9CC6;
+  --thunder: #6C6A8A;
+
+  /* 圆角 */
+  --radius-sm: 12rpx;
+  --radius-md: 20rpx;
+  --radius-lg: 32rpx;
+
+  /* 间距 */
+  --space-xs: 8rpx;
+  --space-sm: 16rpx;
+  --space-md: 24rpx;
+  --space-lg: 32rpx;
+  --space-xl: 48rpx;
+
+  /* 字号 */
+  --font-sm: 24rpx;
+  --font-md: 28rpx;
+  --font-lg: 40rpx;
+  --font-xl: 56rpx;
+}

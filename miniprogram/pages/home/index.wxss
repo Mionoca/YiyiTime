@@ -1,0 +1,691 @@
+.home-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---------- 导航 ---------- */
+.nav {
+  flex-shrink: 0;
+  padding-left: 40rpx;
+  padding-right: 40rpx;
+}
+
+.nav-title {
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 2rpx;
+}
+
+/* ---------- 场景 ---------- */
+.scene {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #FCF4E7 0%, #F4E6D2 58%, #E7D3B8 100%);
+}
+
+.phase-morning .scene {
+  background: linear-gradient(180deg, #FCF0E0 0%, #F6E2CC 58%, #E8D3B8 100%);
+}
+
+.phase-dusk .scene {
+  background: linear-gradient(180deg, #F6DCC4 0%, #E8CBB8 50%, #D8BFA8 100%);
+}
+
+.phase-night .scene {
+  background: linear-gradient(180deg, #3E4360 0%, #333852 60%, #2C3048 100%);
+}
+
+/* 通用木质感 */
+/* ---------- 窗 ---------- */
+.window {
+  position: absolute;
+  top: 5%;
+  left: 8%;
+  width: 40%;
+  height: 22%;
+}
+
+.window-glass {
+  width: 100%;
+  height: calc(100% - 12rpx);
+  border-radius: 12rpx 12rpx 4rpx 4rpx;
+  background: linear-gradient(180deg, #CFE6F2 0%, #E8F2F7 100%);
+  border: 8rpx solid #E4CDB2;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.phase-morning .window-glass {
+  background: linear-gradient(180deg, #FFE7C9 0%, #FFF4E4 100%);
+}
+
+.phase-dusk .window-glass {
+  background: linear-gradient(180deg, #F7C9A8 0%, #F6DEC6 100%);
+}
+
+.phase-night .window-glass {
+  background: linear-gradient(180deg, #232948 0%, #2F3559 100%);
+}
+
+.sun {
+  position: absolute;
+  right: 18%;
+  top: 22%;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #F7D48A;
+  box-shadow: 0 0 24rpx rgba(247, 212, 138, 0.8);
+}
+
+.moon {
+  position: absolute;
+  right: 18%;
+  top: 20%;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #F3EEDC;
+  box-shadow: 0 0 24rpx rgba(243, 238, 220, 0.6);
+}
+
+.star {
+  position: absolute;
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: #FFFFFF;
+  opacity: 0.85;
+}
+
+.star-1 {
+  left: 22%;
+  top: 24%;
+}
+
+.star-2 {
+  left: 42%;
+  top: 48%;
+}
+
+.window-sill {
+  height: 12rpx;
+  border-radius: 0 0 8rpx 8rpx;
+  background: #E4CDB2;
+}
+
+/* ---------- 墙历 ---------- */
+.calendar {
+  position: absolute;
+  top: 8%;
+  right: 8%;
+  width: 26%;
+  padding: 16rpx 8rpx 20rpx;
+  border-radius: 8rpx;
+  background: var(--card);
+  box-shadow: 0 6rpx 16rpx rgba(63, 58, 54, 0.08);
+  text-align: center;
+}
+
+.calendar::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -10rpx;
+  width: 4rpx;
+  height: 12rpx;
+  background: #C9A787;
+  transform: translateX(-50%);
+}
+
+.calendar-top {
+  font-size: 20rpx;
+  color: var(--muted);
+  letter-spacing: 1rpx;
+}
+
+.calendar-days {
+  margin-top: 8rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.calendar-days-empty {
+  font-size: 22rpx;
+  color: #C4B9AC;
+  font-weight: 400;
+}
+
+/* ---------- 相框 ---------- */
+.frame {
+  position: absolute;
+  top: 34%;
+  left: 9%;
+  width: 18%;
+  height: 14%;
+  padding: 8rpx;
+  border-radius: 8rpx;
+  background: #E8D3B8;
+  box-shadow: 0 6rpx 16rpx rgba(63, 58, 54, 0.12);
+  transform: rotate(-3deg);
+}
+
+.frame-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 4rpx;
+  background: var(--wall);
+}
+
+/* ---------- 落地灯 ---------- */
+.lamp {
+  position: absolute;
+  right: 7%;
+  bottom: 30%;
+  width: 14%;
+  height: 34%;
+}
+
+.lamp-glow {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 320rpx;
+  height: 320rpx;
+  margin-left: -160rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(247, 212, 138, 0.55) 0%, rgba(247, 212, 138, 0) 68%);
+  transition: opacity 400ms ease;
+}
+
+.lamp.dim .lamp-glow {
+  opacity: 0;
+}
+
+.phase-night .lamp-glow {
+  background: radial-gradient(circle, rgba(255, 214, 148, 0.6) 0%, rgba(255, 214, 148, 0) 70%);
+}
+
+.lamp-shade {
+  position: absolute;
+  left: 0;
+  top: 4%;
+  width: 100%;
+  height: 26%;
+  border-radius: 8rpx 8rpx 4rpx 4rpx;
+  background: #F2CC8F;
+  opacity: 0.95;
+}
+
+.lamp.dim .lamp-shade {
+  background: #D9CBB8;
+}
+
+.lamp-pole {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  width: 6rpx;
+  height: 56%;
+  margin-left: -3rpx;
+  background: #B99677;
+}
+
+.lamp-base {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 60%;
+  height: 10rpx;
+  margin-left: -30%;
+  border-radius: 999rpx;
+  background: #B99677;
+}
+
+/* ---------- 地毯 ---------- */
+.rug {
+  position: absolute;
+  left: 50%;
+  bottom: 14%;
+  width: 66%;
+  height: 6%;
+  transform: translateX(-50%);
+  border-radius: 999rpx;
+  background: rgba(217, 142, 115, 0.22);
+}
+
+/* ---------- 沙发 ---------- */
+.sofa {
+  position: absolute;
+  left: 50%;
+  bottom: 24%;
+  width: 76%;
+  height: 20%;
+  transform: translateX(-50%);
+}
+
+.sofa-back {
+  position: absolute;
+  left: 0;
+  top: -28%;
+  width: 100%;
+  height: 62%;
+  border-radius: 24rpx 24rpx 8rpx 8rpx;
+  background: #D8A98C;
+}
+
+.phase-night .sofa-back {
+  background: #A8836C;
+}
+
+.sofa-seat {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 62%;
+  border-radius: 12rpx;
+  background: #E2B89A;
+}
+
+.phase-night .sofa-seat {
+  background: #B08E77;
+}
+
+.sofa-arm {
+  position: absolute;
+  bottom: 0;
+  width: 8%;
+  height: 74%;
+  border-radius: 12rpx;
+  background: #CE9E81;
+}
+
+.phase-night .sofa-arm {
+  background: #9C7A66;
+}
+
+.sofa-arm-left {
+  left: -2%;
+}
+
+.sofa-arm-right {
+  right: -2%;
+}
+
+.people {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 52%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 12rpx;
+}
+
+.person-avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  border: 6rpx solid #FFFDF9;
+  background: var(--wall);
+  box-shadow: 0 6rpx 14rpx rgba(63, 58, 54, 0.14);
+}
+
+.person-name {
+  margin-top: 8rpx;
+  max-width: 140rpx;
+  font-size: 20rpx;
+  color: #6B5B4E;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.phase-night .person-name {
+  color: #EFE6D8;
+}
+
+.empty-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 12rpx;
+}
+
+.empty-cushion {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  border: 4rpx dashed #C9B49C;
+  background: rgba(255, 253, 249, 0.35);
+}
+
+.empty-text {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  color: #9C8B7A;
+  white-space: nowrap;
+}
+
+.phase-night .empty-text {
+  color: #C9BCA9;
+}
+
+/* ---------- 冰箱 ---------- */
+.fridge {
+  position: absolute;
+  left: 5%;
+  bottom: 5%;
+  width: 22%;
+  height: 30%;
+  border-radius: 10rpx;
+  background: #EBE4D8;
+  box-shadow: inset 0 0 0 4rpx #DCD0BE;
+  overflow: hidden;
+}
+
+.fridge-door {
+  position: relative;
+  height: 68%;
+  border-bottom: 4rpx solid #DCD0BE;
+}
+
+.fridge-handle {
+  position: absolute;
+  right: 10rpx;
+  top: 18%;
+  width: 6rpx;
+  height: 30%;
+  border-radius: 999rpx;
+  background: #B8AB98;
+}
+
+.fridge-note {
+  position: absolute;
+  left: 12%;
+  top: 16%;
+  width: 42%;
+  height: 34%;
+  border-radius: 4rpx;
+  background: #F2CC8F;
+  transform: rotate(-4deg);
+}
+
+.fridge-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28%;
+}
+
+/* ---------- 门 ---------- */
+.door {
+  position: absolute;
+  right: 5%;
+  bottom: 5%;
+  width: 22%;
+  height: 28%;
+  border-radius: 10rpx 10rpx 0 0;
+  background: #C99C7C;
+  box-shadow: inset 0 0 0 4rpx #B98A6A;
+}
+
+.door-panel {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 10%;
+  bottom: 10%;
+  border-radius: 6rpx;
+  border: 4rpx solid #B98A6A;
+}
+
+.door-knob {
+  position: absolute;
+  right: 10%;
+  top: 50%;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #F2CC8F;
+}
+
+/* ---------- 信封 ---------- */
+.envelope {
+  position: absolute;
+  right: 7%;
+  bottom: 15%;
+  width: 18%;
+  height: 9%;
+  transform: rotate(-4deg);
+}
+
+.envelope-body {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 78%;
+  border-radius: 4rpx;
+  background: #FFFDF9;
+  box-shadow: 0 4rpx 12rpx rgba(63, 58, 54, 0.16);
+}
+
+.envelope-flap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-left: 60rpx solid transparent;
+  border-right: 60rpx solid transparent;
+  border-top: 34rpx solid #F4E6D2;
+}
+
+.envelope.applied_by_partner {
+  animation: envelope-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes envelope-pulse {
+  0%, 100% { transform: rotate(-4deg) scale(1); }
+  50% { transform: rotate(-4deg) scale(1.08); }
+}
+
+.envelope-reddot {
+  position: absolute;
+  right: -6rpx;
+  top: -6rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 3rpx solid #FFFDF9;
+}
+
+/* ---------- 加载骨架 ---------- */
+.skeleton-scene .sk-block {
+  position: absolute;
+  background: rgba(255, 253, 249, 0.5);
+  border-radius: 12rpx;
+  animation: sk-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes sk-breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+
+.sk-window {
+  top: 6%;
+  left: 8%;
+  width: 40%;
+  height: 22%;
+}
+
+.sk-calendar {
+  top: 8%;
+  right: 8%;
+  width: 26%;
+  height: 16%;
+}
+
+.sk-frame {
+  top: 34%;
+  left: 9%;
+  width: 18%;
+  height: 14%;
+}
+
+.sk-sofa {
+  left: 12%;
+  bottom: 24%;
+  width: 76%;
+  height: 20%;
+}
+
+.sk-fridge {
+  left: 5%;
+  bottom: 5%;
+  width: 22%;
+  height: 30%;
+}
+
+.sk-door {
+  right: 5%;
+  bottom: 5%;
+  width: 22%;
+  height: 28%;
+}
+
+.state-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 40%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.state-text {
+  color: var(--muted);
+  font-size: var(--font-md);
+}
+
+.retry-btn {
+  margin-top: 32rpx;
+  width: 320rpx;
+}
+
+/* ---------- 底部动作 ---------- */
+.action-bar {
+  flex-shrink: 0;
+  padding: 16rpx 48rpx calc(40rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(251, 246, 238, 0) 0%, #FBF6EE 30%);
+}
+
+.action-hint {
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--muted);
+  margin-bottom: 16rpx;
+}
+
+.action-btn {
+  width: 100%;
+}
+
+/* ---------- 浮层 ---------- */
+.sheet-mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  background: rgba(63, 58, 54, 0.32);
+  display: flex;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  padding: 24rpx 48rpx calc(48rpx + env(safe-area-inset-bottom));
+  border-radius: 32rpx 32rpx 0 0;
+  background: var(--card);
+  animation: sheet-up 240ms ease-out;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-handle {
+  width: 64rpx;
+  height: 8rpx;
+  margin: 0 auto 24rpx;
+  border-radius: 999rpx;
+  background: var(--wall);
+}
+
+.sheet-title {
+  font-size: var(--font-md);
+  color: var(--muted);
+}
+
+.sheet-days {
+  margin: 12rpx 0 32rpx;
+  font-size: 64rpx;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-top: 2rpx solid var(--wall);
+}
+
+.sheet-label {
+  font-size: var(--font-md);
+  color: var(--muted);
+}
+
+.sheet-value {
+  font-size: var(--font-md);
+  color: var(--ink);
+}
+
+.sheet-close {
+  margin-top: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: 30rpx;
+}

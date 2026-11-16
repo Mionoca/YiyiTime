@@ -1,0 +1,118 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert');
+
+const time = require('../cloudfunctions/api/lib/time');
+
+test('dateKeyOf: 东八区跨日', () => {
+  assert.strictEqual(time.dateKeyOf(new Date('2026-11-15T16:00:00.000Z')), '2026-11-16');
+  assert.strictEqual(time.dateKeyOf(new Date('2026-11-15T15:59:59.000Z')), '2026-11-15');
+  assert.strictEqual(time.dateKeyOf(new Date('2026-01-01T00:00:00.000Z')), '2026-01-01');
+});
+
+test('startOfDateKey: 东八区 00:00 对应 UTC 前一日 16:00', () => {
+  assert.strictEqual(
+    time.startOfDateKey('2026-11-15').toISOString(),
+    '2026-11-14T16:00:00.000Z'
+  );
+});
+
+test('addDays: 跨月 / 跨年 / 闰年', () => {
+  assert.strictEqual(time.addDays('2026-12-31', 1), '2027-01-01');
+  assert.strictEqual(time.addDays('2024-02-28', 1), '2024-02-29');
+  assert.strictEqual(time.addDays('2024-02-29', 1), '2024-03-01');
+  assert.strictEqual(time.addDays('2026-11-15', -1), '2026-11-14');
+});
+
+test('daysTogether: 开始当天算第 1 天', () => {
+  assert.strictEqual(time.daysTogether('2026-11-15', '2026-11-15'), 1);
+  assert.strictEqual(time.daysTogether('2026-11-14', '2026-11-15'), 2);
+  assert.strictEqual(time.daysTogether('2024-05-20', '2025-05-20'), 366);
+  assert.strictEqual(time.daysTogether('2025-12-31', '2026-01-01'), 2);
+});
+
+test('nextUnlockAt: 次日 00:00 +08', () => {
+  assert.strictEqual(
+    time.nextUnlockAt('2026-11-15').toISOString(),
+    '2026-11-15T16:00:00.000Z'
+  );
+});
+
+test('phaseOf: 6/9/17/20 分档边界', () => {
+  const cases = [
+    ['2026-11-15T21:59:00.000Z', 'night'], // 05:59 +08
+    ['2026-11-15T22:00:00.000Z', 'morning'], // 06:00
+    ['2026-11-16T00:59:00.000Z', 'morning'], // 08:59
+    ['2026-11-16T01:00:00.000Z', 'day'], // 09:00
+    ['2026-11-16T08:59:00.000Z', 'day'], // 16:59
+    ['2026-11-16T09:00:00.000Z', 'dusk'], // 17:00
+    ['2026-11-16T11:59:00.000Z', 'dusk'], // 19:59
+    ['2026-11-16T12:00:00.000Z', 'night'], // 20:00
+  ];
+  for (const [iso, expected] of cases) {
+    assert.strictEqual(time.phaseOf(new Date(iso)), expected, iso);
+  }
+});
+
+test('nextAnniversary: 文档示例', () => {
+  assert.deepStrictEqual(time.nextAnniversary('2024-05-20', '2026-11-15'), {
+    date: '2027-05-20',
+    daysLeft: 186,
+    years: 3,
+  });
+  assert.deepStrictEqual(time.nextAnniversary('2024-05-20', '2026-05-20'), {
+    date: '2026-05-20',
+    daysLeft: 0,
+    years: 2,
+  });
+});
+
+test('nextAnniversary: 当天/跨年/开始那天不算', () => {
+  // 开始那天（2 月 29 日）当年没有 2 月 29 日时按当月最后一天
+  assert.deepStrictEqual(time.nextAnniversary('2020-02-29', '2026-02-28'), {
+    date: '2026-02-28',
+    daysLeft: 0,
+    years: 6,
+  });
+  assert.deepStrictEqual(time.nextAnniversary('2020-02-29', '2026-03-01'), {
+    date: '2027-02-28',
+    daysLeft: 364,
+    years: 7,
+  });
+  // 正好在开始那天：明年的今天
+  assert.deepStrictEqual(time.nextAnniversary('2024-05-20', '2024-05-20'), {
+    date: '2025-05-20',
+    daysLeft: 365,
+    years: 1,
+  });
+  // 开始于 2-29、平年 2-28 当天：就是今天
+  assert.deepStrictEqual(time.nextAnniversary('2024-02-29', '2025-02-28'), {
+    date: '2025-02-28',
+    daysLeft: 0,
+    years: 1,
+  });
+  // 12-31 的下一个纪念日是次年 12-31
+  assert.deepStrictEqual(time.nextAnniversary('2024-12-31', '2026-11-15'), {
+    date: '2026-12-31',
+    daysLeft: 46,
+    years: 2,
+  });
+});
+
+test('isValidDateKey: 严格校验真实日期', () => {
+  assert.strictEqual(time.isValidDateKey('2024-02-29'), true);
+  assert.strictEqual(time.isValidDateKey('2023-02-29'), false);
+  assert.strictEqual(time.isValidDateKey('2026-13-01'), false);
+  assert.strictEqual(time.isValidDateKey('2026-1-1'), false);
+  assert.strictEqual(time.isValidDateKey(''), false);
+  assert.strictEqual(time.isValidDateKey(null), false);
+});
+
+test('isValidStartDate: 2000-01-01 至今天', () => {
+  const todayKey = '2026-11-15';
+  assert.strictEqual(time.isValidStartDate('1999-12-31', todayKey), false);
+  assert.strictEqual(time.isValidStartDate('2000-01-01', todayKey), true);
+  assert.strictEqual(time.isValidStartDate('2026-11-15', todayKey), true);
+  assert.strictEqual(time.isValidStartDate('2026-11-16', todayKey), false);
+});

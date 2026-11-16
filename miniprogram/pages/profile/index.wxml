@@ -1,0 +1,74 @@
+<view class="profile-page">
+
+  <view class="loading" wx:if="{{loading && !home}}">正在开门…</view>
+
+  <view class="error-state" wx:if="{{!loading && !home}}">
+    <view class="error-text">{{error || '小屋暂时打不开'}}</view>
+    <button class="btn-primary error-retry" bindtap="onRetry">再试一次</button>
+  </view>
+
+  <block wx:if="{{home}}">
+    <!-- 资料卡 -->
+    <view class="card profile-card">
+      <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image class="avatar-img" src="{{avatarPreview}}" mode="aspectFill" />
+      </button>
+      <view class="profile-main">
+        <input
+          class="nickname-input"
+          type="nickname"
+          value="{{nickname}}"
+          maxlength="12"
+          placeholder="你的昵称"
+          placeholder-class="input-placeholder"
+          bindinput="onNicknameInput"
+        />
+        <view class="bind-state">{{bindStateText}}</view>
+      </view>
+      <view class="save-btn" bindtap="onSaveNickname">保存</view>
+    </view>
+
+    <!-- 我们的日子 -->
+    <view class="card days-card" wx:if="{{bound}}">
+      <view class="days-head">
+        <view class="days-title">我们的日子</view>
+        <view class="days-number">{{daysText}}</view>
+      </view>
+      <view class="row">
+        <text class="row-label">开始于</text>
+        <text class="row-value">{{startDateText}}</text>
+      </view>
+      <view class="row">
+        <text class="row-label">下一个纪念日</text>
+        <text class="row-value">{{anniversaryText}}</text>
+      </view>
+      <view class="row-link" bindtap="onTapComingSoon">修改开始日期 →</view>
+    </view>
+
+    <!-- 邀请 -->
+    <view class="card invite-card" wx:if="{{!bound}}">
+      <view class="invite-title">屋里还缺一个人</view>
+      <view class="invite-sub">邀请 TA 一起住进来，日子从你们选的那天算起</view>
+      <button class="btn-primary" bindtap="onTapBind">去邀请 TA</button>
+    </view>
+
+    <!-- 更多 -->
+    <view class="card list-card">
+      <view class="list-item" bindtap="onTapComingSoon">
+        <text>每日提醒</text>
+        <text class="list-arrow">›</text>
+      </view>
+      <view class="list-item" bindtap="onTapComingSoon">
+        <text>心情记录</text>
+        <text class="list-arrow">›</text>
+      </view>
+      <view class="list-item" bindtap="onTapComingSoon">
+        <text>关于小怡怡安</text>
+        <text class="list-arrow">›</text>
+      </view>
+    </view>
+
+    <view class="footer">小怡怡安 · 只属于两个人的小屋</view>
+  </block>
+
+</view>

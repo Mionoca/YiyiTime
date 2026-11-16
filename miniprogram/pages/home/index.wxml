@@ -1,0 +1,145 @@
+<view class="home-page phase-{{phase}}">
+
+  <!-- 自定义导航 -->
+  <view class="nav" style="padding-top: {{statusBarHeight}}px;">
+    <view class="nav-title">小怡怡安</view>
+  </view>
+
+  <!-- 加载中 / 加载失败的房间轮廓 -->
+  <view class="scene skeleton-scene" wx:if="{{!home && (loading || error)}}">
+    <view class="sk-block sk-window"></view>
+    <view class="sk-block sk-calendar"></view>
+    <view class="sk-block sk-frame"></view>
+    <view class="sk-block sk-sofa"></view>
+    <view class="sk-block sk-fridge"></view>
+    <view class="sk-block sk-door"></view>
+    <view class="state-overlay">
+      <view class="state-text" wx:if="{{loading}}">正在开门…</view>
+      <block wx:else>
+        <view class="state-text">{{error}}</view>
+        <button class="btn-primary retry-btn" bindtap="onRetry">再试一次</button>
+      </block>
+    </view>
+  </view>
+
+  <!-- 小屋 -->
+  <view class="scene" wx:if="{{home}}">
+    <!-- 窗 -->
+    <view class="window">
+      <view class="window-glass">
+        <view class="moon" wx:if="{{phase === 'night'}}"></view>
+        <view class="sun" wx:if="{{phase === 'day' || phase === 'morning'}}"></view>
+        <view class="star star-1" wx:if="{{phase === 'night'}}"></view>
+        <view class="star star-2" wx:if="{{phase === 'night'}}"></view>
+      </view>
+      <view class="window-sill"></view>
+    </view>
+
+    <!-- 墙历 -->
+    <view class="calendar" bindtap="onTapCalendar">
+      <view class="calendar-top">我们的日子</view>
+      <view class="calendar-days" wx:if="{{home.couple}}">{{daysText}}</view>
+      <view class="calendar-days calendar-days-empty" wx:else>从今天开始</view>
+    </view>
+
+    <!-- 相框 -->
+    <view class="frame" bindtap="onTapProfile">
+      <image class="frame-avatar" src="{{myAvatar}}" mode="aspectFill" />
+    </view>
+
+    <!-- 落地灯 -->
+    <view class="lamp {{home.couple ? '' : 'dim'}}">
+      <view class="lamp-glow"></view>
+      <view class="lamp-shade"></view>
+      <view class="lamp-pole"></view>
+      <view class="lamp-base"></view>
+    </view>
+
+    <!-- 地毯 -->
+    <view class="rug"></view>
+
+    <!-- 沙发 + 两个人 -->
+    <view class="sofa">
+      <view class="sofa-back"></view>
+      <view class="sofa-arm sofa-arm-left"></view>
+      <view class="sofa-arm sofa-arm-right"></view>
+      <view class="sofa-seat"></view>
+      <view class="people">
+        <view class="person">
+          <image class="person-avatar" src="{{myAvatar}}" mode="aspectFill" />
+          <view class="person-name">{{myName}}</view>
+        </view>
+        <view class="person" wx:if="{{home.couple}}">
+          <image class="person-avatar" src="{{partnerAvatar}}" mode="aspectFill" />
+          <view class="person-name">{{partnerName}}</view>
+        </view>
+        <view class="empty-seat" wx:else>
+          <view class="empty-cushion"></view>
+          <view class="empty-text">屋里还缺一个人</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 冰箱（愿望） -->
+    <view class="fridge" bindtap="onTapComingSoon">
+      <view class="fridge-door">
+        <view class="fridge-handle"></view>
+        <view class="fridge-note"></view>
+      </view>
+      <view class="fridge-bottom"></view>
+    </view>
+
+    <!-- 门（报平安） -->
+    <view class="door" bindtap="onTapComingSoon">
+      <view class="door-panel">
+        <view class="door-knob"></view>
+      </view>
+    </view>
+
+    <!-- 门垫信封：邀请状态 -->
+    <view
+      class="envelope {{home.bind.state}}"
+      wx:if="{{!home.couple && home.bind.state !== 'unbound'}}"
+      bindtap="onTapBind"
+    >
+      <view class="envelope-body"></view>
+      <view class="envelope-flap"></view>
+      <view class="envelope-reddot" wx:if="{{home.bind.state === 'applied_by_partner'}}"></view>
+    </view>
+  </view>
+
+  <!-- 底部动作 -->
+  <view class="action-bar" wx:if="{{home}}">
+    <block wx:if="{{home.bind.state === 'unbound'}}">
+      <view class="action-hint">小屋还空着一半</view>
+      <button class="btn-primary action-btn" bindtap="onTapBind">邀请 TA 住进来</button>
+    </block>
+    <block wx:elif="{{home.bind.state !== 'bound'}}">
+      <view class="action-hint">{{bindHint}}</view>
+      <button class="btn-primary action-btn" bindtap="onTapBind">去看看</button>
+    </block>
+    <block wx:else>
+      <view class="action-hint">{{daysText}} · 一起的日子还在继续</view>
+      <button class="btn-primary action-btn" bindtap="onTapComingSoon">抱一抱</button>
+    </block>
+  </view>
+
+  <!-- 我们的日子浮层 -->
+  <view class="sheet-mask" wx:if="{{showDaysSheet}}" bindtap="onCloseDaysSheet">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-title">我们的日子</view>
+      <view class="sheet-days">{{daysText}}</view>
+      <view class="sheet-row">
+        <text class="sheet-label">开始于</text>
+        <text class="sheet-value">{{startDateText}}</text>
+      </view>
+      <view class="sheet-row">
+        <text class="sheet-label">下一个纪念日</text>
+        <text class="sheet-value">{{anniversaryText}}</text>
+      </view>
+      <view class="sheet-close" bindtap="onCloseDaysSheet">知道啦</view>
+    </view>
+  </view>
+
+</view>

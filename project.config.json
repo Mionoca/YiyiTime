@@ -45,9 +45,8 @@
     "disableSWC": true
   },
   "appid": "wx5c7cc21e713e2e3b",
-  "projectname": "quickstart-wx-cloud",
-  "libVersion": "2.20.1",
-  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/",
+  "projectname": "YiyiTime",
+  "libVersion": "2.32.3",
   "condition": {
     "search": {
       "list": []
@@ -65,8 +64,8 @@
       "list": [
         {
           "id": -1,
-          "name": "db guide",
-          "pathName": "pages/databaseGuide/databaseGuide"
+          "name": "首页",
+          "pathName": "pages/home/index"
         }
       ]
     }

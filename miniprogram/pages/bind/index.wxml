@@ -1,0 +1,134 @@
+<view class="bind-page">
+
+  <!-- 加载 -->
+  <view class="center-state" wx:if="{{step === 'loading'}}">
+    <view class="loading-dot"></view>
+    <view class="state-text">正在开门…</view>
+  </view>
+
+  <!-- 加载失败 -->
+  <view class="center-state" wx:if="{{step === 'error'}}">
+    <view class="state-text">{{error}}</view>
+    <button class="btn-primary retry-btn" bindtap="onTapRetry">重新试一次</button>
+  </view>
+
+  <!-- 第一步：填资料 -->
+  <view class="section" wx:if="{{step === 'profile'}}">
+    <view class="section-title">先认识一下</view>
+    <view class="section-sub">起个名字，让 TA 认出你</view>
+
+    <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image class="avatar-img" src="{{avatarPreview}}" mode="aspectFill" />
+      <view class="avatar-tip">换头像</view>
+    </button>
+
+    <input
+      class="input"
+      type="nickname"
+      value="{{nickname}}"
+      maxlength="12"
+      placeholder="你的昵称"
+      placeholder-class="input-placeholder"
+      bindinput="onNicknameInput"
+    />
+
+    <button class="btn-primary main-btn" bindtap="onTapSaveProfile" disabled="{{submitting}}">就这样</button>
+    <view class="hint">头像可以先跳过，用默认的小房子</view>
+  </view>
+
+  <!-- 第二步：生成邀请 / 去输入 -->
+  <view class="section" wx:if="{{step === 'invite'}}">
+    <view class="section-title">住进小怡怡安</view>
+    <view class="section-sub">先选一个开始的日子，再邀请 TA</view>
+
+    <picker mode="date" start="2000-01-01" end="{{maxDate}}" value="{{startDate}}" bindchange="onStartDateChange">
+      <view class="picker-row">
+        <text class="picker-label">开始日期</text>
+        <text class="picker-value">{{startDateText || startDate}}</text>
+      </view>
+    </picker>
+
+    <button class="btn-primary main-btn" bindtap="onTapCreate" disabled="{{submitting}}">生成邀请码</button>
+    <view class="link-row" bindtap="onTapGoEnter">TA 给了我邀请码，去输入 →</view>
+  </view>
+
+  <!-- 输入邀请码 -->
+  <view class="section" wx:if="{{step === 'enter'}}">
+    <view class="section-title">输入邀请码</view>
+    <view class="section-sub">让 TA 把 6 位数字发给你</view>
+
+    <input
+      class="input code-input"
+      type="number"
+      maxlength="6"
+      value="{{codeInput}}"
+      placeholder="6 位数字"
+      placeholder-class="input-placeholder"
+      bindinput="onCodeInput"
+    />
+
+    <button class="btn-primary main-btn" bindtap="onTapPreview" disabled="{{submitting}}">看看是谁</button>
+    <view class="link-row" bindtap="onTapGoInvite">← 我自己生成邀请码</view>
+  </view>
+
+  <!-- 预览对方 -->
+  <view class="section" wx:if="{{step === 'preview' && preview}}">
+    <view class="section-title">是 TA</view>
+    <view class="card creator-card">
+      <image class="creator-avatar" src="{{preview.creator.avatarFileID || defaultAvatar}}" mode="aspectFill" />
+      <view class="creator-name">{{preview.creator.nickname || 'TA'}}</view>
+      <view class="creator-desc">想和你一起住进小怡怡安</view>
+      <view class="creator-date">从 {{startDateText}} 开始</view>
+    </view>
+
+    <button class="btn-primary main-btn" bindtap="onTapApply" disabled="{{submitting}}">申请住进去</button>
+    <view class="link-row" bindtap="onTapGoEnter">← 换个码</view>
+  </view>
+
+  <!-- 邀请码已生成 -->
+  <view class="section" wx:if="{{step === 'code' && pending}}">
+    <view class="section-title">邀请码准备好了</view>
+    <view class="card code-card">
+      <view class="code-value">{{pending.code}}</view>
+      <view class="code-expire">有效期至 {{expiresText}}</view>
+    </view>
+    <view class="section-sub">把它发给 TA，等 TA 输入</view>
+
+    <view class="btn-row">
+      <button class="btn-primary btn-ghost flex1" bindtap="onCopyCode">复制</button>
+      <button class="btn-primary flex1" open-type="share">发给 TA</button>
+    </view>
+
+    <view class="link-row" bindtap="onTapRefresh">刷新看看 TA 来了没</view>
+    <view class="link-row" bindtap="onTapCancel">取消邀请</view>
+  </view>
+
+  <!-- 确认对方的申请 -->
+  <view class="section" wx:if="{{step === 'confirm' && pending}}">
+    <view class="section-title">有人在门口等你</view>
+    <view class="card creator-card">
+      <image class="creator-avatar" src="{{(pending.other && pending.other.avatarFileID) || defaultAvatar}}" mode="aspectFill" />
+      <view class="creator-name">{{(pending.other && pending.other.nickname) || 'TA'}}</view>
+      <view class="creator-desc">想和你一起住进小怡怡安</view>
+      <view class="creator-date">从 {{startDateText}} 开始</view>
+    </view>
+
+    <button class="btn-primary main-btn" bindtap="onTapConfirm" disabled="{{submitting}}">让 TA 住进来</button>
+    <view class="link-row" bindtap="onTapCancel">先不了</view>
+  </view>
+
+  <!-- 等待对方确认 -->
+  <view class="section" wx:if="{{step === 'waiting' && pending}}">
+    <view class="section-title">申请已发出</view>
+    <view class="card creator-card">
+      <image class="creator-avatar" src="{{(pending.other && pending.other.avatarFileID) || defaultAvatar}}" mode="aspectFill" />
+      <view class="creator-name">{{(pending.other && pending.other.nickname) || 'TA'}}</view>
+      <view class="creator-desc">等 TA 确认就能住进去啦</view>
+      <view class="creator-date">从 {{startDateText}} 开始</view>
+    </view>
+
+    <view class="link-row" bindtap="onTapRefresh">刷新看看</view>
+    <view class="link-row" bindtap="onTapCancel">取消申请</view>
+  </view>
+
+</view>

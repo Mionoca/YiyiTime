@@ -1,27 +1,53 @@
-/**app.wxss**/
-.container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+@import "./styles/tokens.wxss";
+
+page {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-size: 28rpx;
+  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+
+view,
+text,
+button,
+input,
+image {
   box-sizing: border-box;
-} 
-
-button {
-  background: initial;
 }
 
-button:focus{
-  outline: 0;
-}
-
-button::after{
+button::after {
   border: none;
 }
 
-
-page {
-  background: #f6f6f6;
+/* 通用：主按钮 / 次按钮 */
+.btn-primary {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
+  height: 96rpx;
+  padding: 0 48rpx;
+  border-radius: 48rpx;
+  background-color: var(--accent);
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 500;
+  letter-spacing: 2rpx;
+}
+
+.btn-primary.btn-ghost {
+  background-color: transparent;
+  border: 2rpx solid var(--accent);
+  color: var(--accent);
+}
+
+.btn-primary[disabled] {
+  opacity: 0.5;
+  color: #FFFFFF;
+}
+
+.card {
+  background-color: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8rpx 32rpx rgba(63, 58, 54, 0.08);
 }
