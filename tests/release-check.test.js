@@ -441,6 +441,177 @@ test('发布预检：require 路径、未注册组件、未登记集合都会 FA
   }
 });
 
+test('发布预检：自定义组件按页面/组件作用域注册，跨页注册不算（app.json 全局注册才全局生效）', () => {
+  const STRUCTURE_PASS = '自定义组件文件齐全且按页面/组件作用域注册（app.json 全局注册也放行）';
+  const writeComponent = (dir, name) => {
+    for (const ext of ['js', 'json', 'wxml']) {
+      writeFixtureFile(dir, 'miniprogram/components/' + name + '/index.' + ext, ext === 'json' ? '{"component":true}' : '');
+    }
+  };
+
+  // ① 健康夹具：作用域检查 PASS
+  const healthy = makeFixture();
+  try {
+    const result = runChecks(healthy);
+    assert.deepStrictEqual(failMessages(result), [], failMessages(result).join('\n'));
+    const passText = result.lines.filter((l) => l.level === 'PASS').map((l) => l.msg).join('\n');
+    assert.ok(passText.includes(STRUCTURE_PASS), passText);
+  } finally {
+    cleanup(healthy);
+  }
+
+  // ② 只在 bind 页注册、却在 home 页使用：真机必然「组件未找到」，旧的全仓合并集合会漏报
+  const crossPage = makeFixture();
+  try {
+    writeFixtureFile(crossPage, 'miniprogram/pages/home/index.json', JSON.stringify({ usingComponents: {} }));
+    const result = runChecks(crossPage);
+    const fails = failMessages(result).join('\n');
+    assert.strictEqual(result.ok, false);
+    assert.ok(
+      fails.includes(
+        'miniprogram/pages/home/index.wxml 用了未注册的组件 <privacy-guard>（usingComponents 按页面/组件隔离，miniprogram/pages/home/index.json 与 app.json 都没声明）'
+      ),
+      fails
+    );
+    const passText = result.lines.filter((l) => l.level === 'PASS').map((l) => l.msg).join('\n');
+    assert.ok(!passText.includes(STRUCTURE_PASS), '有 FAIL 时不应再打印作用域 PASS');
+  } finally {
+    cleanup(crossPage);
+  }
+
+  // ③ app.json 的 usingComponents 是全局生效的：没在页面 json 注册也应放行
+  const globalReg = makeFixture();
+  try {
+    writeComponent(globalReg, 'bottom-sheet');
+    const app = JSON.parse(fs.readFileSync(path.join(globalReg, 'miniprogram/app.json'), 'utf8'));
+    app.usingComponents = { 'bottom-sheet': '/components/bottom-sheet/index' };
+    writeFixtureFile(globalReg, 'miniprogram/app.json', JSON.stringify(app));
+    writeFixtureFile(globalReg, 'miniprogram/pages/home/index.wxml', PRIVACY_TAG + '<bottom-sheet show="{{false}}" />\n');
+    const result = runChecks(globalReg);
+    assert.deepStrictEqual(failMessages(result), [], failMessages(result).join('\n'));
+  } finally {
+    cleanup(globalReg);
+  }
+
+  // ④ 组件自己的 wxml 也受作用域约束：页面 json 注册的组件不能给组件用
+  const componentScope = makeFixture();
+  try {
+    writeComponent(componentScope, 'empty-state');
+    writeFixtureFile(componentScope, 'miniprogram/pages/bind/index.json', JSON.stringify({
+      usingComponents: {
+        'privacy-guard': '/components/privacy-guard/index',
+        'empty-state': '/components/empty-state/index',
+      },
+    }));
+    writeFixtureFile(componentScope, 'miniprogram/components/privacy-guard/index.wxml', '<empty-state />\n');
+    const result = runChecks(componentScope);
+    const fails = failMessages(result).join('\n');
+    assert.strictEqual(result.ok, false);
+    assert.ok(
+      fails.includes(
+        'miniprogram/components/privacy-guard/index.wxml 用了未注册的组件 <empty-state>（usingComponents 按页面/组件隔离，miniprogram/components/privacy-guard/index.json 与 app.json 都没声明）'
+      ),
+      fails
+    );
+  } finally {
+    cleanup(componentScope);
+  }
+
+  // ⑤ 内置组件（view / scroll-view / rich-text / picker-view 等）不需要注册；
+  //    wxml 注释（含跨行）里的示例标签也不算使用
+  const builtinAndComment = makeFixture();
+  try {
+    writeFixtureFile(
+      builtinAndComment,
+      'miniprogram/pages/home/index.wxml',
+      PRIVACY_TAG
+        + '<scroll-view scroll-y="{{true}}"><view>x</view></scroll-view>' + '\n'
+        + '<rich-text nodes="{{[]}}" /><picker-view><picker-view-column /></picker-view>' + '\n'
+        + '<view bindtap="noop">x</view>' + '\n'
+        + '<!-- 单行 <foo-bar /> -->' + '\n'
+        + '<!--' + '\n<foo-bar />\n' + '-->' + '\n'
+    );
+    const result = runChecks(builtinAndComment);
+    assert.deepStrictEqual(failMessages(result), [], failMessages(result).join('\n'));
+  } finally {
+    cleanup(builtinAndComment);
+  }
+
+  // ⑥ 组件自身 json 注册的组件给组件自己用：合法（不能只测页面作用域的负例）
+  const componentOwnScope = makeFixture();
+  try {
+    writeComponent(componentOwnScope, 'empty-state');
+    writeFixtureFile(componentOwnScope, 'miniprogram/components/privacy-guard/index.json', JSON.stringify({
+      component: true,
+      usingComponents: { 'empty-state': '/components/empty-state/index' },
+    }));
+    writeFixtureFile(componentOwnScope, 'miniprogram/components/privacy-guard/index.wxml', '<empty-state />' + '\n');
+    const result = runChecks(componentOwnScope);
+    assert.deepStrictEqual(failMessages(result), [], failMessages(result).join('\n'));
+  } finally {
+    cleanup(componentOwnScope);
+  }
+
+  // ⑦ usingComponents 用相对路径（../../components/x/index）时按 json 所在目录解析
+  const relativeRef = makeFixture();
+  try {
+    writeFixtureFile(relativeRef, 'miniprogram/pages/home/index.json', JSON.stringify({
+      usingComponents: { 'privacy-guard': '../../components/privacy-guard/index' },
+    }));
+    const result = runChecks(relativeRef);
+    assert.deepStrictEqual(failMessages(result), [], failMessages(result).join('\n'));
+  } finally {
+    cleanup(relativeRef);
+  }
+
+  // ⑧ wxml 与 json 同名但不叫 index（components/y/card.wxml + card.json）也按同名 json 取注册域
+  const nonIndexName = makeFixture();
+  try {
+    writeComponent(nonIndexName, 'inner-comp');
+    writeFixtureFile(nonIndexName, 'miniprogram/components/y/card.js', 'Component({});' + '\n');
+    writeFixtureFile(nonIndexName, 'miniprogram/components/y/card.json', JSON.stringify({
+      component: true,
+      usingComponents: { 'inner-comp': '/components/inner-comp/index' },
+    }));
+    writeFixtureFile(nonIndexName, 'miniprogram/components/y/card.wxml', '<inner-comp />' + '\n');
+    const result = runChecks(nonIndexName);
+    assert.deepStrictEqual(failMessages(result), [], failMessages(result).join('\n'));
+  } finally {
+    cleanup(nonIndexName);
+  }
+
+  // ⑨ 无连字符 / 下划线的自定义组件也纳入扫描：<foo>、<my_comp> 未注册要 FAIL
+  const plainTags = makeFixture();
+  try {
+    writeFixtureFile(plainTags, 'miniprogram/pages/home/index.wxml', PRIVACY_TAG + '<foo />' + '\n<my_comp />' + '\n');
+    const result = runChecks(plainTags);
+    const fails = failMessages(result).join('\n');
+    assert.strictEqual(result.ok, false);
+    assert.ok(
+      fails.includes(
+        'miniprogram/pages/home/index.wxml 用了未注册的组件 <foo>（usingComponents 按页面/组件隔离，miniprogram/pages/home/index.json 与 app.json 都没声明）'
+      ),
+      fails
+    );
+    assert.ok(fails.includes('用了未注册的组件 <my_comp>'), fails);
+  } finally {
+    cleanup(plainTags);
+  }
+
+  // ⑩ 同一组件重复使用只报一条（Set 去重）；自闭合与成对写法按标签名比较
+  const duplicateTag = makeFixture();
+  try {
+    writeFixtureFile(duplicateTag, 'miniprogram/pages/home/index.json', JSON.stringify({ usingComponents: {} }));
+    writeFixtureFile(duplicateTag, 'miniprogram/pages/home/index.wxml', '<foo-bar />' + '\n<foo-bar></foo-bar>' + '\n');
+    const result = runChecks(duplicateTag);
+    const fails = failMessages(result);
+    assert.strictEqual(fails.filter((m) => m.includes('<foo-bar>')).length, 1, fails.join('\n'));
+  } finally {
+    cleanup(duplicateTag);
+  }
+
+});
+
 test('发布预检：基础库版本比较只接受合法的三段版本号', () => {
   assert.strictEqual(versionAtLeast('3.18.0', '2.32.3'), true);
   assert.strictEqual(versionAtLeast('2.32.3', '2.32.3'), true);

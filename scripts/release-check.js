@@ -50,6 +50,26 @@ const SKIP_FILES = new Set([
 // 本地私钥/环境文件即使存在也不该被当成「待提交」而报错
 const SKIP_FILE_PATTERNS = [/^\.env(\.|$)/, /\.pem$/i, /\.key$/i];
 
+// 内置组件与模板语法标签：不需要 usingComponents 注册，扫 wxml 时必须放行。
+// 清单对照微信官方「内置组件」一节；slot / block / template / import / include / wxs 属模板语法标签。
+const BUILTIN_TAGS = new Set([
+  // 基础组件（不带连字符）
+  'view', 'text', 'image', 'icon', 'button', 'input', 'textarea', 'checkbox', 'checkbox-group',
+  'radio', 'radio-group', 'form', 'label', 'picker', 'picker-view', 'picker-view-column',
+  'slider', 'switch', 'navigator', 'progress', 'rich-text', 'swiper', 'swiper-item', 'video',
+  'camera', 'map', 'canvas', 'audio', 'ad', 'editor',
+  // 模板语法标签
+  'slot', 'block', 'template', 'import', 'include', 'wxs',
+  // 带连字符的内置组件
+  'scroll-view', 'movable-area', 'movable-view', 'cover-view', 'cover-image',
+  'live-player', 'live-pusher', 'open-data', 'web-view', 'ad-custom',
+  'functional-page-navigator', 'official-account', 'match-media', 'page-meta', 'navigation-bar',
+  'root-portal', 'voip-room', 'channel-live', 'channel-video', 'inline-payment-panel',
+  'grid-view', 'list-view', 'sticky-header', 'sticky-section', 'share-element',
+  'keyboard-accessory', 'page-container', 'store-home', 'store-product', 'store-coupon',
+  'store-gift', 'store-order',
+]);
+
 function walk(root, relDir, out, errors) {
   const dir = path.join(root, relDir);
   let entries;
@@ -285,8 +305,12 @@ function checkStructure(root, lines, warnings) {
   }
   if (!badRequire) lines.push({ level: 'PASS', msg: '小程序与云函数里的相对 require 路径全部可解析' });
 
-  // 2) usingComponents 的文件存在，wxml 里用到的自定义组件都已在某个 json 注册
-  const registered = new Set();
+  // 2) usingComponents：组件文件存在；wxml 用到的自定义组件必须在本页/本组件作用域注册。
+  //    标签名按小写字母 / 数字 / - / _ 收集（WXML 不允许大写标签）；内置组件与模板语法标签放行。
+  //    旧实现把所有 json 的 usingComponents 合成一个全局集合，于是「在 bind 页注册、却在 home 页使用」
+  //    这种真机必然报「组件未找到」的写法会漏过预检；只有 app.json 的 usingComponents 才是全局生效的。
+  const scopeTags = new Map(); // json 相对路径 -> 该作用域注册的标签
+  const globalTags = new Set(); // app.json 的 usingComponents（全局生效）
   let badComponent = 0;
   for (const rel of files) {
     if (!rel.endsWith('.json') || !rel.startsWith('miniprogram/')) continue;
@@ -299,8 +323,9 @@ function checkStructure(root, lines, warnings) {
       continue;
     }
     const using = conf.usingComponents || {};
+    const tags = new Set();
     for (const tag of Object.keys(using)) {
-      registered.add(tag);
+      tags.add(tag);
       const ref = using[tag];
       const base = ref.startsWith('/')
         ? path.join(root, 'miniprogram', ref.replace(/^\//, ''))
@@ -311,23 +336,34 @@ function checkStructure(root, lines, warnings) {
         badComponent += 1;
       }
     }
+    scopeTags.set(rel, tags);
+    if (rel === 'miniprogram/app.json') for (const tag of tags) globalTags.add(tag);
   }
   let badTag = 0;
   for (const rel of files) {
     if (!rel.endsWith('.wxml') || !rel.startsWith('miniprogram/')) continue;
-    const text = readText(path.join(root, rel)) || '';
+    const raw = readText(path.join(root, rel));
+    if (!raw) continue;
+    // wxml 注释里的示例标签不算使用（避免 <!-- <foo-bar /> --> 误报）
+    const text = raw.replace(/<!--[\s\S]*?-->/g, ' ');
+    // 注册域取同目录同名 json（pages/home/index.wxml → index.json；components/x/card.wxml → card.json）
+    const owner = rel.replace(/\.wxml$/, '.json');
+    const scoped = scopeTags.get(owner);
     const tags = new Set();
-    const tagRe = /<([a-z][a-z0-9]*(?:-[a-z0-9]+)+)\b/g;
+    const tagRe = /<([a-z][a-z0-9_-]*)\b/g;
     let m;
     while ((m = tagRe.exec(text))) tags.add(m[1]);
     for (const tag of tags) {
-      if (!registered.has(tag)) {
-        lines.push({ level: 'FAIL', msg: rel + ' 用了未注册的组件 <' + tag + '>' });
-        badTag += 1;
-      }
+      if (BUILTIN_TAGS.has(tag)) continue;
+      if (globalTags.has(tag) || (scoped && scoped.has(tag))) continue;
+      lines.push({
+        level: 'FAIL',
+        msg: rel + ' 用了未注册的组件 <' + tag + '>（usingComponents 按页面/组件隔离，' + owner + ' 与 app.json 都没声明）',
+      });
+      badTag += 1;
     }
   }
-  if (!badComponent && !badTag) lines.push({ level: 'PASS', msg: '自定义组件都有文件且已在 json 注册' });
+  if (!badComponent && !badTag) lines.push({ level: 'PASS', msg: '自定义组件文件齐全且按页面/组件作用域注册（app.json 全局注册也放行）' });
 
   // 3) 云函数只访问预期集合（新增集合要先去控制台创建 + 配权限 + 建索引）
   const expected = ['users', 'couples', 'bind_invites', 'moods', 'hugs', 'safety_checkins', 'diaries', 'wishes'];

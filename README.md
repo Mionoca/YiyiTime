@@ -37,7 +37,7 @@ YiyiTime/
 ├─ tests/                           # 云函数 / 页面 / 组件级单测 + WXML 绑定自检（helpers: fake-db / cloud-entry / client-page）
 ├─ scripts/
 │  ├─ check-secrets.js              # 推送前扫描环境 ID / 密钥
-│  └─ release-check.js              # M6 静态预检（页面/组件/隐私接线/敏感日志/密钥/部署配置/图片资源与包体/未处理 Promise/客户端云访问边界）
+│  └─ release-check.js              # M6 静态预检（页面/组件路径与作用域/隐私接线/敏感日志/密钥/部署配置/图片资源与包体/未处理 Promise/客户端云访问边界）
 └─ docs/                            # 技术设计文档、开发进度、M6 真机验收与发布
 ```
 
@@ -69,7 +69,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 489 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 490 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 
@@ -85,7 +85,7 @@ Get-ChildItem tests/*.test.js | ForEach-Object { node $_.FullName; if ($LASTEXIT
 
 ```bash
 node scripts/check-secrets.js   # 环境 ID / AppSecret / 私钥扫描（需要 git）
-node scripts/release-check.js   # 页面/组件路径与注册、require 可解析、模板残留、默认头像、隐私接线、敏感 console、密钥、集合白名单、云函数 package.json/config.json、project.config.json 根目录 / appid / 基础库（≥ 2.32.3，允许 latest / trial 符号值）、图片资源与包体（图片位置 / 单张 ≤100KB / 包体 <2MB / 默认头像 200×200）、客户端 api.call 不能悬空（必须 await / return / .then / .catch）、客户端不直连数据库（`wx.cloud.database` 点号 / 括号写法都拦，动态键告警）且 `wx.cloud.callFunction` 只经 `utils/api.js`（文档 11.9 + 架构约定；静态检查只覆盖 `wx.cloud` 点号 / 括号普通字符串键直接写法，含 `\uXXXX` 转义键还原，可选链 / 括号化 / 别名 / 模板键不覆盖，动态键与无法解析的键只 `[WARN]` 不阻断发布）、env.js / project.private.config.json 是否被跟踪
+node scripts/release-check.js   # 页面/组件路径与注册（`usingComponents` 按页面/组件作用域校验：跨页注册判红、`app.json` 全局注册放行、内置组件（`view` / `scroll-view` / `rich-text` 等）放行、注册域取同目录同名 json、wxml 注释（含跨行）忽略）、require 可解析、模板残留、默认头像、隐私接线、敏感 console、密钥、集合白名单、云函数 package.json/config.json、project.config.json 根目录 / appid / 基础库（≥ 2.32.3，允许 latest / trial 符号值）、图片资源与包体（图片位置 / 单张 ≤100KB / 包体 <2MB / 默认头像 200×200）、客户端 api.call 不能悬空（必须 await / return / .then / .catch）、客户端不直连数据库（`wx.cloud.database` 点号 / 括号写法都拦，动态键告警）且 `wx.cloud.callFunction` 只经 `utils/api.js`（文档 11.9 + 架构约定；静态检查只覆盖 `wx.cloud` 点号 / 括号普通字符串键直接写法，含 `\uXXXX` 转义键还原，可选链 / 括号化 / 别名 / 模板键不覆盖，动态键与无法解析的键只 `[WARN]` 不阻断发布）、env.js / project.private.config.json 是否被跟踪
 ```
 
 `release-check.js` 会额外打印云开发控制台待办（集合/索引/部署/超时与内存/隐私指引/真机验收），手动项清单见
