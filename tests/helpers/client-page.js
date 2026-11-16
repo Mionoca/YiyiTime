@@ -37,12 +37,28 @@ function loadPage(relPath) {
   return config;
 }
 
-/** 用 Page 配置造一个可调用的实例（setData 合并进 data）。 */
+/**
+ * 用 Page 配置造一个可调用的实例（setData 合并进 data）。
+ * setData 支持 'form.title' 这类路径键（真机支持，wish 页的输入框在用）：
+ * 只做简单的点号/下标展开，不模拟同层合并语义之外的细节。
+ */
+function setDataPath(data, key, value) {
+  const parts = String(key).replace(/\[(\d+)\]/g, '.$1').split('.').filter((part) => part !== '');
+  if (!parts.length) return;
+  let target = data;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    const part = parts[i];
+    if (!target[part] || typeof target[part] !== 'object') target[part] = {};
+    target = target[part];
+  }
+  target[parts[parts.length - 1]] = value;
+}
+
 function instantiate(config) {
   const page = Object.assign({}, config);
   page.data = JSON.parse(JSON.stringify(config.data || {}));
   page.setData = function setData(patch) {
-    Object.assign(this.data, patch);
+    Object.keys(patch || {}).forEach((key) => setDataPath(this.data, key, patch[key]));
   };
   return page;
 }
