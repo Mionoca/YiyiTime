@@ -3,6 +3,7 @@ const constants = require('../../utils/constants');
 const timeUtil = require('../../utils/time');
 const upload = require('../../utils/upload');
 const haptics = require('../../utils/haptics');
+const privacy = require('../../utils/privacy');
 
 const DEFAULT_AVATAR = constants.DEFAULT_AVATAR;
 
@@ -28,6 +29,10 @@ Page({
     appVersion: '',
     // 文档 8.9：振动反馈只用于抱抱 / 报平安成功，且可关闭
     hapticsEnabled: true,
+    // 文档 11.6：数据与隐私说明（收集 / 不收集 / 用途 / 存储 / 删除数据）
+    privacySheet: false,
+    privacySections: privacy.SECTIONS,
+    privacyFooter: privacy.FOOTER,
   },
 
   onShow() {
@@ -244,6 +249,15 @@ Page({
       return;
     }
     this.toast('可以在「微信 - 设置 - 隐私」里查看');
+  },
+
+  /** 文档 11.6：数据与隐私说明（收集什么 / 不收集什么 / 怎么删数据），弹层内容走 utils/privacy.js */
+  onOpenDataPrivacy() {
+    this.setData({ privacySheet: true });
+  },
+
+  onCloseDataPrivacy() {
+    this.setData({ privacySheet: false });
   },
 
 });

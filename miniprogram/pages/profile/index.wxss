@@ -187,6 +187,45 @@
   font-size: var(--font-sm);
 }
 
+/* 文档 11.6：数据与隐私说明弹层。标题用主文本色，正文 --muted（在 --card 上 5.41:1） */
+.privacy-section + .privacy-section {
+  border-top: 2rpx solid var(--wall);
+}
+
+.privacy-section__title {
+  padding-top: 20rpx;
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.privacy-section__text {
+  margin-top: 8rpx;
+  padding-bottom: 20rpx;
+  font-size: var(--font-sm);
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.privacy-sheet__footer {
+  padding-top: 24rpx;
+  font-size: var(--font-sm);
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* 白字主按钮统一 --accent-strong（文档 8.9，4.9:1）；88rpx 高满足热区要求 */
+.privacy-sheet__close {
+  margin-top: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: var(--font-md);
+  color: #FFFFFF;
+  background-color: var(--accent-strong);
+}
+
 /* 文档 8.9：振动反馈开关（默认开启，只影响抱抱 / 报平安成功）
    不缩放，保留原生 switch 的命中区域；行高 104rpx 已满足 ≥88rpx */
 .list-switch {

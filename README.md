@@ -24,13 +24,13 @@ YiyiTime/
 │  ├─ pages/
 │  │  ├─ home/                      # 小屋首页（场景、门口信封、两个入口页脚）
 │  │  ├─ bind/                      # 双人绑定与邀请码
-│  │  ├─ profile/                   # 我的（昵称头像、开始日期、隐私入口）
+│  │  ├─ profile/                   # 我的（昵称头像、开始日期、隐私保护指引 / 数据与隐私说明）
 │  │  ├─ safety/                    # 报平安（我到家了 + 时间线）
 │  │  ├─ diary/                     # 台灯下的日记（当天上锁，次日解锁）
 │  │  └─ wish/                      # 下次见面想做的事
 │  ├─ components/                   # avatar-bubble / mood-picker / hug-banner / bottom-sheet /
 │  │                                # timeline-item / diary-card / wish-item / empty-state / privacy-guard
-│  ├─ utils/                        # api（唯一云函数入口）、constants、time、format、me、upload、haptics
+│  ├─ utils/                        # api（唯一云函数入口）、constants、time、format、me、upload、haptics、privacy
 │  ├─ styles/tokens.wxss            # 颜色/间距/字号设计变量
 │  ├─ config/env.example.js         # 环境 ID 模板（env.js 不入库）
 │  └─ images/avatars/               # 默认头像
@@ -69,7 +69,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 482 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 485 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 

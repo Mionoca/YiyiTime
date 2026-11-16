@@ -83,11 +83,25 @@
         <text>隐私保护指引</text>
         <text class="list-arrow">›</text>
       </view>
+      <view class="list-item" bindtap="onOpenDataPrivacy">
+        <text>数据与隐私</text>
+        <text class="list-arrow">›</text>
+      </view>
       <view class="list-item">
         <text>关于小怡怡安</text>
         <text class="list-version">{{appVersion}}</text>
       </view>
     </view>
+
+    <!-- 文档 11.6：数据与隐私说明（体验版阶段以此为准，正式上线前补完整协议） -->
+    <bottom-sheet show="{{privacySheet}}" title="数据与隐私" bind:close="onCloseDataPrivacy">
+      <view class="privacy-section" wx:for="{{privacySections}}" wx:key="title">
+        <view class="privacy-section__title">{{item.title}}</view>
+        <view class="privacy-section__text">{{item.text}}</view>
+      </view>
+      <view class="privacy-sheet__footer">{{privacyFooter}}</view>
+      <view class="privacy-sheet__close" bindtap="onCloseDataPrivacy" aria-role="button">知道啦</view>
+    </bottom-sheet>
 
     <view class="footer">小怡怡安 · 只属于两个人的小屋</view>
   </block>

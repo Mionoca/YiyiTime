@@ -291,3 +291,55 @@ test('profile: 非校验类上传失败仍用通用文案', async () => {
   }
 });
 
+
+/* 文档 11.6：用户要求删除数据时 P1 人工处理，「我的」里要留联系方式。
+ * 这里锁死三条：①入口能打开/收起说明弹层且覆盖 11.6 的全部口径；
+ * ②删除数据指引走微信官方「反馈与投诉」，不编造联系方式、不把集合名/控制台这类实现细节写给用户；
+ * ③wxml 真的绑定了事件、bottom-sheet 真的注册了（页面测试直接调方法，绑错也会全绿）。 */
+test('profile: 数据与隐私入口打开说明弹层，覆盖 11.6 的收集 / 不收集 / 存储 / 删除口径', () => {
+  installWx({});
+  try {
+    stubApi(baseHome());
+    const page = newPage();
+    assert.strictEqual(page.data.privacySheet, false, '默认不弹「数据与隐私」说明');
+    page.onOpenDataPrivacy();
+    assert.strictEqual(page.data.privacySheet, true, '点「数据与隐私」要打开说明弹层');
+    const sections = page.data.privacySections || [];
+    assert.ok(sections.length >= 5, '说明至少覆盖收集 / 不收集 / 用途 / 存储 / 删除五条，实际 ' + sections.length);
+    sections.forEach((item) => {
+      assert.ok(item && item.title && item.text, '每条说明都要有标题和正文：' + JSON.stringify(item));
+    });
+    const text = sections.map((s) => s.title + s.text).join('|') + (page.data.privacyFooter || '');
+    ['openid', '昵称', '头像', '手机号', '位置', '通讯录', '身份证', '支付信息', '第三方', '云开发', '删除', '反馈与投诉'].forEach((token) => {
+      assert.ok(text.indexOf(token) >= 0, '说明里缺少文档 11.6 的口径：' + token);
+    });
+    page.onCloseDataPrivacy();
+    assert.strictEqual(page.data.privacySheet, false, '关掉弹层后要复位 privacySheet');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('profile: 删除数据指引是微信官方「反馈与投诉」，不编造联系方式、不暴露实现细节', () => {
+  const privacy = require('../miniprogram/utils/privacy');
+  const text = privacy.SECTIONS.map((s) => s.title + s.text).join('|') + privacy.FOOTER;
+  assert.ok(text.indexOf('反馈与投诉') >= 0, '删除数据必须给真实可达的通道（微信「反馈与投诉」）');
+  assert.ok(text.indexOf('右上角') >= 0, '要说清楚「··」入口在右上角');
+  assert.strictEqual(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(text), false, '不能凭空编一个邮箱当联系方式');
+  assert.strictEqual(/QQ|qq|微信号\s*[:：]|电话\s*[:：]/.test(text), false, '不能凭空编 QQ / 微信号 / 电话当联系方式');
+  assert.strictEqual(/\d{5,}/.test(text), false, '用户可见文案里不要放长数字（电话 / 学号这类）');
+  ['集合', '控制台', 'users', 'couples', 'bind_invites'].forEach((word) => {
+    assert.strictEqual(text.indexOf(word) >= 0, false, '用户可见文案不要出现实现细节：' + word);
+  });
+});
+
+test('profile: 数据与隐私的 wxml 绑定与 bottom-sheet 注册真的存在', () => {
+  const root = path.join(__dirname, '..');
+  const wxml = fs.readFileSync(path.join(root, 'miniprogram', 'pages', 'profile', 'index.wxml'), 'utf8');
+  assert.ok(wxml.indexOf('bindtap="onOpenDataPrivacy"') >= 0, '「数据与隐私」行没有绑定 onOpenDataPrivacy');
+  assert.ok(/<bottom-sheet[\s\S]*?show="\{\{privacySheet\}\}"/.test(wxml), 'bottom-sheet 没有绑定 privacySheet');
+  assert.ok(wxml.indexOf('bind:close="onCloseDataPrivacy"') >= 0, 'bottom-sheet 没有绑定关闭事件');
+  assert.ok(wxml.indexOf('wx:for="{{privacySections}}"') >= 0, '说明条目没有按 privacySections 渲染');
+  const json = JSON.parse(fs.readFileSync(path.join(root, 'miniprogram', 'pages', 'profile', 'index.json'), 'utf8'));
+  assert.strictEqual(json.usingComponents['bottom-sheet'], '/components/bottom-sheet/index', 'profile 页没有注册 bottom-sheet 组件');
+});
