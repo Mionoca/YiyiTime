@@ -39,3 +39,15 @@ test('fake-db: update 文档不存在时返回 stats.updated=0（与真实云开
   assert.deepStrictEqual(res, { stats: { updated: 0 } });
   assert.strictEqual(fake.get('users', 'oMissing'), undefined);
 });
+
+/**
+ * 单次 get 的 100 条上限是云函数的真实约束（home-blocks.loadSafety 的回归用例依赖它），
+ * 在 fake-db 自身锁一次，避免将来改默认值后回归静默失效。
+ */
+test('fake-db: 单次 get 默认最多返回 100 条（与云函数上限一致）', async () => {
+  const rows = [];
+  for (let i = 0; i < 120; i += 1) rows.push({ _id: 'd' + i, coupleId: 'c_1', openid: 'oA' });
+  const fake = makeFakeDb({ safety_checkins: rows });
+  const res = await fake.db.collection('safety_checkins').where({ coupleId: 'c_1' }).get();
+  assert.strictEqual(res.data.length, 100, '默认 get 必须封顶 100 条');
+});

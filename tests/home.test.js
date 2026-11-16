@@ -215,6 +215,53 @@ test('loadSafety: 一天多条时按 openid 判断，不会因为条数被截断
   });
 });
 
+test('loadSafety: 同一天超过 100 条时门灯仍按 openid 判断（单次 get 上限回归）', async () => {
+  // 云函数单次 get 上限 100 条：旧实现整取今日记录再按 openid 找，条数超限时
+  // 后插入的伴侣记录会被截掉，门灯漏亮。现在两人各按 openid 精确查询。
+  const nowMs = NOW.getTime();
+  const rows = [];
+  for (let i = 0; i < 101; i += 1) {
+    rows.push({
+      _id: 'many_' + i, coupleId: 'c_1', openid: 'oA', note: '', date: TODAY, createdAt: new Date(nowMs - (200 - i) * 1000),
+    });
+  }
+  const partnerAt = new Date(nowMs - 1000);
+  rows.push({
+    _id: 'partner_today', coupleId: 'c_1', openid: 'oB', note: '', date: TODAY, createdAt: partnerAt,
+  });
+  const { ctx } = makeCtx({ safety_checkins: rows });
+  const res = await loadSafety(ctx, 'c_1', TODAY, 'oB');
+  assert.deepStrictEqual(res, {
+    mineToday: true,
+    partnerToday: true,
+    partnerLastAt: partnerAt.toISOString(),
+  });
+});
+
+test('loadSafety: 对方超过 100 条时也不会把我的今日记录截断（对称回归）', async () => {
+  // 旧实现整取今日记录，前 100 条全是对方的记录时，我的记录被截断 → mineToday 漏，
+  // 首页会出现「对方报平安了但我没报」的错觉。新实现按 openid 各查，互不影响。
+  const nowMs = NOW.getTime();
+  const rows = [];
+  for (let i = 0; i < 100; i += 1) {
+    rows.push({
+      _id: 'partner_many_' + i, coupleId: 'c_1', openid: 'oB', note: '', date: TODAY, createdAt: new Date(nowMs - (300 - i) * 1000),
+    });
+  }
+  const mineAt = new Date(nowMs - 1000);
+  rows.push({
+    _id: 'mine_today', coupleId: 'c_1', openid: 'oA', note: '我到家了', date: TODAY, createdAt: mineAt,
+  });
+  const partnerLast = new Date(nowMs - 201 * 1000);
+  const { ctx } = makeCtx({ safety_checkins: rows });
+  const res = await loadSafety(ctx, 'c_1', TODAY, 'oB');
+  assert.deepStrictEqual(res, {
+    mineToday: true,
+    partnerToday: true,
+    partnerLastAt: partnerLast.toISOString(),
+  });
+});
+
 test('loadSafety: 伴侣从没报过平安时 partnerLastAt 为 null', async () => {
   const { ctx } = makeCtx();
   const res = await loadSafety(ctx, 'c_1', TODAY, 'oB');

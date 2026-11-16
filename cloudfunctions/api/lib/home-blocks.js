@@ -83,29 +83,34 @@ async function loadHug(ctx, coupleId) {
 
 /**
  * 报平安聚合（文档 7.8）：今天两人是否已报 + 伴侣最近一次报平安时间。
- * 两次查询：今日两人（coupleId+date 索引）、伴侣最近一条（coupleId+createdAt 索引）。
+ * 两次查询：我的今日记录（coupleId+date 索引）、伴侣最近一条（coupleId+createdAt 索引）。
+ * 5.3.6 允许一天多条，云函数单次 get 上限 100 条：不能整取今日全部记录再按 openid 找，
+ * 极端连点超过 100 条时另一个人的记录会被截掉、门灯漏亮，所以每人都按 openid 精确查询。
  */
 async function loadSafety(ctx, coupleId, todayKey, partnerOpenid) {
-  // 5.3.6 允许一天多条：不能用 limit(2) 假设两人各一条，
-  // 无排序的 limit 返回哪两条未定义，会把某一人的今日记录截掉
-  const todayRes = await ctx.db.collection('safety_checkins')
-    .where({ coupleId, date: todayKey })
+  const mineRes = await ctx.db.collection('safety_checkins')
+    .where({ coupleId, date: todayKey, openid: ctx.openid })
+    .limit(1)
     .get();
-  const todayDocs = (todayRes && todayRes.data) || [];
-  const mineToday = todayDocs.some((doc) => doc.openid === ctx.openid);
-  const partnerToday = partnerOpenid
-    ? todayDocs.some((doc) => doc.openid === partnerOpenid)
-    : false;
+  const mineToday = !!(mineRes && mineRes.data && mineRes.data.length);
 
+  let partnerToday = false;
   let partnerLastAt = null;
   if (partnerOpenid) {
+    // 伴侣最近一条即最新：同一条记录同时给出「今天是否已报」和门牌时间，不额外读库。
+    // 这里依赖 date 与 createdAt 由服务端同一次写入（handlers/safety.js 写入时 date=服务端 todayKey、
+    // createdAt=ctx.now），所以「最新一条 createdAt 记录的 date 是否等于 todayKey」等价于
+    // 「今天有没有伴侣的记录」；手工改库/导入导致两者错位时按最新一条为准。
     const lastRes = await ctx.db.collection('safety_checkins')
       .where({ coupleId, openid: partnerOpenid })
       .orderBy('createdAt', 'desc')
       .limit(1)
       .get();
     const lastDoc = lastRes && lastRes.data && lastRes.data[0];
-    partnerLastAt = lastDoc ? iso(lastDoc.createdAt) : null;
+    if (lastDoc) {
+      partnerLastAt = iso(lastDoc.createdAt);
+      partnerToday = lastDoc.date === todayKey;
+    }
   }
 
   return { mineToday, partnerToday, partnerLastAt };

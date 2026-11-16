@@ -406,10 +406,8 @@ test('F5 抱抱：发送 pending / 7 天有效 / 重复不新建 / 对方回应 
   assert.strictEqual(resent.existing, false);
   assert.notStrictEqual(resent.hug.hugId, sent.hug.hugId);
 
-  // 超过 7 天未回应：发送方看到过期；接收方 incoming 不展示。
-  // TODO(14.9)：文档 F5 要求「双方都看到过期」，当前 lib/home-blocks.js 只给发送方 outgoing.status='expired'，
-  // 接收方 incoming 只查未过期 pending（见 docs/开发进度.md 已知偏差）。实现对齐后这里应改为
-  // assert.strictEqual((await callAs(B, 'home.get', {})).hug.incoming.status, 'expired')
+  // 超过 7 天未回应：发送方 outgoing 惰性写回并显示 expired；接收方 incoming 不展示
+  // （7.8 明文「incoming 只返回未过期的 pending」，F5 的「过期」由回应过期抱抱返回 HUG_EXPIRED 覆盖）。
   const now = Date.now();
   h.reset({
     users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
