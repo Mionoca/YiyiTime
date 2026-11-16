@@ -1,0 +1,46 @@
+.hb {
+  display: flex;
+  align-items: center;
+  padding: 18rpx 24rpx;
+  border-radius: 28rpx;
+  background: var(--card, #FFFDF9);
+  box-shadow: 0 8rpx 24rpx rgba(63, 58, 54, 0.16);
+}
+
+.hb--incoming {
+  background: linear-gradient(135deg, #FDF2E9 0%, #F8DCCB 100%);
+}
+
+.hb__heart {
+  flex-shrink: 0;
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--accent-soft, #F4C9B8);
+  color: var(--accent, #D98E73);
+  font-size: 28rpx;
+}
+
+.hb__body {
+  flex: 1;
+  min-width: 0;
+  padding: 0 18rpx;
+}
+
+.hb__text {
+  font-size: var(--font-sm, 24rpx);
+  color: var(--ink, #3F3A36);
+  line-height: 1.4;
+}
+
+.hb__btn {
+  flex-shrink: 0;
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  background: var(--accent, #D98E73);
+  color: #FFFFFF;
+  font-size: var(--font-sm, 24rpx);
+  font-weight: 500;
+}

@@ -341,15 +341,6 @@
   margin: 0 12rpx;
 }
 
-.person-avatar {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 50%;
-  border: 6rpx solid #FFFDF9;
-  background: var(--wall);
-  box-shadow: 0 6rpx 14rpx rgba(63, 58, 54, 0.14);
-}
-
 .person-name {
   margin-top: 8rpx;
   max-width: 140rpx;
@@ -503,12 +494,24 @@
 }
 
 .envelope.applied_by_partner {
-  animation: envelope-pulse 1.4s ease-in-out infinite;
+  animation: envelope-pulse 1.8s ease-in-out infinite;
 }
 
 @keyframes envelope-pulse {
   0%, 100% { transform: rotate(-4deg) scale(1); }
   50% { transform: rotate(-4deg) scale(1.08); }
+}
+
+.envelope-avatar {
+  position: absolute;
+  right: -12rpx;
+  top: -44rpx;
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  border: 4rpx solid #FFFDF9;
+  background-color: var(--card);
+  box-shadow: 0 4rpx 10rpx rgba(63, 58, 54, 0.18);
 }
 
 .envelope-reddot {
@@ -600,7 +603,7 @@
 /* ---------- 底部动作 ---------- */
 .action-bar {
   flex-shrink: 0;
-  padding: 16rpx 48rpx calc(40rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 48rpx calc(24rpx + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, rgba(251, 246, 238, 0) 0%, #FBF6EE 30%);
 }
 
@@ -615,6 +618,116 @@
   width: 100%;
 }
 
+/* ---------- 抱抱横幅与心形动画 ---------- */
+.hug-slot {
+  position: relative;
+  flex-shrink: 0;
+  padding: 8rpx 40rpx 12rpx;
+  /* 文档 9.8：抱抱横幅在第 5 层 */
+  z-index: 50;
+  animation: hug-slot-in 240ms ease-out;
+}
+
+@keyframes hug-slot-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hug-btn-wrap {
+  position: relative;
+}
+
+.hug-heart-float {
+  position: absolute;
+  left: 50%;
+  bottom: 60rpx;
+  margin-left: -20rpx;
+  width: 40rpx;
+  text-align: center;
+  font-size: 40rpx;
+  color: var(--accent);
+  pointer-events: none;
+  animation: hug-float 1400ms ease-out forwards;
+}
+
+@keyframes hug-float {
+  0% { opacity: 0; transform: translateY(12rpx) scale(0.6); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-90rpx) scale(1.2); }
+}
+
+/* ---------- 对方心情详情 ---------- */
+.pm-head {
+  display: flex;
+  align-items: center;
+  margin: 24rpx 0 8rpx;
+}
+
+.pm-info {
+  margin-left: 32rpx;
+}
+
+.pm-chip {
+  display: inline-block;
+  padding: 8rpx 24rpx;
+  border-radius: 999rpx;
+  background: var(--wall);
+  font-size: var(--font-md);
+  color: var(--ink);
+}
+
+.pm-chip--sunny {
+  background: #FDF2DC;
+  color: #8A6420;
+}
+
+.pm-chip--cloudy {
+  background: #EEF1F5;
+  color: #4F5866;
+}
+
+.pm-chip--rainy {
+  background: #E6EEF8;
+  color: #3D5B7C;
+}
+
+.pm-chip--thunder {
+  background: #E8E6F0;
+  color: #45425E;
+}
+
+.pm-time {
+  margin-top: 8rpx;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.pm-empty {
+  font-size: var(--font-md);
+  color: var(--muted);
+}
+
+.pm-note {
+  margin-top: 24rpx;
+  padding: 24rpx;
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  font-size: var(--font-md);
+  color: var(--ink);
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.pm-note-empty {
+  color: var(--ink-faint);
+}
+
 /* ---------- 浮层 ---------- */
 .sheet-mask {
   position: absolute;
@@ -622,7 +735,8 @@
   right: 0;
   top: 0;
   bottom: 0;
-  z-index: 20;
+  /* 文档 9.8：页面级浮层在第 6 层，必须盖住抱抱横幅（50） */
+  z-index: 60;
   background: rgba(63, 58, 54, 0.32);
   display: flex;
   align-items: flex-end;

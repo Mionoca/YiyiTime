@@ -1,0 +1,138 @@
+.avatar-bubble {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+}
+
+/* ---------- 心情气泡 ---------- */
+.bubble {
+  --bubble-bg: var(--card, #FFFDF9);
+  --bubble-color: var(--ink, #3F3A36);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64rpx;
+  margin-bottom: 10rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 24rpx;
+  background: var(--bubble-bg);
+  color: var(--bubble-color);
+  box-shadow: 0 4rpx 12rpx rgba(63, 58, 54, 0.12);
+  /* 气泡在头像右上方（文档 9.5），三角指向头像 */
+  align-self: flex-end;
+  margin-right: -10rpx;
+}
+
+/* 只在心情真的变化时由页面/组件加 class 触发一次淡入（文档 10.4） */
+.bubble.is-pop {
+  animation: bubble-in 200ms ease-out;
+}
+
+.bubble__icon {
+  margin-right: 4rpx;
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.bubble__char {
+  font-size: 26rpx;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.bubble__tail {
+  position: absolute;
+  left: 25%;
+  bottom: -8rpx;
+  width: 0;
+  height: 0;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-top: 8rpx solid var(--bubble-bg);
+}
+
+.bubble--sunny {
+  --bubble-bg: #FDF2DC;
+  --bubble-color: #8A6420;
+}
+
+.bubble--cloudy {
+  --bubble-bg: #EEF1F5;
+  --bubble-color: #4F5866;
+}
+
+.bubble--rainy {
+  --bubble-bg: #E6EEF8;
+  --bubble-color: #3D5B7C;
+}
+
+.bubble--thunder {
+  --bubble-bg: #E8E6F0;
+  --bubble-color: #45425E;
+}
+
+.bubble--empty {
+  border: 2rpx dashed var(--ink-faint, #C4B9AC);
+  background: rgba(255, 253, 249, 0.72);
+  color: var(--muted, #8C837A);
+  box-shadow: none;
+}
+
+.bubble--empty .bubble__tail {
+  border-top-color: rgba(255, 253, 249, 0.72);
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(6rpx) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---------- 头像 ---------- */
+.avatar-wrap {
+  position: relative;
+  display: flex;
+}
+
+.avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  border: 6rpx solid #FFFDF9;
+  background: var(--wall, #F3E8D8);
+  box-shadow: 0 6rpx 14rpx rgba(63, 58, 54, 0.14);
+}
+
+.avatar-bubble--sm .avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-width: 4rpx;
+}
+
+.avatar-bubble--lg .avatar {
+  width: 132rpx;
+  height: 132rpx;
+  border-width: 8rpx;
+}
+
+.hug-badge {
+  position: absolute;
+  right: -8rpx;
+  top: 6rpx;
+  width: 34rpx;
+  height: 34rpx;
+  line-height: 34rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--accent, #D98E73);
+  color: #FFFFFF;
+  font-size: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(63, 58, 54, 0.2);
+  animation: badge-beat 1.4s ease-in-out infinite;
+}
+
+@keyframes badge-beat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}

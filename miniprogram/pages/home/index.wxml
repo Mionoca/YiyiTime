@@ -5,6 +5,13 @@
     <view class="nav-title">小怡怡安</view>
   </view>
 
+  <!-- 抱抱横幅（文档 10.5「顶部横幅」）：只在 TA 的待处理抱抱时出现；
+       我发出/已回应/已过期由底部按钮矩阵 + 心形动画表达（文档 9.4）。
+       放在导航与场景之间占位，避免压住墙历等热区（文档 9.2）。 -->
+  <view class="hug-slot" wx:if="{{home && home.couple && hugIncoming}}">
+    <hug-banner incoming="{{hugIncoming}}" bind:respond="onHugRespond" />
+  </view>
+
   <!-- 加载中 / 加载失败的房间轮廓 -->
   <view class="scene skeleton-scene" wx:if="{{!home && (loading || error)}}">
     <view class="sk-block sk-window"></view>
@@ -36,14 +43,14 @@
     </view>
 
     <!-- 墙历 -->
-    <view class="calendar" bindtap="onTapCalendar">
+    <view class="calendar" bindtap="onTapCalendar" aria-label="我们的日子">
       <view class="calendar-top">我们的日子</view>
       <view class="calendar-days" wx:if="{{home.couple}}">{{daysText}}</view>
       <view class="calendar-days calendar-days-empty" wx:else>从今天开始</view>
     </view>
 
     <!-- 相框 -->
-    <view class="frame" bindtap="onTapProfile">
+    <view class="frame" bindtap="onTapProfile" aria-label="我的资料">
       <image class="frame-avatar" src="{{myAvatar}}" mode="aspectFill" />
     </view>
 
@@ -65,15 +72,26 @@
       <view class="sofa-arm sofa-arm-right"></view>
       <view class="sofa-seat"></view>
       <view class="people">
-        <view class="person">
-          <image class="person-avatar" src="{{myAvatar}}" mode="aspectFill" />
+        <view class="person" aria-label="我的心情">
+          <avatar-bubble
+            user="{{myUser}}"
+            mood="{{moodMine}}"
+            size="md"
+            bind:tap="onTapMyAvatar"
+          />
           <view class="person-name">{{myName}}</view>
         </view>
-        <view class="person" wx:if="{{home.couple}}">
-          <image class="person-avatar" src="{{partnerAvatar}}" mode="aspectFill" />
+        <view class="person" wx:if="{{home.couple}}" aria-label="TA 的心情">
+          <avatar-bubble
+            user="{{partnerUser}}"
+            mood="{{moodPartner}}"
+            size="md"
+            hug-badge="{{hugIncoming ? true : false}}"
+            bind:tap="onTapPartnerAvatar"
+          />
           <view class="person-name">{{partnerName}}</view>
         </view>
-        <view class="empty-seat" wx:else>
+        <view class="empty-seat" wx:else bindtap="onTapBind" aria-label="邀请 TA 住进来">
           <view class="empty-cushion"></view>
           <view class="empty-text">屋里还缺一个人</view>
         </view>
@@ -81,7 +99,7 @@
     </view>
 
     <!-- 冰箱（愿望） -->
-    <view class="fridge" bindtap="onTapComingSoon">
+    <view class="fridge" bindtap="onTapComingSoon" aria-label="愿望清单">
       <view class="fridge-door">
         <view class="fridge-handle"></view>
         <view class="fridge-note"></view>
@@ -90,7 +108,7 @@
     </view>
 
     <!-- 门（报平安） -->
-    <view class="door" bindtap="onTapComingSoon">
+    <view class="door" bindtap="onTapComingSoon" aria-label="报平安">
       <view class="door-panel">
         <view class="door-knob"></view>
       </view>
@@ -101,11 +119,20 @@
       class="envelope {{home.bind.state}}"
       wx:if="{{!home.couple && home.bind.state !== 'unbound'}}"
       bindtap="onTapBind"
+      aria-label="有人在等你"
     >
       <view class="envelope-body"></view>
       <view class="envelope-flap"></view>
+      <image
+        class="envelope-avatar"
+        wx:if="{{home.bind.pending && home.bind.pending.other && home.bind.pending.other.avatarFileID}}"
+        src="{{home.bind.pending.other.avatarFileID}}"
+        mode="aspectFill"
+        aria-label="等你确认的 TA"
+      ></image>
       <view class="envelope-reddot" wx:if="{{home.bind.state === 'applied_by_partner'}}"></view>
     </view>
+
   </view>
 
   <!-- 底部动作 -->
@@ -119,8 +146,17 @@
       <button class="btn-primary action-btn" bindtap="onTapBind">去看看</button>
     </block>
     <block wx:else>
-      <view class="action-hint">{{daysText}} · 一起的日子还在继续</view>
-      <button class="btn-primary action-btn" bindtap="onTapComingSoon">抱一抱</button>
+      <view class="action-hint">{{hugHint}}</view>
+      <view class="hug-btn-wrap">
+        <view class="hug-heart-float" wx:if="{{hugCelebrate}}">♥</view>
+        <button
+          class="btn-primary action-btn"
+          bindtap="onTapHug"
+          disabled="{{hugButtonDisabled || hugSending}}"
+        >
+          {{hugSending ? '抱抱中…' : hugButtonText}}
+        </button>
+      </view>
     </block>
   </view>
 
@@ -154,5 +190,37 @@
       <view class="sheet-close" bindtap="onCloseDaysSheet">知道啦</view>
     </view>
   </view>
+
+  <!-- 对方心情详情：只读，备注只在这里出现（文档 9.5） -->
+  <view class="sheet-mask" wx:if="{{partnerMoodSheet}}" bindtap="onClosePartnerMood">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-title">{{partnerName}} 今天</view>
+      <view class="pm-head">
+        <avatar-bubble user="{{partnerUser}}" show-mood="{{false}}" size="lg" />
+        <view class="pm-info">
+          <block wx:if="{{partnerMood}}">
+            <view class="pm-chip pm-chip--{{partnerMood.mood}}">{{partnerMood.emoji}} {{partnerMood.label}}</view>
+            <view class="pm-time">{{partnerMood.timeText}} 记下的</view>
+          </block>
+          <view wx:else class="pm-empty">TA 今天还没说心情</view>
+        </view>
+      </view>
+      <view class="pm-note" wx:if="{{partnerMood}}">
+        <text wx:if="{{partnerMood.note}}">{{partnerMood.note}}</text>
+        <text wx:else class="pm-note-empty">TA 今天没写备注</text>
+      </view>
+      <view class="sheet-close" bindtap="onClosePartnerMood">知道啦</view>
+    </view>
+  </view>
+
+  <!-- 心情打卡弹层 -->
+  <mood-picker
+    show="{{moodPickerShow}}"
+    value="{{moodMine}}"
+    saving="{{moodSaving}}"
+    bind:select="onMoodSelect"
+    bind:close="onCloseMoodPicker"
+  />
 
 </view>

@@ -2,6 +2,7 @@
 
 const time = require('../lib/time');
 const bind = require('./bind');
+const blocks = require('../lib/home-blocks');
 
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -55,6 +56,7 @@ async function get(payload, ctx) {
     return Object.assign({}, base, empty, { bind: await bind.computeStatus(ctx) });
   }
 
+  const coupleId = couple._id || ctx.user.coupleId;
   const partnerOpenid = (couple.memberOpenids || []).find((id) => id !== ctx.openid) || null;
   let partner = null;
   if (partnerOpenid) {
@@ -67,18 +69,21 @@ async function get(payload, ctx) {
       : { openid: partnerOpenid, nickname: '', avatarFileID: '' };
   }
 
+  const mood = await blocks.optionalBlock(ctx, 'mood', () => blocks.loadMood(ctx, coupleId, todayKey, partnerOpenid));
+  const hug = await blocks.optionalBlock(ctx, 'hug', () => blocks.loadHug(ctx, coupleId));
+
   return Object.assign({}, base, {
     bind: { state: 'bound', pending: null },
     couple: {
-      coupleId: couple._id || ctx.user.coupleId,
+      coupleId,
       startDate: couple.startDate,
       daysTogether: time.daysTogether(couple.startDate, todayKey),
       anniversary: time.nextAnniversary(couple.startDate, todayKey),
     },
     partner,
-    // 心情 / 抱抱 / 报平安 / 日记 / 愿望：M3、M4 接入后替换为真实聚合
-    mood: null,
-    hug: null,
+    mood,
+    hug,
+    // 报平安 / 日记 / 愿望：M4 接入后替换为真实聚合
     safety: null,
     diary: null,
     wish: null,

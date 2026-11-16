@@ -1,0 +1,7 @@
+<view wx:if="{{visible}}" class="hb hb--incoming" aria-label="TA 需要抱抱">
+  <view class="hb__heart">♥</view>
+  <view class="hb__body">
+    <view class="hb__text">TA 需要抱抱</view>
+  </view>
+  <view class="hb__btn" catchtap="onRespond">抱抱 TA</view>
+</view>

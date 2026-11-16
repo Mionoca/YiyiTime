@@ -2,5 +2,9 @@
   "navigationStyle": "custom",
   "disableScroll": true,
   "backgroundColor": "#FBF6EE",
-  "usingComponents": {}
+  "usingComponents": {
+    "avatar-bubble": "/components/avatar-bubble/index",
+    "hug-banner": "/components/hug-banner/index",
+    "mood-picker": "/components/mood-picker/index"
+  }
 }

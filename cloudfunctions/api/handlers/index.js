@@ -20,5 +20,8 @@ module.exports = {
   'bind.cancel': require('./bind').cancel,
   'bind.status': require('./bind').status,
   'couple.updateStartDate': require('./couple').updateStartDate,
+  'mood.set': require('./mood').set,
+  'hug.send': require('./hug').send,
+  'hug.respond': require('./hug').respond,
   'home.get': require('./home').get,
 };

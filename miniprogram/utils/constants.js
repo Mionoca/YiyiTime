@@ -1,8 +1,9 @@
+// 文案与 emoji 对齐文档 8.5 / 9.5：晴 / 阴 / 雨 / 雷（不使用「多云/小雨/雷雨」）
 const MOODS = [
-  { key: 'sunny', label: '晴', color: '#F2CC8F' },
-  { key: 'cloudy', label: '多云', color: '#B8C0CC' },
-  { key: 'rainy', label: '小雨', color: '#7A9CC6' },
-  { key: 'thunder', label: '雷雨', color: '#6C6A8A' },
+  { key: 'sunny', label: '晴', emoji: '☀️', color: '#F2CC8F' },
+  { key: 'cloudy', label: '阴', emoji: '☁️', color: '#B8C0CC' },
+  { key: 'rainy', label: '雨', emoji: '🌧️', color: '#7A9CC6' },
+  { key: 'thunder', label: '雷', emoji: '⛈️', color: '#6C6A8A' },
 ];
 
 const ROUTES = {

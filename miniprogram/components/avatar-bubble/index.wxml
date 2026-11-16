@@ -1,0 +1,15 @@
+<view class="avatar-bubble avatar-bubble--{{size}}" catchtap="onTap">
+  <view
+    wx:if="{{showMood}}"
+    class="bubble {{moodKey ? 'bubble--' + moodKey : 'bubble--empty'}} {{pop ? 'is-pop' : ''}}"
+    aria-label="{{moodKey ? '今天心情' + moodShort : '今天心情？'}}"
+  >
+    <text wx:if="{{moodKey}}" class="bubble__icon">{{moodIcon}}</text>
+    <text class="bubble__char">{{moodKey ? moodShort : '？'}}</text>
+    <view class="bubble__tail"></view>
+  </view>
+  <view class="avatar-wrap">
+    <image class="avatar" src="{{avatar}}" mode="aspectFill" />
+    <view wx:if="{{hugBadge}}" class="hug-badge">♥</view>
+  </view>
+</view>

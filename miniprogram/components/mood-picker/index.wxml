@@ -1,0 +1,36 @@
+<view wx:if="{{show}}" class="mp-mask" bindtap="onClose" catchtouchmove="noop">
+  <view class="mp-sheet" catchtap="noop">
+    <view class="mp-handle"></view>
+    <view class="mp-title">今天心情怎么样？</view>
+    <view class="mp-sub">点一个最像今天的状态</view>
+
+    <view class="mp-options">
+      <view
+        wx:for="{{moods}}"
+        wx:key="key"
+        class="mp-option {{mood === item.key ? 'is-active' : ''}}"
+        data-key="{{item.key}}"
+        catchtap="onSelectMood"
+      >
+        <text class="mp-option__icon">{{item.emoji}}</text>
+        <text class="mp-option__label">{{item.label}}</text>
+      </view>
+    </view>
+
+    <view class="mp-note-wrap">
+      <textarea
+        class="mp-note"
+        value="{{note}}"
+        maxlength="{{noteMax}}"
+        placeholder="想说点什么（可不写）"
+        placeholder-class="mp-note__ph"
+        auto-height
+        cursor-spacing="140"
+        bindinput="onNoteInput"
+      />
+      <view class="mp-count">{{note.length}}/{{noteMax}}</view>
+    </view>
+
+    <view class="mp-confirm {{mood && !saving ? '' : 'is-disabled'}}" catchtap="onConfirm">{{saving ? '保存中…' : '记下今天的心情'}}</view>
+  </view>
+</view>
