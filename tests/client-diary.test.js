@@ -6,6 +6,10 @@ const assert = require('node:assert');
 const { installWx, restoreWx, loadPage, instantiate } = require('./helpers/client-page');
 const api = require('../miniprogram/utils/api');
 const timeUtil = require('../miniprogram/utils/time');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const ROOT = path.resolve(__dirname, '..');
 
 /**
  * 日记页：日期判断只认服务端下发的 todayKey（文档 1.5 / 10.9），
@@ -195,7 +199,7 @@ test('diary: 加载更多用 beforeDate 游标追加，不重复首屏', async (
   }
 });
 
-test('diary: 首屏失败进错误态，静默刷新失败只 toast 不清空列表', async () => {
+test('diary: 首屏失败进错误态，静默刷新失败保留列表并给底部重试', async () => {
   let fail = true;
   const { page, errors } = setup({
     'diary.list': () => {
@@ -207,12 +211,82 @@ test('diary: 首屏失败进错误态，静默刷新失败只 toast 不清空列
     await page.load();
     assert.strictEqual(page.data.error, '台灯好像没插好，再试一次');
     assert.strictEqual(page.data.loading, false);
-    // 已有数据后静默刷新失败：保留旧列表，只走 showError
+    // 已有数据后静默刷新失败：保留旧列表，整页错误态已退掉，只走 showError
     page.data.items = [{ date: '2026-11-01', mine: { content: '旧' } }];
+    page.data.error = '';
     fail = true;
     await page.load(true);
     assert.strictEqual(page.data.items.length, 1);
     assert.strictEqual(errors.length, 1);
+    assert.strictEqual(page.data.listError, '加载失败，点重试', '底部给重试入口（文档 12.9）');
+    assert.strictEqual(page.data.error, '', '不退回整页错误态');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('diary: 加载更多失败保留列表并在底部给重试，点重试从游标继续', async () => {
+  const today = tomorrowKey();
+  const first = { date: today, mine: { content: '今天' }, partner: null };
+  const older = { date: '2026-11-01', mine: { content: '旧的' }, partner: null };
+  let failMore = true;
+  const { page, calls, errors } = setup({
+    'diary.list': (payload) => {
+      if (!payload || !payload.beforeDate) {
+        return listRes({ todayKey: today, items: [first], nextBeforeDate: '2026-11-02' });
+      }
+      assert.strictEqual(payload.beforeDate, '2026-11-02');
+      if (failMore) throw new Error('down');
+      return { items: [older], nextBeforeDate: '', todayKey: today };
+    },
+  });
+  try {
+    await page.load();
+    assert.strictEqual(page.data.listError, '');
+    await page.loadMore();
+    assert.strictEqual(page.data.listError, '加载失败，点重试');
+    assert.strictEqual(page.data.items.length, 1, '翻页失败保留已加载内容（文档 12.9）');
+    assert.strictEqual(page.data.loadingMore, false);
+    assert.strictEqual(errors.length, 1);
+    failMore = false;
+    await page.onRetryList();
+    assert.strictEqual(page.data.items.length, 2, '点重试从同一个游标继续翻页');
+    assert.strictEqual(page.data.items[1].date, '2026-11-01');
+    assert.strictEqual(calls.filter((c) => c.action === 'diary.list').length, 3);
+  } finally {
+    restoreWx();
+  }
+});
+
+test('diary: 静默刷新失败后点底部重试重拉第一页并清掉提示', async () => {
+  const today = tomorrowKey();
+  let fail = false;
+  let lists = 0;
+  const { page } = setup({
+    'diary.list': () => {
+      lists += 1;
+      if (fail) throw new Error('down');
+      return listRes({ todayKey: today, items: [{ date: today, unlockAt: 'x', mine: { content: '今天' }, partner: null }] });
+    },
+  });
+  try {
+    await page.load();
+    assert.strictEqual(page.data.items.length, 1);
+    fail = true;
+    await page.load(true);
+    assert.strictEqual(page.data.listError, '加载失败，点重试');
+    assert.strictEqual(page.data.items.length, 1);
+    fail = false;
+    const retry = page.onRetryList();
+    // 文档 12.9：刷新失败后的重试也要静默，不能用整页 loading 盖掉已加载列表
+    assert.strictEqual(page.data.loading, false, '重试不进入整页骨架');
+    assert.strictEqual(page.data.items.length, 1, '重试过程中保留已加载列表');
+    const retryAgain = page.onRetryList();
+    assert.strictEqual(retry, retryAgain, '连点复用同一个在途请求');
+    await retry;
+    assert.strictEqual(lists, 3, '点重试重拉第一页而不是继续翻页；连点只发一次请求');
+    assert.strictEqual(page.data.listError, '');
+    assert.strictEqual(page.data.items.length, 1);
   } finally {
     restoreWx();
   }
@@ -291,4 +365,56 @@ test('diary: 下拉刷新静默重拉第一页并收起转圈（失败也收起�
   } finally {
     restoreWx();
   }
+});
+
+test('diary: 翻页失败后又刷新失败，点底部重试重拉第一页而不是续翻（错误类型不串味）', async () => {
+  const today = tomorrowKey();
+  const first = { date: today, mine: { content: '今天' }, partner: null };
+  const older = { date: '2026-11-01', mine: { content: '旧的' }, partner: null };
+  let failMore = true;
+  let failList = false;
+  const payloads = [];
+  const { page } = setup({
+    'diary.list': (payload) => {
+      payloads.push(payload);
+      if (!payload || !payload.beforeDate) {
+        if (failList) throw new Error('down');
+        return listRes({ todayKey: today, items: [first], nextBeforeDate: '2026-11-02' });
+      }
+      if (failMore) throw new Error('down');
+      return { items: [older], nextBeforeDate: '', todayKey: today };
+    },
+  });
+  try {
+    await page.load();
+    await page.loadMore();
+    assert.strictEqual(page.data.listError, '加载失败，点重试');
+    // 翻页失败后紧接着下拉静默刷新也失败：重试类型必须重置为 refresh
+    failMore = false;
+    failList = true;
+    await page.load(true);
+    assert.strictEqual(page.data.listError, '加载失败，点重试');
+    failList = false;
+    await page.onRetryList();
+    assert.strictEqual(payloads.length, 4);
+    assert.strictEqual(payloads[3].beforeDate, undefined, '刷新失败后的重试要从第一页开始，不能拿旧游标续翻');
+    assert.strictEqual(page.data.listError, '');
+    assert.strictEqual(page.data.items.length, 1);
+  } finally {
+    restoreWx();
+  }
+});
+
+test('diary: 模板里的底部重试入口真实绑定且排在翻页提示之后（文档 12.9）', () => {
+  const wxml = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/diary/index.wxml'), 'utf8');
+  assert.ok(wxml.includes('bindtap="onRetryList"'), '底部提示要绑 onRetryList');
+  assert.ok(wxml.includes('wx:elif="{{listError}}"'), '用 wx:elif 接在翻页提示之后，避免与整页错误态/没有更多同时出现');
+  assert.ok(wxml.includes('aria-role="button"'), '可点提示要有无障碍角色');
+  assert.ok(wxml.includes('{{listError}}'), '提示文案来自 data.listError');
+  const loadingMoreAt = wxml.indexOf('wx:if="{{loadingMore}}"');
+  const listErrorAt = wxml.indexOf('wx:elif="{{listError}}"');
+  assert.ok(loadingMoreAt >= 0, '翻页提示视图还在');
+  assert.ok(listErrorAt > loadingMoreAt, '重试入口排在翻页提示之后');
+  const wxss = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/diary/index.wxss'), 'utf8');
+  assert.ok(/\.hint--error\s*\{[^}]*var\(--accent-strong/.test(wxss), '重试文案用 --accent-strong token 保证对比度');
 });

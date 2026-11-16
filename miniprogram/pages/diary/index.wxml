@@ -38,6 +38,13 @@
     <empty-state wx:if="{{!items.length}}" icon="🕯️" title="还没有日记，今天先写一句吧" />
 
     <view wx:if="{{loadingMore}}" class="hint">正在翻页…</view>
+    <view
+      wx:elif="{{listError}}"
+      class="hint hint--error"
+      bindtap="onRetryList"
+      aria-role="button"
+      aria-label="重新加载日记列表"
+    >{{listError}}</view>
     <view wx:elif="{{!hasMore && items.length > 1}}" class="hint hint--faint">没有更多啦</view>
   </block>
 </view>

@@ -67,6 +67,12 @@
   color: var(--muted, #6F685F);
 }
 
+/* 文档 12.9：列表失败保留内容 + 底部可点重试 */
+.hint--error {
+  color: var(--accent-strong, #A85C42);
+  text-decoration: underline;
+}
+
 .state {
   padding: 120rpx 48rpx;
   text-align: center;

@@ -6,6 +6,8 @@ const timeUtil = require('../../utils/time');
 
 const PAGE_SIZE = 10;
 const CONTENT_MAX = constants.LIMITS.diary;
+// 文档 12.9：日记列表失败保留已加载内容，底部提示「加载失败，点重试」
+const LIST_ERROR_TEXT = '加载失败，点重试';
 
 Page({
   data: {
@@ -19,6 +21,7 @@ Page({
     loadingMore: false,
     hasMore: false,
     error: '',
+    listError: '',
   },
 
   onLoad() {
@@ -49,6 +52,20 @@ Page({
     this.load();
   },
 
+  /** 列表底部「加载失败，点重试」（文档 12.9）：翻页失败从游标继续，刷新失败重拉第一页 */
+  onRetryList() {
+    // 失败提示会一直停在底部，用户容易连点：在途时复用同一个请求，避免并发拉取 + 重复 toast
+    if (this._retryingList) return this._retryingList;
+    const retryMore = this._listErrorKind === 'more' && !!this._beforeDate;
+    const run = retryMore ? this.loadMore() : this.load(true);
+    this._retryingList = run;
+    const clear = () => {
+      this._retryingList = null;
+    };
+    run.then(clear, clear);
+    return run;
+  },
+
   onContentInput(e) {
     const content = String((e && e.detail && e.detail.value) || '');
     this.setData({ content, canSave: !!content.trim() });
@@ -56,7 +73,7 @@ Page({
 
   async load(silent) {
     if (this._loadingList && !silent) return;
-    if (!silent) this.setData({ loading: true, error: '' });
+    if (!silent) this.setData({ loading: true, error: '', listError: '' });
     this._loadingList = true;
     try {
       const res = await api.call('diary.list', { limit: PAGE_SIZE });
@@ -76,6 +93,7 @@ Page({
         loading: false,
         loadingMore: false,
         error: '',
+        listError: '',
       };
       // 首次加载把今天已写的内容带进编辑器，方便改；之后静默刷新不覆盖用户正在打的草稿
       if (!this._draftInited) {
@@ -90,9 +108,12 @@ Page({
       }
     } catch (err) {
       if (silent && this.data.items.length) {
+        // 文档 12.9：保留已加载内容，底部提示「加载失败，点重试」，不退回整页错误态
+        this._listErrorKind = 'refresh';
+        this.setData({ listError: LIST_ERROR_TEXT });
         api.showError(err);
       } else {
-        this.setData({ loading: false, error: '台灯好像没插好，再试一次' });
+        this.setData({ loading: false, error: '台灯好像没插好，再试一次', listError: '' });
       }
     } finally {
       this._loadingList = false;
@@ -101,7 +122,7 @@ Page({
 
   async loadMore() {
     if (this.data.loading || this.data.loadingMore || !this._beforeDate) return;
-    this.setData({ loadingMore: true });
+    this.setData({ loadingMore: true, listError: '' });
     try {
       const res = await api.call('diary.list', {
         beforeDate: this._beforeDate,
@@ -113,10 +134,12 @@ Page({
         items: this.data.items.concat(items),
         hasMore: !!this._beforeDate,
         loadingMore: false,
+        listError: '',
       });
     } catch (err) {
-      // 加载更多失败只 toast，不丢已有列表（文档 8.3.3）
-      this.setData({ loadingMore: false });
+      // 文档 12.9 / 8.3.3：保留已加载内容，底部给「加载失败，点重试」，从当前游标继续翻页
+      this._listErrorKind = 'more';
+      this.setData({ loadingMore: false, listError: LIST_ERROR_TEXT });
       api.showError(err);
     }
   },
