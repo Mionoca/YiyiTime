@@ -69,7 +69,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 449 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 458 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 

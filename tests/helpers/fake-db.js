@@ -7,6 +7,9 @@
  */
 function makeFakeDb(initial) {
   let autoIdSeq = 0;
+  /** 可选操作钩子：每次真实读/写前调用 onOperation(collection, op)，用于查询预算测试 */
+  let operationHook = null;
+  const notify = (name, op) => { if (operationHook) operationHook(name, op); };
   const stores = new Map();
   const storeOf = (name) => {
     if (!stores.has(name)) stores.set(name, new Map());
@@ -62,6 +65,7 @@ function makeFakeDb(initial) {
       doc(id) {
         return {
           async get() {
+            notify(name, 'doc.get');
             const doc = storeOf(name).get(id);
             if (!doc) {
               // 与真实云开发一致：不存在时抛 errCode=-1，供 isDocumentMissing 判定
@@ -72,6 +76,7 @@ function makeFakeDb(initial) {
             return { data: clone(doc) };
           },
           async update({ data }) {
+            notify(name, 'doc.update');
             const doc = storeOf(name).get(id);
             // 真实云开发 update 文档不存在时返回 stats.updated=0 而不抛错
             if (!doc) return { stats: { updated: 0 } };
@@ -90,16 +95,19 @@ function makeFakeDb(initial) {
             return { stats: { updated: 1 } };
           },
           async set({ data }) {
+            notify(name, 'doc.set');
             storeOf(name).set(id, Object.assign({ _id: id }, clone(data)));
             return { _id: id };
           },
           async remove() {
+            notify(name, 'doc.remove');
             const existed = storeOf(name).delete(id);
             return { stats: { removed: existed ? 1 : 0 } };
           },
         };
       },
       async add({ data }) {
+        notify(name, 'add');
         if (data && data._id !== undefined && storeOf(name).has(data._id)) {
           // 真实云开发对显式 _id 重复会报错（bind_invites 用邀请码当 _id，靠它兜底冲突）
           const err = new Error('duplicate key _id: ' + data._id);
@@ -128,6 +136,7 @@ function makeFakeDb(initial) {
             return api;
           },
           async get() {
+            notify(name, 'where.get');
             let rows = Array.from(storeOf(name).values()).filter((doc) =>
               Object.keys(query.cond).every((key) => matchValue(doc[key], query.cond[key])));
             // 注意：没有 orderBy 时保持插入顺序；真实云库的默认顺序未定义，
@@ -144,6 +153,7 @@ function makeFakeDb(initial) {
             return { data: rows.slice(0, query.limit).map(clone) };
           },
           async count() {
+            notify(name, 'where.count');
             const rows = Array.from(storeOf(name).values()).filter((doc) =>
               Object.keys(query.cond).every((key) => matchValue(doc[key], query.cond[key])));
             return { total: rows.length };
@@ -181,6 +191,7 @@ function makeFakeDb(initial) {
 
   return {
     db: { collection, command, runTransaction },
+    setOperationHook: (fn) => { operationHook = typeof fn === 'function' ? fn : null; },
     get: (name, id) => storeOf(name).get(id),
     all: (name) => Array.from(storeOf(name).values()),
   };

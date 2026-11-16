@@ -51,3 +51,51 @@ test('fake-db: 单次 get 默认最多返回 100 条（与云函数上限一致�
   const res = await fake.db.collection('safety_checkins').where({ coupleId: 'c_1' }).get();
   assert.strictEqual(res.data.length, 100, '默认 get 必须封顶 100 条');
 });
+
+/**
+ * 操作钩子是查询预算测试的计数底座；七个 notify 点任何一个被删都会静默少计，
+ * 单测锁住「每类真实读写各触发一次且集合名透传、链式构造不触发、事务内计数、
+ * 读不存在的文档（抛错路径）也计数、可关闭」。
+ */
+test('fake-db: 操作钩子对七类读写各触发一次，链式构造不触发，可关闭', async () => {
+  const fake = makeFakeDb({
+    users: [{ _id: 'oA', nickname: '小怡' }],
+    couples: [{ _id: 'c_1', startDate: '2024-05-20' }],
+  });
+  const ops = [];
+  fake.setOperationHook((name, op) => ops.push(name + ':' + op));
+  const users = fake.db.collection('users');
+  const couples = fake.db.collection('couples');
+
+  // 七类操作分散在 users / couples 两个集合上，顺便锁集合名透传（写死 'users' 会被抓）
+  await users.doc('oA').get();
+  await couples.doc('c_1').update({ data: { startDate: '2024-05-21' } });
+  await users.doc('oB').set({ data: { nickname: '小乙' } });
+  await couples.doc('c_1').remove();
+  await users.add({ data: { nickname: '小丙' } });
+  await couples.where({}).get();
+  await users.where({ nickname: '小丙' }).count();
+  assert.deepStrictEqual(ops, [
+    'users:doc.get', 'couples:doc.update', 'users:doc.set', 'couples:doc.remove',
+    'users:add', 'couples:where.get', 'users:where.count',
+  ], '七类真实读写必须各触发一次钩子，且集合名透传不能写死');
+
+  // 只拼链式查询不执行时不计数
+  users.where({}).orderBy('nickname', 'asc').limit(1);
+  assert.strictEqual(ops.length, 7, '链式构造不能触发计数');
+
+  // 事务内复用同一 collection，读也要计数（否则事务读写会绕过预算统计）
+  await fake.db.runTransaction(async (tx) => {
+    await tx.collection('users').doc('oA').get();
+  });
+  assert.deepStrictEqual(ops.slice(7), ['users:doc.get'], '事务内读必须计数');
+
+  // 读不存在的文档要抛错，但钩子必须在读取前触发（抛错路径也计数，供预算统计）
+  await assert.rejects(users.doc('oMissing').get());
+  assert.deepStrictEqual(ops.slice(8), ['users:doc.get'], '读不存在文档的抛错路径也要计数');
+
+  // 关闭钩子后不再计数
+  fake.setOperationHook(null);
+  await users.doc('oA').get();
+  assert.strictEqual(ops.length, 9, 'setOperationHook(null) 后必须停止计数');
+});
