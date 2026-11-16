@@ -1,5 +1,5 @@
 <view wx:if="{{item}}" class="tl {{isMine ? 'tl--mine' : ''}}">
-  <image class="tl__avatar" src="{{avatar}}" mode="aspectFill" aria-label="{{nickname}}的头像"></image>
+  <image class="tl__avatar" src="{{avatar}}" mode="aspectFill" lazy-load aria-label="{{nickname}}的头像"></image>
   <view class="tl__main">
     <view class="tl__meta">
       <text class="tl__name">{{nickname}}</text>

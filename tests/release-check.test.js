@@ -31,6 +31,26 @@ function writeFixtureFile(dir, rel, text) {
 
 const PRIVACY_TAG = "<privacy-guard />\n";
 
+/** 合成一张结构完整的最小 PNG（签名 + IHDR + IEND；CRC 置 0，预检不校验像素与 CRC） */
+function pngBytes(width, height) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // color type: RGBA
+  const chunk = (type, data) => {
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length, 0);
+    head.write(type, 4, 'ascii');
+    return Buffer.concat([head, data, Buffer.alloc(4)]);
+  };
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
 /** 构造一个「除了被删改项以外都健康」的临时小程序仓库 */
 function makeFixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-check-'));
@@ -49,7 +69,7 @@ function makeFixture() {
     writeFixtureFile(dir, 'miniprogram/' + page + '.js', 'Page({});\n');
   }
   writeFixtureFile(dir, 'miniprogram/utils/constants.js', "const DEFAULT_AVATAR = '/images/avatars/default.png';\nmodule.exports = { DEFAULT_AVATAR };\n");
-  writeFixtureFile(dir, 'miniprogram/images/avatars/default.png', 'not-a-real-png');
+  writeFixtureFile(dir, 'miniprogram/images/avatars/default.png', pngBytes(200, 200));
   writeFixtureFile(dir, 'miniprogram/config/env.example.js', 'module.exports = { ENV_ID: \'\' };\n');
   for (const ext of ['js', 'json', 'wxml']) {
     writeFixtureFile(dir, 'miniprogram/components/privacy-guard/index.' + ext, '');
@@ -101,6 +121,7 @@ test('发布预检：当前仓库静态检查全部通过', () => {
     '云函数 package.json 依赖与入口正确',
     '云函数 config.json 权限/触发器格式正确',
     'project.config.json 的根目录 / appid / compileType / 基础库 ≥ 2.32.3 正确',
+    '图片资源与包体符合 8.8',
   ].forEach((needle) => {
     assert.ok(passText.includes(needle), '缺少检查项：' + needle);
   });
@@ -117,6 +138,136 @@ test('发布预检：当前仓库静态检查全部通过', () => {
   ['8 个集合', '已重新上传部署', '超时 10s、内存 256MB', '用户隐私保护指引', 'F1–F8'].forEach((needle) => {
     assert.ok(todoText.includes(needle), '缺少 TODO 提醒：' + needle);
   });
+});
+
+test('发布预检：图片位置 / 单张体积 / 包体预算 / 默认头像尺寸', () => {
+  const passText = (result) => result.lines.filter((l) => l.level === 'PASS').map((l) => l.msg).join('\n');
+  const packagePass = (result) => passText(result).includes('图片资源与包体符合 8.8');
+  const noPackagePass = (result) => assert.ok(!packagePass(result), '有 FAIL 时不应再打印「图片资源与包体符合 8.8」');
+
+  // 健康夹具：有 PASS，且没有任何 FAIL
+  const healthy = makeFixture();
+  try {
+    const result = runChecks(healthy);
+    assert.deepStrictEqual(failMessages(result), [], '健康夹具不应有 FAIL 项');
+    assert.ok(packagePass(result), '缺少资源与包体 PASS：' + passText(result));
+  } finally {
+    cleanup(healthy);
+  }
+
+  // 默认头像尺寸不是 200×200
+  const wrongAvatar = makeFixture();
+  try {
+    fs.writeFileSync(path.join(wrongAvatar, 'miniprogram/images/avatars/default.png'), pngBytes(210, 212));
+    const result = runChecks(wrongAvatar);
+    assert.ok(failMessages(result).some((m) => m.includes('默认头像尺寸应为 200×200（当前 210×212）')), failMessages(result).join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(wrongAvatar);
+  }
+
+  // 默认头像不是结构完整的 PNG（只有 IHDR 头、没有 IEND）→ 必须 FAIL，不能只 WARN
+  const brokenAvatar = makeFixture();
+  try {
+    fs.writeFileSync(path.join(brokenAvatar, 'miniprogram/images/avatars/default.png'), pngBytes(200, 200).subarray(0, 40));
+    const result = runChecks(brokenAvatar);
+    assert.ok(failMessages(result).some((m) => m.includes('默认头像不是可解析的 PNG')), failMessages(result).join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(brokenAvatar);
+  }
+
+  // 头像文件短到读不出 PNG 头（4 字节）：必须安全 FAIL，不能抛异常中断预检
+  const tinyAvatar = makeFixture();
+  try {
+    fs.writeFileSync(path.join(tinyAvatar, 'miniprogram/images/avatars/default.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const result = runChecks(tinyAvatar);
+    assert.ok(failMessages(result).some((m) => m.includes('默认头像不是可解析的 PNG')), failMessages(result).join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(tinyAvatar);
+  }
+
+  // 默认头像路径以 constants.js 为准：改了常量而旧文件还在时，不能继续 PASS 旧头像
+  const movedAvatar = makeFixture();
+  try {
+    writeFixtureFile(movedAvatar, 'miniprogram/utils/constants.js', 'const DEFAULT_AVATAR = ' + "'/images/moved.png';\n" + 'module.exports = { DEFAULT_AVATAR };\n');
+    const result = runChecks(movedAvatar);
+    assert.ok(failMessages(result).some((m) => m.includes('默认头像缺失：miniprogram/images/moved.png')), failMessages(result).join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(movedAvatar);
+  }
+
+  // 图片放到 images/ 之外（含大写扩展名，扩展名匹配不区分大小写）
+  const misplaced = makeFixture();
+  try {
+    writeFixtureFile(misplaced, 'miniprogram/pages/home/bg.png', pngBytes(10, 10));
+    writeFixtureFile(misplaced, 'miniprogram/pages/home/BG.PNG', pngBytes(10, 10));
+    const result = runChecks(misplaced);
+    assert.ok(failMessages(result).some((m) => m.includes('图片必须放在 miniprogram/images/ 下')), failMessages(result).join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(misplaced);
+  }
+
+  // 只有大写扩展名时也必须被识别为图片（扩展名匹配不区分大小写）
+  const upperOnly = makeFixture();
+  try {
+    writeFixtureFile(upperOnly, 'miniprogram/pages/home/ONLY.PNG', pngBytes(10, 10));
+    const result = runChecks(upperOnly);
+    assert.ok(failMessages(result).some((m) => m.includes('图片必须放在 miniprogram/images/ 下')), failMessages(result).join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(upperOnly);
+  }
+
+  // 目录前缀必须精确到 images/：images_extra/ 不算合规
+  const siblingDir = makeFixture();
+  try {
+    writeFixtureFile(siblingDir, 'miniprogram/images_extra/x.png', pngBytes(10, 10));
+    const result = runChecks(siblingDir);
+    assert.ok(failMessages(result).some((m) => m.includes('图片必须放在 miniprogram/images/ 下')), failMessages(result).join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(siblingDir);
+  }
+
+  // 单张图片超过 100KB（文案带真实字节数，不四舍五入成「100KB」自相矛盾）
+  const oversized = makeFixture();
+  try {
+    writeFixtureFile(oversized, 'miniprogram/images/big.png', Buffer.alloc(100 * 1024 + 1, 1));
+    const result = runChecks(oversized);
+    const msgs = failMessages(result);
+    assert.ok(msgs.some((m) => m.includes('单张图片不能超过 100KB')), msgs.join('\n'));
+    assert.ok(msgs.some((m) => m.includes('102401 字节')), 'FAIL 文案应给出真实字节数：' + msgs.join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(oversized);
+  }
+
+  // 恰好 100KB 属于「≤100KB」，应当通过
+  const exact = makeFixture();
+  try {
+    writeFixtureFile(exact, 'miniprogram/images/edge.png', Buffer.alloc(100 * 1024, 1));
+    const result = runChecks(exact);
+    assert.deepStrictEqual(failMessages(result), [], '恰好 100KB 不应 FAIL');
+    assert.ok(packagePass(result), '恰好 100KB 应打印包体 PASS');
+  } finally {
+    cleanup(exact);
+  }
+
+  // 小程序包体达到 2MB（文档是「< 2MB」，等于也不合规）
+  const heavy = makeFixture();
+  try {
+    writeFixtureFile(heavy, 'miniprogram/utils/big.bin', Buffer.alloc(2 * 1024 * 1024, 1));
+    const result = runChecks(heavy);
+    const msgs = failMessages(result);
+    assert.ok(msgs.some((m) => m.includes('小程序包体不能超过 2MB')), msgs.join('\n'));
+    noPackagePass(result);
+  } finally {
+    cleanup(heavy);
+  }
 });
 
 test('发布预检：密钥扫描能识别环境 ID、AppSecret 与私钥', () => {

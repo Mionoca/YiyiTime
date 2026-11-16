@@ -502,18 +502,137 @@ function checkTemplate(root, lines) {
   }
 }
 
-function checkAssets(root, lines, warnings) {
+/** 从 constants.js 解析默认头像路径；checkAssets 与包体预算共用，避免两处硬编码不一致 */
+function resolveAvatar(root) {
   const constants = readText(path.join(root, 'miniprogram/utils/constants.js'));
-  if (!constants) {
+  const m = String(constants || '').match(/DEFAULT_AVATAR\s*=\s*'([^']+)'/);
+  const display = m ? m[1] : '/images/avatars/default.png';
+  // 统一成 walkPackage 使用的相对路径（miniprogram/ 开头、正斜杠）
+  return { display: display, rel: 'miniprogram/' + display.replace(/^\//, ''), constantsOk: Boolean(constants) };
+}
+
+function checkAssets(root, lines, warnings) {
+  const avatar = resolveAvatar(root);
+  if (!avatar.constantsOk) {
     warnings.push('读不到 miniprogram/utils/constants.js，默认头像按约定路径检查');
     lines.push({ level: 'WARN', msg: '读不到 miniprogram/utils/constants.js，按约定路径检查默认头像' });
   }
-  const m = String(constants || '').match(/DEFAULT_AVATAR\s*=\s*'([^']+)'/);
-  const avatar = m ? m[1] : '/images/avatars/default.png';
-  if (fs.existsSync(path.join(root, 'miniprogram', avatar.replace(/^\//, '')))) {
-    lines.push({ level: 'PASS', msg: '默认头像存在：' + avatar });
+  if (fs.existsSync(path.join(root, avatar.rel))) {
+    lines.push({ level: 'PASS', msg: '默认头像存在：' + avatar.display });
   } else {
-    lines.push({ level: 'FAIL', msg: '默认头像缺失：miniprogram' + avatar });
+    lines.push({ level: 'FAIL', msg: '默认头像缺失：' + avatar.rel });
+  }
+}
+
+// ---- 文档 8.8 资源与包体预算 ----
+// 只做静态预算检查（图片位置/单张体积/默认头像尺寸/小程序包体总量），不含真机渲染性能。
+// 云函数不计入小程序包体；miniprogram_npm 若存在会一起统计（它会被打进包）。
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
+const IMAGE_MAX_BYTES = 100 * 1024;
+const PACKAGE_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_SIZE = 200;
+
+/**
+ * 校验默认头像是结构完整的 PNG 并读取 IHDR 宽高；不依赖图片库。
+ * 要求 PNG 签名 + IHDR + 结尾 IEND，避免「只有 33 字节头」或截断文件蒙混过关。
+ * 默认头像很小（文档 8.8 要求 200×200），整文件读入即可，不做流式读取。
+ */
+function readPngSize(file) {
+  let buf;
+  try {
+    buf = fs.readFileSync(file);
+  } catch {
+    return null;
+  }
+  if (buf.length < 45) return null;
+  if (buf.readUInt32BE(0) !== 0x89504e47 || buf.readUInt32BE(4) !== 0x0d0a1a0a) return null;
+  if (buf.toString('ascii', 12, 16) !== 'IHDR') return null;
+  if (buf.toString('ascii', buf.length - 8, buf.length - 4) !== 'IEND') return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+function walkPackage(root, relDir, out, warnings) {
+  const dir = path.join(root, relDir);
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    warnings.push('无法读取 ' + relDir + '：' + (err && err.message));
+    return;
+  }
+  for (const entry of entries) {
+    const rel = relDir + '/' + entry.name;
+    if (entry.isDirectory()) {
+      // 包体统计不含 .git/node_modules；miniprogram_npm 属于包体，保留统计
+      if (entry.name === '.git' || entry.name === 'node_modules') continue;
+      walkPackage(root, rel, out, warnings);
+    } else if (entry.isFile()) {
+      try {
+        out.push({ rel: rel, size: fs.statSync(path.join(root, rel)).size });
+      } catch (err) {
+        warnings.push('无法读取 ' + rel + ' 的大小：' + (err && err.message));
+      }
+    } else if (entry.isSymbolicLink()) {
+      warnings.push('跳过符号链接 ' + rel + '（包体统计不含软链，请确认上传包里没有链接）');
+    }
+  }
+}
+
+function checkPackageBudget(root, lines, warnings) {
+  const files = [];
+  walkPackage(root, 'miniprogram', files, warnings);
+  if (!files.length) {
+    warnings.push('miniprogram 目录为空或读不到，跳过图片与包体预算检查');
+    lines.push({ level: 'WARN', msg: '读不到 miniprogram 目录，跳过图片与包体预算检查' });
+    return;
+  }
+
+  const images = files.filter((f) => IMAGE_EXT.test(f.rel));
+  const outside = images.filter((f) => !f.rel.startsWith('miniprogram/images/'));
+  const oversize = images.filter((f) => f.size > IMAGE_MAX_BYTES);
+  const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+
+  if (outside.length) {
+    lines.push({ level: 'FAIL', msg: '图片必须放在 miniprogram/images/ 下（发现：' + outside.map((f) => f.rel).slice(0, 5).join('、') + '）' });
+  }
+  if (oversize.length) {
+    lines.push({
+      level: 'FAIL',
+      msg: '单张图片不能超过 100KB（发现：' + oversize.map((f) => f.rel + ' ' + f.size + ' 字节').slice(0, 5).join('、') + '）',
+    });
+  }
+  // 文档 8.8 是「总包体 < 2MB」，恰好 2MB 也不合规，所以用 >= 判 FAIL
+  if (totalBytes >= PACKAGE_MAX_BYTES) {
+    lines.push({
+      level: 'FAIL',
+      msg: '小程序包体不能超过 2MB（当前 ' + totalBytes + ' 字节，' + files.length + ' 个文件）',
+    });
+  }
+
+  // 默认头像：路径从 constants.js 解析（与 checkAssets 同源），要求结构完整的 200×200 PNG。
+  // 文件缺失由 checkAssets 报 FAIL，这里不再重复；PASS 文案也不会硬说「默认头像 200×200」。
+  const avatar = resolveAvatar(root);
+  const avatarFile = files.find((f) => f.rel === avatar.rel);
+  let avatarOk = false;
+  if (avatarFile) {
+    const size = readPngSize(path.join(root, avatar.rel));
+    if (!size) {
+      lines.push({ level: 'FAIL', msg: '默认头像不是可解析的 PNG（需要签名 / IHDR / IEND）：' + avatar.rel });
+    } else if (size.width !== AVATAR_SIZE || size.height !== AVATAR_SIZE) {
+      lines.push({ level: 'FAIL', msg: '默认头像尺寸应为 200×200（当前 ' + size.width + '×' + size.height + '）' });
+    } else {
+      avatarOk = true;
+    }
+  }
+
+  if (!outside.length && !oversize.length && totalBytes < PACKAGE_MAX_BYTES && avatarOk) {
+    const maxImage = images.reduce((max, f) => Math.max(max, f.size), 0);
+    lines.push({
+      level: 'PASS',
+      msg:
+        '图片资源与包体符合 8.8（' + images.length + ' 张图片、单张最大 ' + Math.round(maxImage / 1024) + 'KB、包体 ' +
+        Math.floor(totalBytes / 1024) + 'KB < 2MB、默认头像 200×200）',
+    });
   }
 }
 
@@ -642,6 +761,7 @@ function runChecks(root) {
   checkDeployConfig(root, lines);
   checkTemplate(root, lines);
   checkAssets(root, lines, warnings);
+  checkPackageBudget(root, lines, warnings);
   checkPrivacy(app, root, lines);
   checkConsole(root, lines, warnings);
   checkSecrets(root, lines);
@@ -679,6 +799,7 @@ module.exports = {
   runChecks,
   checkStructure,
   checkDeployConfig,
+  checkPackageBudget,
   versionAtLeast,
   scanTextForSecrets,
   scanConsoleStatement,
