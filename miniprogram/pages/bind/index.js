@@ -151,7 +151,13 @@ Page({
     try {
       const status = await api.call('bind.status');
       if (status.todayKey && status.todayKey !== this.data.maxDate) {
-        this.setData({ maxDate: status.todayKey, todayKey: status.todayKey });
+        const patch = { maxDate: status.todayKey, todayKey: status.todayKey };
+        // 跨天时如果用户还没手选开始日期，把默认值一起挪到今天（否则会把昨天当成开始日提交）
+        if (!this._startDateTouched && this.data.step === 'invite') {
+          patch.startDate = status.todayKey;
+          patch.startDateText = timeUtil.formatDateCN(status.todayKey);
+        }
+        this.setData(patch);
       }
       if (status.state === 'bound') {
         wx.reLaunch({ url: constants.ROUTES.home });
@@ -405,13 +411,22 @@ Page({
     this.setData({ submitting: true });
     try {
       await api.call('bind.cancel', { code });
-      this.setData({
+      const patch = {
         submitting: false,
         step: 'invite',
         bindState: 'unbound',
         pending: null,
         code: '',
-      });
+      };
+      // 等待期间可能跨天：取消回邀请步骤时如果用户没手选过开始日期，重置成服务端今天
+      if (!this._startDateTouched) {
+        const today = this.data.maxDate || this.data.todayKey;
+        if (today) {
+          patch.startDate = today;
+          patch.startDateText = timeUtil.formatDateCN(today);
+        }
+      }
+      this.setData(patch);
       wx.showToast({ title: '已取消', icon: 'none' });
     } catch (err) {
       this.setData({ submitting: false });
