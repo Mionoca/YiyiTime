@@ -110,7 +110,7 @@ test('payload 不是普通对象时按空对象处理（数组/字符串/null �
     const res = await h.main({ action: 'user.updateProfile', payload });
     assert.strictEqual(res.ok, false);
     assert.strictEqual(res.code, 'PROFILE_REQUIRED');
-    assert.strictEqual(res.message, '先填一下昵称吧');
+    assert.strictEqual(res.message, '先给自己起个名字吧');
   }
 
   // 用一个只回显入参的临时 handler，证明是入口把非对象归一成 {}（而不是 handler 内部兜底）

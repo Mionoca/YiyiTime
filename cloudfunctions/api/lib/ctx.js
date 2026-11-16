@@ -2,6 +2,7 @@
 
 const { db } = require('./db');
 const { AppError } = require('./errors');
+const dbUtil = require('./db-util');
 
 /**
  * 把 openid 变成业务上下文：用户文档缺失时自动建档。
@@ -11,8 +12,14 @@ async function buildContext({ openid }) {
   const now = new Date();
   let user = null;
 
-  const userRes = await db.collection('users').doc(openid).get().catch(() => null);
-  user = userRes && userRes.data;
+  // 只有「文档确实不存在」才建档；超时/网络/权限等读故障必须继续抛，
+  // 否则会把读故障当新建，用空白用户覆盖掉 coupleId 等已有资料。
+  try {
+    const userRes = await db.collection('users').doc(openid).get();
+    user = userRes && userRes.data;
+  } catch (err) {
+    if (!dbUtil.isDocumentMissing(err)) throw err;
+  }
 
   if (!user) {
     user = {
@@ -36,8 +43,14 @@ async function buildContext({ openid }) {
   let partner = null;
 
   if (user.coupleId) {
-    const coupleRes = await db.collection('couples').doc(user.coupleId).get().catch(() => null);
-    couple = coupleRes && coupleRes.data;
+    // 同上：读故障必须抛，不能被当成「couples 文档不存在」，
+    // 否则 home/bind 会按数据异常把 user.coupleId 重置成 null。
+    try {
+      const coupleRes = await db.collection('couples').doc(user.coupleId).get();
+      couple = coupleRes && coupleRes.data;
+    } catch (err) {
+      if (!dbUtil.isDocumentMissing(err)) throw err;
+    }
 
     if (couple) {
       const partnerOpenid = (couple.memberOpenids || []).find((id) => id !== openid);

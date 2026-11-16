@@ -25,7 +25,7 @@ async function updateProfile(payload, ctx) {
   const hasNickname = p.nickname !== undefined && p.nickname !== null;
   const hasAvatar = p.avatarFileID !== undefined && p.avatarFileID !== null;
   if (!hasNickname && !hasAvatar) {
-    throw new AppError('PROFILE_REQUIRED', '先填一下昵称吧');
+    throw new AppError('PROFILE_REQUIRED', '先给自己起个名字吧');
   }
 
   const data = { updatedAt: ctx.now };

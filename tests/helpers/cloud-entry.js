@@ -21,9 +21,33 @@ let fake = makeFakeDb({});
 let currentOpenid = 'oA';
 let installed = false;
 let originalLoad = null;
+/** 故障注入：让某个集合的 doc.get/update 抛指定错误（用于测读故障降级/上抛） */
+let fault = null;
+
+function proxyCollection(name) {
+  const real = fake.db.collection(name);
+  if (!fault || fault.collection !== name) return real;
+  if (fault.method === 'collection') throw fault.error;
+  return Object.assign({}, real, {
+    doc(id) {
+      const doc = real.doc(id);
+      if (fault.method === 'get') {
+        return Object.assign({}, doc, {
+          async get() { throw fault.error; },
+        });
+      }
+      if (fault.method === 'update') {
+        return Object.assign({}, doc, {
+          async update() { throw fault.error; },
+        });
+      }
+      return doc;
+    },
+  });
+}
 
 const proxyDb = {
-  collection: (name) => fake.db.collection(name),
+  collection: (name) => proxyCollection(name),
   command: {
     in: (values) => fake.db.command.in(values),
     lt: (value) => fake.db.command.lt(value),
@@ -59,6 +83,10 @@ function uninstall() {
 
 function createHarness() {
   install();
+  // 每个夹具从干净库开始，避免用例漏掉 reset 时串状态
+  fake = makeFakeDb({});
+  currentOpenid = 'oA';
+  fault = null;
   const api = require('../../cloudfunctions/api/index');
   const handlers = require('../../cloudfunctions/api/handlers');
   return {
@@ -77,6 +105,21 @@ function createHarness() {
     reset(initial, openid) {
       fake = makeFakeDb(initial || {});
       currentOpenid = openid === undefined ? 'oA' : openid;
+      fault = null;
+    },
+    /**
+     * 注入故障：{ collection:'users', method:'get'|'update'|'collection', error }；传 null 清除。
+     * method 写错时直接抛错，避免用例因为没注入成功而假通过。
+     */
+    setFault(next) {
+      if (next) {
+        const methods = ['get', 'update', 'collection'];
+        if (methods.indexOf(next.method) === -1) {
+          throw new Error('setFault: unknown method ' + next.method
+            + '（可选 ' + methods.join('/') + '）');
+        }
+      }
+      fault = next || null;
     },
     fake() {
       return fake;

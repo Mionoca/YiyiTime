@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
 const time = require('../lib/time');
+const dbUtil = require('../lib/db-util');
 
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 邀请码 24 小时有效
 const BIND_FAIL_LIMIT = 5; // 连续失败 5 次触发限流
@@ -30,14 +31,48 @@ function newInviteCode() {
 
 async function getUserDoc(db, openid) {
   if (!openid) return null;
+  // 仅用于展示（返回对方昵称/头像）：读故障降级成 null，不阻断主流程。
+  // 需要据此做业务判断的地方必须用 getUserDocStrict。
   const res = await db.collection('users').doc(openid).get().catch(() => null);
   return (res && res.data) || null;
 }
 
+async function getUserDocStrict(db, openid) {
+  if (!openid) return null;
+  // 业务判断用：只有文档确实不存在才当 null，读故障继续抛，
+  // 否则申请时会把「读被邀请人资料失败」误判成邀请码已用过并记一次失败。
+  try {
+    const res = await db.collection('users').doc(openid).get();
+    return (res && res.data) || null;
+  } catch (err) {
+    if (!dbUtil.isDocumentMissing(err)) throw err;
+    return null;
+  }
+}
+
+async function getInviteDocStrict(db, code) {
+  // 业务判断用：邀请文档读故障不能当成「码不存在」，否则会被误报成
+  // INVITE_NOT_FOUND 并累计一次绑定失败。
+  try {
+    const res = await db.collection('bind_invites').doc(code).get();
+    return (res && res.data) || null;
+  } catch (err) {
+    if (!dbUtil.isDocumentMissing(err)) throw err;
+    return null;
+  }
+}
+
 async function getCoupleDoc(db, coupleId) {
   if (!coupleId) return null;
-  const res = await db.collection('couples').doc(coupleId).get().catch(() => null);
-  return (res && res.data) || null;
+  // 只有文档确实不存在才当 null（触发状态自愈）；读故障继续抛，
+  // 否则瞬时报错会被当成「关系不存在」并清掉 user.coupleId。
+  try {
+    const res = await db.collection('couples').doc(coupleId).get();
+    return (res && res.data) || null;
+  } catch (err) {
+    if (!dbUtil.isDocumentMissing(err)) throw err;
+    return null;
+  }
 }
 
 function inviteIdOf(invite) {
@@ -110,8 +145,7 @@ async function failWith(ctx, code, message) {
  * 校验失败会累计限流计数。
  */
 async function loadJoinableInvite(ctx, code) {
-  const res = await ctx.db.collection('bind_invites').doc(code).get().catch(() => null);
-  const invite = res && res.data;
+  const invite = await getInviteDocStrict(ctx.db, code);
   if (!invite) {
     await failWith(ctx, 'INVITE_NOT_FOUND', '没有找到这个邀请码');
   }
@@ -128,7 +162,7 @@ async function loadJoinableInvite(ctx, code) {
     await expireInvite(ctx.db, invite, ctx.now);
     await failWith(ctx, 'INVITE_EXPIRED', '邀请码过期了，让 TA 重新生成');
   }
-  const creator = await getUserDoc(ctx.db, invite.creatorOpenid);
+  const creator = await getUserDocStrict(ctx.db, invite.creatorOpenid);
   if (!creator) {
     await failWith(ctx, 'INVITE_USED', '这个邀请码已经用过了');
   }
@@ -284,8 +318,7 @@ async function apply(payload, ctx) {
 
 async function confirm(payload, ctx) {
   const code = validate.code(payload.code);
-  const res = await ctx.db.collection('bind_invites').doc(code).get().catch(() => null);
-  const invite = res && res.data;
+  const invite = await getInviteDocStrict(ctx.db, code);
   if (!invite) {
     throw new AppError('INVITE_NOT_FOUND', '没有找到这个邀请码');
   }
@@ -382,8 +415,7 @@ async function confirm(payload, ctx) {
 
 async function cancel(payload, ctx) {
   const code = validate.code(payload.code);
-  const res = await ctx.db.collection('bind_invites').doc(code).get().catch(() => null);
-  const invite = res && res.data;
+  const invite = await getInviteDocStrict(ctx.db, code);
   if (!invite) {
     throw new AppError('INVITE_NOT_FOUND', '没有找到这个邀请码');
   }

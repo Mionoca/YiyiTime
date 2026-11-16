@@ -480,3 +480,100 @@ test('home.get: 抱抱/日记/愿望区块各自失败只让对应块为 null（
     console.error = originalError;
   }
 });
+
+/**
+ * 包一层 users 集合，统计 update 调用次数（用于断言「写/不写」而不是只看库值）。
+ * withFailure 为 true 时让 update 抛错，模拟写库故障。
+ */
+function countUserUpdates(ctx, fake, withFailure) {
+  const calls = [];
+  const realDb = fake.db;
+  ctx.db = {
+    command: realDb.command,
+    runTransaction: realDb.runTransaction,
+    collection(name) {
+      if (name !== 'users') return realDb.collection(name);
+      return Object.assign({}, realDb.collection('users'), {
+        doc(id) {
+          const real = realDb.collection('users').doc(id);
+          return Object.assign({}, real, {
+            async update(arg) {
+              calls.push(arg);
+              if (withFailure) throw new Error('users update down');
+              return real.update(arg);
+            },
+          });
+        },
+      });
+    },
+  };
+  return calls;
+}
+
+function unboundCtx(users) {
+  const { ctx, fake } = makeCtx({ users });
+  const last = users[0].lastActiveAt;
+  ctx.user = { _id: 'oA', coupleId: null, lastActiveAt: last };
+  ctx.couple = null;
+  ctx.partner = null;
+  return { ctx, fake };
+}
+
+test('home.get: 距上次 lastActiveAt 超过 5 分钟才写库（文档 7.8）', async () => {
+  const last = new Date(NOW.getTime() - 6 * 60 * 1000);
+  const { ctx, fake } = unboundCtx([{ _id: 'oA', coupleId: null, lastActiveAt: last }]);
+  const calls = countUserUpdates(ctx, fake);
+
+  const res = await homeHandler.get({}, ctx);
+  assert.strictEqual(calls.length, 1, '超过 5 分钟应写一次');
+  assert.deepStrictEqual(fake.get('users', 'oA').lastActiveAt, NOW);
+  // 7.8：首页返回的 user 只有 4 个公开字段
+  assert.deepStrictEqual(Object.keys(res.user).sort(),
+    ['avatarFileID', 'nickname', 'openid', 'profileComplete']);
+});
+
+test('home.get: 5 分钟内不写 lastActiveAt（文档 7.8 / 1515）', async () => {
+  const last = new Date(NOW.getTime() - 4 * 60 * 1000);
+  const { ctx, fake } = unboundCtx([{ _id: 'oA', coupleId: null, lastActiveAt: last }]);
+  const calls = countUserUpdates(ctx, fake);
+
+  await homeHandler.get({}, ctx);
+  assert.strictEqual(calls.length, 0, '4 分钟内不应写库');
+  assert.deepStrictEqual(fake.get('users', 'oA').lastActiveAt, last);
+});
+
+test('home.get: 恰好 5 分钟不写、多 1ms 才写（实现与文档都是严格大于）', async () => {
+  for (const [delta, expected] of [[5 * 60 * 1000, 0], [5 * 60 * 1000 + 1, 1]]) {
+    const last = new Date(NOW.getTime() - delta);
+    const { ctx, fake } = unboundCtx([{ _id: 'oA', coupleId: null, lastActiveAt: last }]);
+    const calls = countUserUpdates(ctx, fake);
+
+    await homeHandler.get({}, ctx);
+    assert.strictEqual(calls.length, expected, 'delta=' + delta);
+  }
+});
+
+test('home.get: lastActiveAt 缺失时补写', async () => {
+  const { ctx, fake } = makeCtx({ users: [{ _id: 'oA', coupleId: null }] });
+  ctx.user = { _id: 'oA', coupleId: null };
+  ctx.couple = null;
+  ctx.partner = null;
+  const calls = countUserUpdates(ctx, fake);
+
+  await homeHandler.get({}, ctx);
+  assert.strictEqual(calls.length, 1);
+  assert.deepStrictEqual(fake.get('users', 'oA').lastActiveAt, NOW);
+});
+
+test('home.get: lastActiveAt 写库失败被吞掉，首页仍正常返回', async () => {
+  const last = new Date(NOW.getTime() - 6 * 60 * 1000);
+  const { ctx, fake } = unboundCtx([{ _id: 'oA', coupleId: null, lastActiveAt: last }]);
+  const calls = countUserUpdates(ctx, fake, true);
+
+  const res = await homeHandler.get({}, ctx);
+  assert.strictEqual(calls.length, 1, '仍应尝试写一次（不是悄悄跳过）');
+  assert.strictEqual(res.todayKey, TODAY);
+  assert.strictEqual(res.user.openid, 'oA');
+  assert.strictEqual(res.bind.state, 'unbound');
+  assert.deepStrictEqual(fake.get('users', 'oA').lastActiveAt, last, '写失败保持原值');
+});

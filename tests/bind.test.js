@@ -524,6 +524,7 @@ test('bind.cancel 边界：申请人没申请过不能取消，已作废的码�
 
   // oB 还没申请这个码，不能以申请人身份取消
   await assert.rejects(() => bind.cancel({ code: '515151' }, ctxB), { code: 'FORBIDDEN' });
+  await assert.rejects(() => bind.cancel({ code: '909090' }, ctxB), { code: 'INVITE_NOT_FOUND' });
   assert.strictEqual(fake.get('bind_invites', '515151').status, 'open');
   // creator 取消已经作废的码
   await assert.rejects(() => bind.cancel({ code: '525252' }, ctxA), { code: 'INVITE_USED' });
@@ -743,4 +744,117 @@ test('create 连续 5 次邀请码冲突后返回 INTERNAL_ERROR，不产生脏�
     { attempt: 4, errCode: -502001 },
     { attempt: 5, errCode: -502001 },
   ]);
+});
+
+test('bind.status: couples 读故障必须抛出，不能把 coupleId 重置成 null', async (t) => {
+  const logs = captureConsoleError(t);
+  const fake = makeFakeDb({
+    users: [userDoc('oA', { coupleId: 'c_1' })],
+    couples: [{
+      _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2024-05-20',
+    }],
+  });
+  const ctx = makeCtx(fake, 'oA');
+  const realCollection = fake.db.collection.bind(fake.db);
+  fake.db.collection = (name) => {
+    const col = realCollection(name);
+    if (name !== 'couples') return col;
+    return Object.assign({}, col, {
+      doc(id) {
+        return Object.assign({}, col.doc(id), {
+          async get() {
+            throw Object.assign(new Error('database timeout'), { errCode: -501001 });
+          },
+        });
+      },
+    });
+  };
+
+  await assert.rejects(
+    () => bind.status({}, ctx),
+    (err) => err.message === 'database timeout',
+    '读故障要上抛，不能当成关系不存在');
+  assert.strictEqual(fake.get('users', 'oA').coupleId, 'c_1', '瞬时报错不能清 coupleId');
+  assert.strictEqual(logs.length, 0, '不能走自愈分支（不打 couple missing 日志）');
+});
+
+test('bind.apply: 读被邀请人资料故障要上抛，不能被当成邀请码已用过（不记失败）', async () => {
+  const fake = makeFakeDb({
+    users: [userDoc('oA'), userDoc('oB')],
+    bind_invites: [seedInvite({ _id: '777777', code: '777777', creatorOpenid: 'oA' })],
+  });
+  const ctxB = makeCtx(fake, 'oB');
+  const realCollection = fake.db.collection.bind(fake.db);
+  fake.db.collection = (name) => {
+    const col = realCollection(name);
+    if (name !== 'users') return col;
+    return Object.assign({}, col, {
+      doc(id) {
+        return Object.assign({}, col.doc(id), {
+          async get() {
+            throw Object.assign(new Error('database timeout'), { errCode: -501001 });
+          },
+        });
+      },
+    });
+  };
+
+  await assert.rejects(
+    () => bind.apply({ code: '777777' }, ctxB),
+    (err) => err.message === 'database timeout',
+    '读故障不能被翻译成 INVITE_USED');
+  assert.strictEqual(fake.get('users', 'oB').bindFailCount, 0, '读故障不能计一次绑定失败');
+  assert.strictEqual(fake.get('users', 'oB').bindFailResetAt, null);
+  assert.strictEqual(fake.get('bind_invites', '777777').status, 'open');
+});
+
+test('bind.preview: creator 文档真实缺失时按 INVITE_USED 处理并计一次失败', async () => {
+  const fake = makeFakeDb({
+    users: [userDoc('oB')], // oA 的资料不存在
+    bind_invites: [seedInvite({ _id: '888888', code: '888888', creatorOpenid: 'oA' })],
+  });
+  const ctxB = makeCtx(fake, 'oB');
+
+  await assert.rejects(() => bind.preview({ code: '888888' }, ctxB), (err) => {
+    assert.strictEqual(err.code, 'INVITE_USED');
+    return true;
+  });
+  assert.strictEqual(fake.get('users', 'oB').bindFailCount, 1);
+});
+
+test('bind.preview / bind.confirm / bind.cancel: 邀请文档读故障要上抛，不能当成「码不存在」', async () => {
+  const fake = makeFakeDb({
+    users: [userDoc('oA'), userDoc('oB')],
+    bind_invites: [seedInvite({ _id: '999999', code: '999999', creatorOpenid: 'oA' })],
+  });
+  const ctxA = makeCtx(fake, 'oA');
+  const ctxB = makeCtx(fake, 'oB');
+  const realCollection = fake.db.collection.bind(fake.db);
+  fake.db.collection = (name) => {
+    const col = realCollection(name);
+    if (name !== 'bind_invites') return col;
+    return Object.assign({}, col, {
+      doc(id) {
+        return Object.assign({}, col.doc(id), {
+          async get() {
+            throw Object.assign(new Error('database timeout'), { errCode: -501001 });
+          },
+        });
+      },
+    });
+  };
+
+  await assert.rejects(() => bind.preview({ code: '999999' }, ctxB),
+    (err) => err.message === 'database timeout', '预览不能把读故障翻译成 INVITE_NOT_FOUND');
+  assert.strictEqual(fake.get('users', 'oB').bindFailCount, 0, '读故障不能计绑定失败');
+
+  await assert.rejects(() => bind.confirm({ code: '999999' }, ctxA),
+    (err) => err.message === 'database timeout', '确认不能把读故障翻译成 INVITE_NOT_FOUND');
+
+  await assert.rejects(() => bind.cancel({ code: '999999' }, ctxA),
+    (err) => err.message === 'database timeout', '取消不能把读故障翻译成 INVITE_NOT_FOUND');
+
+  fake.db.collection = realCollection;
+  const applied = await bind.apply({ code: '999999' }, ctxB);
+  assert.strictEqual(applied.state, 'applied_by_me');
 });
