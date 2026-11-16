@@ -12,6 +12,7 @@ const {
   scanConsoleStatement,
   extractConsoleStatements,
   isIgnoredByGitignore,
+  versionAtLeast,
 } = require('../scripts/release-check');
 
 const ROOT = path.join(__dirname, '..');
@@ -58,6 +59,7 @@ function makeFixture() {
     cloudfunctionRoot: 'cloudfunctions/',
     compileType: 'miniprogram',
     appid: 'wx5c7cc21e713e2e3b',
+    libVersion: '3.18.0',
   }));
   writeFixtureFile(dir, 'cloudfunctions/api/index.js', "const cloud = require('wx-server-sdk');\ncloud.init();\n");
   writeFixtureFile(dir, 'cloudfunctions/api/package.json', JSON.stringify({
@@ -98,7 +100,7 @@ test('发布预检：当前仓库静态检查全部通过', () => {
     '未发现云环境 ID / AppSecret / 私钥',
     '云函数 package.json 依赖与入口正确',
     '云函数 config.json 权限/触发器格式正确',
-    'project.config.json 的根目录 / appid / compileType 正确',
+    'project.config.json 的根目录 / appid / compileType / 基础库 ≥ 2.32.3 正确',
   ].forEach((needle) => {
     assert.ok(passText.includes(needle), '缺少检查项：' + needle);
   });
@@ -109,6 +111,12 @@ test('发布预检：当前仓库静态检查全部通过', () => {
     allText.includes('未被 Git 跟踪') || allText.includes('手动确认：git ls-files'),
     '缺少 env.js 跟踪状态的检查结果'
   );
+
+  // 只能人工在控制台/公众平台做的项必须打印出来，否则真机验收前容易漏（超时/内存不在代码里，删掉没人发现）
+  const todoText = result.lines.filter((l) => l.level === 'TODO').map((l) => l.msg).join('\n');
+  ['8 个集合', '已重新上传部署', '超时 10s、内存 256MB', '用户隐私保护指引', 'F1–F8'].forEach((needle) => {
+    assert.ok(todoText.includes(needle), '缺少 TODO 提醒：' + needle);
+  });
 });
 
 test('发布预检：密钥扫描能识别环境 ID、AppSecret 与私钥', () => {
@@ -279,12 +287,35 @@ test('发布预检：require 路径、未注册组件、未登记集合都会 FA
   }
 });
 
+test('发布预检：基础库版本比较只接受合法的三段版本号', () => {
+  assert.strictEqual(versionAtLeast('3.18.0', '2.32.3'), true);
+  assert.strictEqual(versionAtLeast('2.32.3', '2.32.3'), true);
+  assert.strictEqual(versionAtLeast('2.32.4', '2.32.3'), true);
+  // 数字比较而不是字符串比较：'2.32.10' 按字典序小于 '2.32.3'
+  assert.strictEqual(versionAtLeast('2.32.10', '2.32.3'), true);
+  assert.strictEqual(versionAtLeast('10.0.0', '2.32.3'), true);
+  assert.strictEqual(versionAtLeast('2.32.2', '2.32.3'), false);
+  assert.strictEqual(versionAtLeast('1.99.99', '2.0.0'), false);
+  // 字典序比较的盲区：'2.9.0' 字典序大于 '2.32.3'，但数值上更小，必须判 false
+  assert.strictEqual(versionAtLeast('2.9.0', '2.32.3'), false);
+  assert.strictEqual(versionAtLeast('0.9.0', '0.10.0'), false);
+  assert.strictEqual(versionAtLeast('2.32.30', '2.32.3'), true);
+  assert.strictEqual(versionAtLeast('10.0.0', '9.0.0'), true);
+  // 前导零不是合法写法（开发者工具不会这么写），按不满足处理
+  assert.strictEqual(versionAtLeast('02.32.3', '2.32.3'), false);
+  // 缺失、空串、两段、带后缀、非字符串一律视为不满足（避免猜开发者工具的版本规则）
+  ['', '2.32', '2.32.3.1', '3.18.0-beta', '三.十八.零', undefined, null, 318].forEach((bad) => {
+    assert.strictEqual(versionAtLeast(bad, '2.32.3'), false, String(bad) + ' 应视为不满足');
+  });
+});
+
 test('发布预检：云函数部署配置 / 项目根目录写错都会 FAIL', () => {
   const projectConfig = (overrides) => JSON.stringify(Object.assign({
     miniprogramRoot: 'miniprogram/',
     cloudfunctionRoot: 'cloudfunctions/',
     compileType: 'miniprogram',
     appid: 'wx5c7cc21e713e2e3b',
+    libVersion: '3.18.0',
   }, overrides));
   const cases = [
     {
@@ -343,6 +374,24 @@ test('发布预检：云函数部署配置 / 项目根目录写错都会 FAIL', 
       mutate: (dir) => writeFixtureFile(dir, 'project.config.json', projectConfig({ appid: 'wx123' })),
       expect: 'appid 不合法',
     },
+    {
+      // JSON.stringify 会丢掉 undefined 字段，等价于「没写 libVersion」
+      name: 'project.config.json 缺少 libVersion',
+      mutate: (dir) => writeFixtureFile(dir, 'project.config.json', projectConfig({ libVersion: undefined })),
+      expect: '缺少 libVersion（最低基础库 2.32.3）',
+    },
+    {
+      name: 'project.config.json 的 libVersion 是 widelyUsed（无法确认版本）',
+      mutate: (dir) => writeFixtureFile(dir, 'project.config.json', projectConfig({ libVersion: 'widelyUsed' })),
+      expect: 'libVersion 是 widelyUsed',
+      noPass: '基础库 ≥ 2.32.3 正确',
+    },
+    {
+      name: 'project.config.json 的基础库低于隐私开关下限',
+      mutate: (dir) => writeFixtureFile(dir, 'project.config.json', projectConfig({ libVersion: '2.21.2' })),
+      expect: 'libVersion 必须 ≥ 2.32.3',
+      noPass: '基础库 ≥ 2.32.3 正确',
+    },
   ];
 
   for (const item of cases) {
@@ -359,6 +408,20 @@ test('发布预检：云函数部署配置 / 项目根目录写错都会 FAIL', 
       }
     } finally {
       cleanup(dir);
+    }
+  }
+
+  // latest / trial 是微信允许的符号值，一定不比下限旧，不能误报
+  for (const symbol of ['latest', 'trial']) {
+    const symbolDir = makeFixture();
+    try {
+      writeFixtureFile(symbolDir, 'project.config.json', projectConfig({ libVersion: symbol }));
+      const symbolResult = runChecks(symbolDir);
+      const symbolFails = failMessages(symbolResult).join('\n');
+      assert.strictEqual(symbolResult.ok, true, 'libVersion=' + symbol + ' 不该让预检失败：' + symbolFails);
+      assert.ok(!symbolFails.includes('libVersion'), 'libVersion=' + symbol + ' 不该报 libVersion：' + symbolFails);
+    } finally {
+      cleanup(symbolDir);
     }
   }
 

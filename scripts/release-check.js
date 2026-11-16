@@ -382,6 +382,33 @@ function readJsonObject(root, rel, hint, lines) {
   return data;
 }
 
+// 项目要求的最低基础库（隐私开关 __usePrivacyCheck__ 的下限；chooseAvatar 只需 2.21.2+）。
+// 注意：本地 project.private.config.json 里若写了别的 libVersion，开发者工具会覆盖这个模拟值。
+const MIN_LIB_VERSION = '2.32.3';
+// 微信开发者工具的 project.config.json 允许把 libVersion 写成这些符号值：
+// latest=最新非灰度、trial=最新（含灰度）、widelyUsed=使用比例最高。
+// 前两个一定不比下限旧，视为满足；widelyUsed 无法确认，仍按不满足处理并给出明确文案。
+const LIB_VERSION_SYMBOLS = ['latest', 'trial'];
+
+/**
+ * 版本号比较：只用于「基础库不得低于下限」这类三段的比较，非法格式一律视为不满足。
+ * 前导零（如 02.32.3）不是合法写法，也视为不满足；逐段按数值比较，不能按字符串字典序。
+ */
+function versionAtLeast(version, minVersion) {
+  const parse = (v) => {
+    if (typeof v !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(v)) return null;
+    return v.split('.').map((n) => Number(n));
+  };
+  const a = parse(version);
+  const b = parse(minVersion);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i += 1) {
+    if (a[i] > b[i]) return true;
+    if (a[i] < b[i]) return false;
+  }
+  return true;
+}
+
 /**
  * 部署配置自检：云函数的 package.json / config.json 决定云端装什么依赖、开哪些 openapi；
  * project.config.json 的根目录与 appid 错了，开发者工具会传错目录或直接传不上去。
@@ -441,8 +468,21 @@ function checkDeployConfig(root, lines) {
       lines.push({ level: 'FAIL', msg: 'project.config.json 的 appid 不合法' });
       projProblems += 1;
     }
+    // 项目按 MIN_LIB_VERSION 的下限自测（而不是文档 16.6 的 3.18.0），已知偏差已记录。
+    if (proj.libVersion === undefined || proj.libVersion === null || proj.libVersion === '') {
+      lines.push({ level: 'FAIL', msg: 'project.config.json 缺少 libVersion（最低基础库 ' + MIN_LIB_VERSION + '）' });
+      projProblems += 1;
+    } else if (LIB_VERSION_SYMBOLS.indexOf(proj.libVersion) >= 0) {
+      // latest / trial 一定不比下限旧，放行（避免为测最新基础库改成符号值就误报）
+    } else if (proj.libVersion === 'widelyUsed') {
+      lines.push({ level: 'FAIL', msg: 'project.config.json 的 libVersion 是 widelyUsed，无法确认 ≥ ' + MIN_LIB_VERSION + '，请改成三段数字' });
+      projProblems += 1;
+    } else if (!versionAtLeast(proj.libVersion, MIN_LIB_VERSION)) {
+      lines.push({ level: 'FAIL', msg: 'project.config.json 的 libVersion 必须 ≥ ' + MIN_LIB_VERSION + '（当前：' + String(proj.libVersion) + '）' });
+      projProblems += 1;
+    }
     if (!projProblems) {
-      lines.push({ level: 'PASS', msg: 'project.config.json 的根目录 / appid / compileType 正确' });
+      lines.push({ level: 'PASS', msg: 'project.config.json 的根目录 / appid / compileType / 基础库 ≥ ' + MIN_LIB_VERSION + ' 正确' });
     }
   }
 }
@@ -609,6 +649,7 @@ function runChecks(root) {
 
   lines.push({ level: 'TODO', msg: '云开发控制台确认：8 个集合 + 权限「所有用户不可读写」+ 索引（见 docs/开发进度.md）' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 已重新上传部署（最近一次改动之后）' });
+  lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 超时 10s、内存 256MB（文档 16.6；默认超时可能只有 3s，冷启动会偶发失败）' });
   lines.push({ level: 'TODO', msg: '微信公众平台确认：用户隐私保护指引（头像/昵称）已声明' });
   lines.push({ level: 'TODO', msg: '双人真机按 docs/M6-真机验收与发布.md 跑 F1–F8，并导出一次数据库备份' });
 
@@ -638,6 +679,7 @@ module.exports = {
   runChecks,
   checkStructure,
   checkDeployConfig,
+  versionAtLeast,
   scanTextForSecrets,
   scanConsoleStatement,
   extractConsoleStatements,
