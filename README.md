@@ -34,7 +34,7 @@ YiyiTime/
 │  ├─ styles/tokens.wxss            # 颜色/间距/字号设计变量
 │  ├─ config/env.example.js         # 环境 ID 模板（env.js 不入库）
 │  └─ images/avatars/               # 默认头像
-├─ tests/                           # 云函数与页面逻辑单测（含 tests/helpers/fake-db.js）
+├─ tests/                           # 云函数 / 页面 / 组件级单测 + WXML 绑定自检（helpers: fake-db / cloud-entry / client-page）
 ├─ scripts/
 │  ├─ check-secrets.js              # 推送前扫描环境 ID / 密钥
 │  └─ release-check.js              # M6 静态预检（页面/组件/隐私接线/敏感日志/密钥）
@@ -69,7 +69,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 355 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 369 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 
