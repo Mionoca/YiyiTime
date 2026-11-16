@@ -36,7 +36,9 @@ exports.main = async (event) => {
     console.error('[api]', JSON.stringify({
       requestId,
       action,
-      code: err && err.code,
+      // 业务错误有 code，SDK 错误用 errCode；都没有时标 INTERNAL_ERROR。
+      // 统一成字符串，避免同一个字段在日志里一会儿是数字一会儿是字符串
+      code: String((err && (err.code || err.errCode)) || 'INTERNAL_ERROR'),
       message: err && err.message,
       openidTail: openid ? openid.slice(-6) : '',
     }));

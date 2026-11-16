@@ -3,8 +3,11 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+const crypto = require('node:crypto');
+
 const bind = require('../cloudfunctions/api/handlers/bind');
 const { makeFakeDb } = require('./helpers/fake-db');
+const { captureConsoleError } = require('./helpers/cloud-entry');
 
 const NOW = new Date('2026-11-16T04:00:00.000Z'); // 东八区 12:00
 const TODAY = '2026-11-16';
@@ -660,4 +663,84 @@ test('apply 事务内重校验：预检后邀请过期不再写 applied', async 
   const invite = fake.get('bind_invites', '949494');
   assert.strictEqual(invite.status, 'open');
   assert.strictEqual(invite.applicantOpenid, null);
+});
+
+/**
+ * 让 newInviteCode() 依次返回指定邀请码，用于覆盖「_id 冲突 → 重试」分支
+ * （正常路径码由 crypto 随机生成，无法稳定构造冲突）。返回恢复函数。
+ */
+function stubInviteCodes(codes) {
+  const original = crypto.randomBytes;
+  let index = 0;
+  crypto.randomBytes = (len) => {
+    const code = codes[Math.min(index, codes.length - 1)];
+    index += 1;
+    // 按调用方要的长度返回，避免以后别处用 randomBytes(16) 时静默拿到 4 字节
+    const size = typeof len === 'number' && len > 0 ? len : 4;
+    const buf = Buffer.alloc(size);
+    if (size >= 4) buf.writeUInt32BE(Number(code) % 1000000, 0);
+    else buf.fill(Number(code) % 256);
+    return buf;
+  };
+  return () => { crypto.randomBytes = original; };
+}
+
+test('create 邀请码冲突时重试，成功且日志不含完整邀请码', async (t) => {
+  const fake = makeFakeDb({ users: [userDoc('oA', { nickname: '小怡' }), userDoc('oB', { nickname: '阿安' })] });
+  const created = await bind.create({ startDate: '2024-05-20' }, makeCtx(fake, 'oA'));
+  const takenCode = created.code;
+  const uniqueCode = takenCode === '123456' ? '654321' : '123456';
+
+  const logs = captureConsoleError(t);
+  const restore = stubInviteCodes([takenCode, uniqueCode]);
+  let second;
+  try {
+    second = await bind.create({ startDate: '2024-05-20' }, makeCtx(fake, 'oB'));
+  } finally {
+    restore();
+  }
+
+  assert.strictEqual(second.code, uniqueCode);
+  assert.strictEqual(second.state, 'code_created');
+  assert.strictEqual(fake.all('bind_invites').length, 2);
+  assert.strictEqual(fake.get('bind_invites', uniqueCode).creatorOpenid, 'oB');
+  // A 的邀请没有被覆盖
+  assert.strictEqual(fake.get('bind_invites', takenCode).creatorOpenid, 'oA');
+
+  assert.strictEqual(logs.length, 1, '只应记录一次冲突');
+  const logged = JSON.parse(logs[0][1]);
+  assert.deepStrictEqual(Object.keys(logged).sort(), ['attempt', 'errCode']);
+  assert.strictEqual(logged.attempt, 1);
+  assert.strictEqual(logged.errCode, -502001);
+  assert.ok(Object.values(logged).every((value) => typeof value !== 'string'), '日志不能带出邀请码等字符串');
+});
+
+test('create 连续 5 次邀请码冲突后返回 INTERNAL_ERROR，不产生脏邀请', async (t) => {
+  const fake = makeFakeDb({
+    users: [userDoc('oA'), userDoc('oB')],
+    bind_invites: [seedInvite({ _id: '482913', code: '482913', creatorOpenid: 'oA' })],
+  });
+  const logs = captureConsoleError(t);
+  const restore = stubInviteCodes(['482913']);
+  try {
+    await assert.rejects(() => bind.create({ startDate: '2024-05-20' }, makeCtx(fake, 'oB')), {
+      code: 'INTERNAL_ERROR',
+      message: '邀请码生成失败，请稍后再试',
+    });
+  } finally {
+    restore();
+  }
+
+  // 只有 A 那条种子邀请，B 没有留下任何半成品
+  assert.strictEqual(fake.all('bind_invites').length, 1);
+  assert.strictEqual(fake.get('bind_invites', '482913').status, 'open');
+  assert.strictEqual(fake.get('bind_invites', '482913').creatorOpenid, 'oA');
+
+  assert.deepStrictEqual(logs.map((args) => JSON.parse(args[1])), [
+    { attempt: 1, errCode: -502001 },
+    { attempt: 2, errCode: -502001 },
+    { attempt: 3, errCode: -502001 },
+    { attempt: 4, errCode: -502001 },
+    { attempt: 5, errCode: -502001 },
+  ]);
 });
