@@ -21,8 +21,10 @@ function setup(handlers) {
   const toasts = [];
   const errors = [];
   const calls = [];
+  const vibrates = [];
   installWx({
     showToast: (opts) => toasts.push(opts),
+    vibrateShort: (opts) => vibrates.push(opts),
   });
   api.call = async (action, payload) => {
     calls.push({ action, payload });
@@ -31,7 +33,7 @@ function setup(handlers) {
   };
   api.showError = (err) => errors.push(err);
   const page = instantiate(loadPage(SAFETY));
-  return { page, toasts, errors, calls };
+  return { page, toasts, errors, calls, vibrates };
 }
 
 function entry(id, patch) {
@@ -57,8 +59,8 @@ test('safety: 首屏用服务端 todayKey，时间线展示日期不依赖设备
   }
 });
 
-test('safety: 检查成功清空备注、先把新记录插到顶部并刷新', async () => {
-  const { page, toasts, calls } = setup({
+test('safety: 检查成功清空备注、先把新记录插到顶部并刷新，并给一次轻振动', async () => {
+  const { page, toasts, calls, vibrates } = setup({
     'safety.checkin': () => ({ entry: entry('k2'), deduped: false }),
     'safety.list': () => ({ items: [entry('k2'), entry('k1')], nextCursor: null, todayKey: tomorrowKey() }),
   });
@@ -69,6 +71,8 @@ test('safety: 检查成功清空备注、先把新记录插到顶部并刷新', 
     assert.strictEqual(page.data.checking, false);
     assert.strictEqual(page.data.items[0].checkinId, 'k2');
     assert.ok(toasts.some((t) => t.title === '我到家了'));
+    // 文档 8.9：报平安成功给一次轻振动
+    assert.deepStrictEqual(vibrates.map((v) => v.type), ['light']);
     assert.deepStrictEqual(
       calls.map((c) => c.action),
       ['safety.checkin', 'safety.list']
@@ -99,8 +103,8 @@ test('safety: 传备注时只传 note，空备注不传', async () => {
   }
 });
 
-test('safety: 去重命中也要清空备注、提示并刷新第一页', async () => {
-  const { page, toasts, calls } = setup({
+test('safety: 去重命中也要清空备注、提示并刷新第一页，且不重复振动', async () => {
+  const { page, toasts, calls, vibrates } = setup({
     'safety.checkin': () => ({ entry: entry('k1'), deduped: true }),
     'safety.list': () => ({ items: [entry('k1')], nextCursor: null, todayKey: tomorrowKey() }),
   });
@@ -109,14 +113,15 @@ test('safety: 去重命中也要清空备注、提示并刷新第一页', async 
     await page.onCheckin();
     assert.strictEqual(page.data.note, '');
     assert.ok(toasts.some((t) => t.title === '刚刚已经报过平安'));
+    assert.deepStrictEqual(vibrates, [], '去重命中不是新的成功，不振动');
     assert.ok(calls.some((c) => c.action === 'safety.list'));
   } finally {
     restoreWx();
   }
 });
 
-test('safety: 报平安失败保留备注并报错', async () => {
-  const { page, errors } = setup({
+test('safety: 报平安失败保留备注并报错，且不振动', async () => {
+  const { page, errors, vibrates } = setup({
     'safety.checkin': () => {
       throw new Error('down');
     },
@@ -127,6 +132,7 @@ test('safety: 报平安失败保留备注并报错', async () => {
     assert.strictEqual(page.data.checking, false);
     assert.strictEqual(page.data.note, '别丢');
     assert.strictEqual(errors.length, 1);
+    assert.deepStrictEqual(vibrates, [], '失败不应振动');
   } finally {
     restoreWx();
   }

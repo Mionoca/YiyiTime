@@ -1,6 +1,7 @@
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
 const timeUtil = require('../../utils/time');
+const haptics = require('../../utils/haptics');
 
 const DEFAULT_AVATAR = constants.DEFAULT_AVATAR;
 const MOODS = constants.MOODS;
@@ -438,7 +439,10 @@ Page({
         hugHint: '抱抱已经送出去啦，等 TA 回应',
       });
       this.toast(res.existing ? '抱抱已经发出去了，等 TA 回应' : '抱抱送出去啦');
-      if (!res.existing) this.playHugCelebrate();
+      if (!res.existing) {
+        this.playHugCelebrate();
+        haptics.light();
+      }
       await this.load(true, true);
     } catch (err) {
       this.setData({ hugSending: false });
@@ -462,6 +466,7 @@ Page({
         hugHint: '抱抱送到啦',
       });
       this.playHugCelebrate();
+      if (!res.already) haptics.light();
       this.toast(res.already ? '你们已经抱过啦' : '抱到啦');
       await this.load(true, true);
     } catch (err) {

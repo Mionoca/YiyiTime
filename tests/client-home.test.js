@@ -6,6 +6,7 @@ const assert = require('node:assert');
 const { installWx, restoreWx, loadPage, instantiate } = require('./helpers/client-page');
 const api = require('../miniprogram/utils/api');
 const constants = require('../miniprogram/utils/constants');
+const haptics = require('../miniprogram/utils/haptics');
 
 /**
  * 首页交互：抱抱按钮状态机（文档 9.4）、心情打卡、改开始日期、房间入口。
@@ -45,6 +46,7 @@ function setup(handlers, wxExtra) {
   const navs = [];
   const storage = {};
   const storeSet = [];
+  const vibrates = [];
   installWx(
     Object.assign(
       {
@@ -55,6 +57,7 @@ function setup(handlers, wxExtra) {
           if (next) opts.success && opts.success(next);
         },
         getStorageSync: (key) => storage[key],
+        vibrateShort: (opts) => vibrates.push(opts),
         setStorageSync: (key, value) => {
           storage[key] = value;
           storeSet.push({ key, value });
@@ -70,7 +73,7 @@ function setup(handlers, wxExtra) {
   };
   api.showError = (err) => errors.push(err);
   const page = instantiate(loadPage(HOME));
-  return { page, toasts, errors, calls, navs, storage, storeSet };
+  return { page, toasts, errors, calls, navs, storage, storeSet, vibrates };
 }
 
 function teardown(page) {
@@ -275,7 +278,7 @@ test('home: onShow 首次拉数据，回到页面静默刷新且失败不打断'
 test('home: 发抱抱成功后切到等待态并刷新', async () => {
   const sent = { hugId: 'h1', status: 'pending', createdAt: '2026-11-16T06:00:00.000Z' };
   let homeHug = { incoming: null, outgoing: null };
-  const { page, toasts, calls } = setup({
+  const { page, toasts, calls, vibrates } = setup({
     'home.get': () => baseHome({ hug: homeHug }),
     'hug.send': () => {
       homeHug = { incoming: null, outgoing: sent };
@@ -290,6 +293,8 @@ test('home: 发抱抱成功后切到等待态并刷新', async () => {
     assert.strictEqual(page.data.hugButtonText, '等 TA 抱抱');
     assert.strictEqual(page.data.hugButtonDisabled, true);
     assert.ok(toasts.some((t) => t.title === '抱抱送出去啦'));
+    // 文档 8.9：抱抱成功给一次轻振动
+    assert.deepStrictEqual(vibrates.map((v) => v.type), ['light']);
     assert.ok(calls.filter((c) => c.action === 'home.get').length >= 2);
   } finally {
     teardown(page);
@@ -346,10 +351,80 @@ test('home: 已有 pending 抱抱时不重复发送', async () => {
   }
 });
 
+test('home: hug.send 返回 existing 时只提示不重复振动', async () => {
+  const sent = { hugId: 'h1', status: 'pending' };
+  let first = true;
+  const { page, toasts, vibrates } = setup({
+    // 首次加载时服务端还没这条抱抱（页面状态偏旧），发送接口返回 existing
+    'home.get': () => {
+      if (first) {
+        first = false;
+        return baseHome({ hug: { incoming: null, outgoing: null } });
+      }
+      return baseHome({ hug: { incoming: null, outgoing: sent } });
+    },
+    'hug.send': () => ({ hug: sent, existing: true }),
+  });
+  try {
+    await page.load();
+    await page.sendHug();
+    assert.strictEqual(page.data.hugButtonText, '等 TA 抱抱');
+    assert.ok(toasts.some((t) => t.title === '抱抱已经发出去了，等 TA 回应'));
+    assert.deepStrictEqual(vibrates, [], '复用已有 pending 不算一次新的成功');
+  } finally {
+    teardown(page);
+    restoreWx();
+  }
+});
+
+test('home: 关闭振动反馈后发抱抱成功不再振动', async () => {
+  const sent = { hugId: 'h1', status: 'pending', createdAt: '2026-11-16T06:00:00.000Z' };
+  let homeHug = { incoming: null, outgoing: null };
+  const { page, calls, vibrates } = setup({
+    'home.get': () => baseHome({ hug: homeHug }),
+    'hug.send': () => {
+      homeHug = { incoming: null, outgoing: sent };
+      return { hug: sent, existing: false };
+    },
+  });
+  try {
+    // 文档 8.9：振动可关闭，关闭后业务照常（home 没有开关 UI，每次 light 现读 storage）
+    wx.setStorageSync(haptics.STORAGE_KEY, false);
+    await page.load();
+    await page.sendHug();
+    assert.strictEqual(page.data.hugButtonText, '等 TA 抱抱');
+    assert.deepStrictEqual(vibrates, []);
+    assert.ok(calls.some((c) => c.action === 'hug.send'));
+    wx.setStorageSync(haptics.STORAGE_KEY, true);
+  } finally {
+    teardown(page);
+    restoreWx();
+  }
+});
+
+test('home: 发抱抱失败不振动', async () => {
+  const { page, errors, vibrates } = setup({
+    'home.get': () => baseHome(),
+    'hug.send': () => {
+      throw new Error('down');
+    },
+  });
+  try {
+    await page.load();
+    await page.sendHug();
+    assert.strictEqual(page.data.hugSending, false);
+    assert.strictEqual(errors.length, 1);
+    assert.deepStrictEqual(vibrates, [], '失败不应振动');
+  } finally {
+    teardown(page);
+    restoreWx();
+  }
+});
+
 test('home: 对方来抱抱时按钮变成「抱抱 TA」，点击走 hug.respond 并切走横幅', async () => {
   const incoming = { hugId: 'h9', fromOpenid: 'oB' };
   let homeHug = { incoming, outgoing: null };
-  const { page, toasts, calls } = setup({
+  const { page, toasts, calls, vibrates } = setup({
     'home.get': () => baseHome({ hug: homeHug }),
     'hug.respond': (payload) => {
       assert.deepStrictEqual(payload, { hugId: 'h9' });
@@ -365,7 +440,29 @@ test('home: 对方来抱抱时按钮变成「抱抱 TA」，点击走 hug.respon
     assert.strictEqual(page.data.hugIncoming, null);
     assert.strictEqual(page.data.hugButtonText, '我需要抱抱');
     assert.ok(toasts.some((t) => t.title === '抱到啦'));
+    assert.deepStrictEqual(vibrates.map((v) => v.type), ['light']);
     assert.ok(calls.some((c) => c.action === 'hug.respond'));
+  } finally {
+    teardown(page);
+    restoreWx();
+  }
+});
+
+test('home: 回应返回 already 时只提示不振动', async () => {
+  const incoming = { hugId: 'h9', fromOpenid: 'oB' };
+  let homeHug = { incoming, outgoing: null };
+  const { page, toasts, vibrates } = setup({
+    'home.get': () => baseHome({ hug: homeHug }),
+    'hug.respond': () => {
+      homeHug = { incoming: null, outgoing: null };
+      return { hugId: 'h9', status: 'hugged', respondedAt: '2026-11-16T06:10:00.000Z', already: true };
+    },
+  });
+  try {
+    await page.load();
+    await page.respondHug('h9');
+    assert.deepStrictEqual(vibrates, [], 'already 不是新回应，不振动');
+    assert.ok(toasts.some((t) => t.title === '你们已经抱过啦'));
   } finally {
     teardown(page);
     restoreWx();
@@ -402,7 +499,7 @@ test('home: 回应成功后静默刷新失败，也要先切走「TA 需要抱�
 
 test('home: 回应时抱抱已过期会报错并刷新真实状态', async () => {
   const incoming = { hugId: 'h9', fromOpenid: 'oB' };
-  const { page, errors, calls } = setup({
+  const { page, errors, calls, vibrates } = setup({
     'home.get': () => baseHome({ hug: { incoming, outgoing: null } }),
     'hug.respond': () => {
       const err = new Error('抱抱过期了');
@@ -415,6 +512,7 @@ test('home: 回应时抱抱已过期会报错并刷新真实状态', async () =>
     await page.respondHug('h9');
     assert.strictEqual(page.data.hugSending, false);
     assert.strictEqual(errors.length, 1);
+    assert.deepStrictEqual(vibrates, [], '失败不应振动');
     assert.ok(calls.filter((c) => c.action === 'home.get').length >= 2);
   } finally {
     teardown(page);

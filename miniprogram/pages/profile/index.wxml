@@ -61,7 +61,7 @@
       <button class="btn-primary" bindtap="onTapBind">去邀请 TA</button>
     </view>
 
-    <!-- 更多（文档 8.3.6：P1 占位统一禁用态） -->
+    <!-- 更多（文档 8.3.6：P1 占位项禁用；振动反馈是可用功能，文档 8.9） -->
     <view class="card list-card">
       <view class="list-item list-item--disabled">
         <text>每日提醒（即将上线）</text>
@@ -74,6 +74,10 @@
       </view>
       <view class="list-item list-item--disabled">
         <text>解绑（联系开发者）</text>
+      </view>
+      <view class="list-item">
+        <text>振动反馈</text>
+        <switch class="list-switch" checked="{{hapticsEnabled}}" color="#A85C42" bindchange="onToggleHaptics" />
       </view>
       <view class="list-item" bindtap="onOpenPrivacy">
         <text>隐私保护指引</text>

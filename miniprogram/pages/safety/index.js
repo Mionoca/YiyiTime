@@ -3,6 +3,7 @@
 const api = require('../../utils/api');
 const meUtil = require('../../utils/me');
 const constants = require('../../utils/constants');
+const haptics = require('../../utils/haptics');
 
 const PAGE_SIZE = 20;
 const NOTE_MAX = constants.LIMITS.safetyNote;
@@ -140,6 +141,7 @@ Page({
       if (res && res.entry) {
         this.setData({ items: this.mergeItems([res.entry], this.data.items) });
       }
+      haptics.light();
       wx.showToast({ title: '我到家了', icon: 'none' });
       await this.load(true, true);
     } catch (err) {

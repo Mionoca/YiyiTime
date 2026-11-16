@@ -2,10 +2,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { installWx, restoreWx, loadPage, instantiate } = require('./helpers/client-page');
 const api = require('../miniprogram/utils/api');
 const timeUtil = require('../miniprogram/utils/time');
+const haptics = require('../miniprogram/utils/haptics');
 
 /**
  * profile 页的天数/开始日期/纪念日文案必须由 home.get 返回值决定：
@@ -121,6 +124,72 @@ test('profile: 版本号取不到时显示「内测版」，取得到时显示 v
     const page2 = newPage();
     await page2.load();
     assert.strictEqual(page2.data.appVersion, 'v1.2.3');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('profile: 振动反馈开关默认开启，关闭后本地持久化并 toast', async () => {
+  const stored = {};
+  const toasts = [];
+  installWx({
+    getStorageSync: (key) => stored[key],
+    setStorageSync: (key, value) => {
+      stored[key] = value;
+    },
+    showToast: (opts) => toasts.push(opts),
+  });
+  try {
+    stubApi(baseHome());
+    const page = newPage();
+    await page.load();
+    assert.strictEqual(page.data.hapticsEnabled, true);
+
+    page.onToggleHaptics({ detail: { value: false } });
+    assert.strictEqual(page.data.hapticsEnabled, false);
+    assert.strictEqual(stored[haptics.STORAGE_KEY], false);
+    assert.strictEqual(toasts[0].title, '振动反馈已关闭');
+
+    // 重新进页面（load）要读到已保存的关闭状态
+    const page2 = newPage();
+    await page2.load();
+    assert.strictEqual(page2.data.hapticsEnabled, false);
+
+    page2.onToggleHaptics({ detail: { value: true } });
+    assert.strictEqual(stored[haptics.STORAGE_KEY], true);
+    assert.strictEqual(page2.data.hapticsEnabled, true);
+  } finally {
+    restoreWx();
+  }
+});
+
+test('profile: 振动反馈开关的 wxml 真的绑定了事件并回显状态', () => {
+  // 页面测试直接调 onToggleHaptics，绑错 bindchange 也会全绿，这里静态锁一下
+  const wxml = fs.readFileSync(path.join(__dirname, '..', 'miniprogram/pages/profile/index.wxml'), 'utf8');
+  assert.ok(wxml.includes('bindchange="onToggleHaptics"'), '振动开关没有绑定 onToggleHaptics');
+  assert.ok(wxml.includes('checked="{{hapticsEnabled}}"'), '振动开关没有回显 hapticsEnabled');
+});
+
+test('profile: 本地写开关失败时回滚 UI 并提示，不假装已关闭', async () => {
+  const stored = {};
+  const toasts = [];
+  installWx({
+    getStorageSync: (key) => stored[key],
+    setStorageSync: () => {
+      throw new Error('storage full');
+    },
+    showToast: (opts) => toasts.push(opts),
+  });
+  try {
+    stubApi(baseHome());
+    const page = newPage();
+    await page.load();
+    assert.strictEqual(page.data.hapticsEnabled, true);
+    page.onToggleHaptics({ detail: { value: false } });
+    // 写失败：storage 仍为「开」，UI 必须回滚成开，不能显示成已关闭
+    assert.strictEqual(stored[haptics.STORAGE_KEY], undefined);
+    assert.strictEqual(page.data.hapticsEnabled, true);
+    assert.strictEqual(toasts[toasts.length - 1].title, '开关没保存成功，稍后再试');
   } finally {
     restoreWx();
   }

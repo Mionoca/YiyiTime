@@ -187,6 +187,12 @@
   font-size: var(--font-sm);
 }
 
+/* 文档 8.9：振动反馈开关（默认开启，只影响抱抱 / 报平安成功）
+   不缩放，保留原生 switch 的命中区域；行高 104rpx 已满足 ≥88rpx */
+.list-switch {
+  flex-shrink: 0;
+}
+
 .footer {
   text-align: center;
   font-size: var(--font-sm);

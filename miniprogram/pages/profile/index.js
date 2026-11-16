@@ -2,6 +2,7 @@ const api = require('../../utils/api');
 const constants = require('../../utils/constants');
 const timeUtil = require('../../utils/time');
 const upload = require('../../utils/upload');
+const haptics = require('../../utils/haptics');
 
 const DEFAULT_AVATAR = constants.DEFAULT_AVATAR;
 
@@ -25,6 +26,8 @@ Page({
     startDateSaving: false,
     defaultAvatar: DEFAULT_AVATAR,
     appVersion: '',
+    // 文档 8.9：振动反馈只用于抱抱 / 报平安成功，且可关闭
+    hapticsEnabled: true,
   },
 
   onShow() {
@@ -58,6 +61,7 @@ Page({
         maxStartDate: home.todayKey || timeUtil.todayKey(),
         startDateSelect: home.couple ? home.couple.startDate : '',
         appVersion: this.getAppVersion(),
+        hapticsEnabled: haptics.isEnabled(),
       };
       if (home.couple) {
         // 脏 startDate 时服务端会把 daysTogether/anniversary 降级为 null（home.get），
@@ -93,6 +97,19 @@ Page({
       // 取不到不影响页面
     }
     return '内测版';
+  },
+
+  /** 文档 8.9：开关只影响抱抱 / 报平安成功的轻振动，不影响其它交互 */
+  onToggleHaptics(e) {
+    const enabled = !!(e && e.detail && e.detail.value);
+    if (!haptics.setEnabled(enabled)) {
+      // 本地写失败时开关要回滚，否则界面显示「已关闭」但还在振动
+      this.setData({ hapticsEnabled: haptics.isEnabled() });
+      this.toast('开关没保存成功，稍后再试');
+      return;
+    }
+    this.setData({ hapticsEnabled: enabled });
+    this.toast(enabled ? '振动反馈已打开' : '振动反馈已关闭');
   },
 
   bindText(bind) {
