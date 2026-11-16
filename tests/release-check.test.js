@@ -53,6 +53,22 @@ function makeFixture() {
   for (const ext of ['js', 'json', 'wxml']) {
     writeFixtureFile(dir, 'miniprogram/components/privacy-guard/index.' + ext, '');
   }
+  writeFixtureFile(dir, 'project.config.json', JSON.stringify({
+    miniprogramRoot: 'miniprogram/',
+    cloudfunctionRoot: 'cloudfunctions/',
+    compileType: 'miniprogram',
+    appid: 'wx5c7cc21e713e2e3b',
+  }));
+  writeFixtureFile(dir, 'cloudfunctions/api/index.js', "const cloud = require('wx-server-sdk');\ncloud.init();\n");
+  writeFixtureFile(dir, 'cloudfunctions/api/package.json', JSON.stringify({
+    name: 'api',
+    main: 'index.js',
+    dependencies: { 'wx-server-sdk': '~2.4.0' },
+  }));
+  writeFixtureFile(dir, 'cloudfunctions/api/config.json', JSON.stringify({
+    permissions: { openapi: [] },
+    triggers: [],
+  }));
   writeFixtureFile(dir, '.gitignore', 'miniprogram/config/env.js\nproject.private.config.json\n');
   return dir;
 }
@@ -80,6 +96,9 @@ test('发布预检：当前仓库静态检查全部通过', () => {
     '三页都接入了隐私弹窗',
     '没有把 openid / coupleId / 邀请码 / 正文写进 console',
     '未发现云环境 ID / AppSecret / 私钥',
+    '云函数 package.json 依赖与入口正确',
+    '云函数 config.json 权限/触发器格式正确',
+    'project.config.json 的根目录 / appid / compileType 正确',
   ].forEach((needle) => {
     assert.ok(passText.includes(needle), '缺少检查项：' + needle);
   });
@@ -177,7 +196,11 @@ test('发布预检：健康夹具无 FAIL，git 不可用时降级为 TODO', () 
     const result = runChecks(dir);
     assert.deepStrictEqual(failMessages(result), []);
     assert.strictEqual(result.ok, true);
-    assert.ok(result.lines.some((l) => l.level === 'TODO' && l.msg.includes('git ls-files')));
+    const gitTodos = result.lines.filter((l) => l.level === 'TODO' && l.msg.includes('git ls-files'));
+    assert.deepStrictEqual(gitTodos.map((l) => l.msg), [
+      '手动确认：git ls-files miniprogram/config/env.js 输出为空',
+      '手动确认：git ls-files project.private.config.json 输出为空',
+    ]);
   } finally {
     cleanup(dir);
   }
@@ -251,6 +274,104 @@ test('发布预检：require 路径、未注册组件、未登记集合都会 FA
     assert.ok(fails.includes("的 require 路径不存在：./not-here"), fails);
     assert.ok(fails.includes('用了未注册的组件 <foo-bar>'), fails);
     assert.ok(fails.includes('未登记的集合 secrets_log'), fails);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('发布预检：云函数部署配置 / 项目根目录写错都会 FAIL', () => {
+  const projectConfig = (overrides) => JSON.stringify(Object.assign({
+    miniprogramRoot: 'miniprogram/',
+    cloudfunctionRoot: 'cloudfunctions/',
+    compileType: 'miniprogram',
+    appid: 'wx5c7cc21e713e2e3b',
+  }, overrides));
+  const cases = [
+    {
+      name: '缺少云函数 package.json',
+      mutate: (dir) => fs.rmSync(path.join(dir, 'cloudfunctions/api/package.json')),
+      expect: '缺少 cloudfunctions/api/package.json',
+    },
+    {
+      name: 'package.json 的 main 不是 index.js',
+      mutate: (dir) => writeFixtureFile(dir, 'cloudfunctions/api/package.json', JSON.stringify({
+        main: 'server.js',
+        dependencies: { 'wx-server-sdk': '~2.4.0' },
+      })),
+      expect: 'main 必须是 index.js',
+      // main 错时不能同时打印「依赖与入口正确」
+      noPass: '云函数 package.json 依赖与入口正确',
+    },
+    {
+      name: 'package.json 无法解析',
+      mutate: (dir) => writeFixtureFile(dir, 'cloudfunctions/api/package.json', '{"main":'),
+      expect: 'cloudfunctions/api/package.json 无法解析',
+    },
+    {
+      name: '缺少云函数入口 index.js',
+      mutate: (dir) => fs.rmSync(path.join(dir, 'cloudfunctions/api/index.js')),
+      expect: '缺少 cloudfunctions/api/index.js',
+    },
+    {
+      name: 'config.json 的 openapi 写成对象',
+      mutate: (dir) => writeFixtureFile(dir, 'cloudfunctions/api/config.json', JSON.stringify({
+        permissions: { openapi: {} },
+        triggers: [],
+      })),
+      expect: 'permissions.openapi 必须是数组',
+    },
+    {
+      name: 'config.json 的 triggers 写成对象',
+      mutate: (dir) => writeFixtureFile(dir, 'cloudfunctions/api/config.json', JSON.stringify({
+        permissions: { openapi: [] },
+        triggers: {},
+      })),
+      expect: 'triggers 必须是数组',
+    },
+    {
+      name: 'project.config.json 顶层是 null',
+      mutate: (dir) => writeFixtureFile(dir, 'project.config.json', 'null'),
+      expect: 'project.config.json 内容必须是一个 JSON 对象',
+    },
+    {
+      name: 'project.config.json 的 cloudfunctionRoot 写错',
+      mutate: (dir) => writeFixtureFile(dir, 'project.config.json', projectConfig({ cloudfunctionRoot: 'cloud/' })),
+      expect: 'cloudfunctionRoot 必须是 cloudfunctions/',
+    },
+    {
+      name: 'project.config.json 的 appid 不合法',
+      mutate: (dir) => writeFixtureFile(dir, 'project.config.json', projectConfig({ appid: 'wx123' })),
+      expect: 'appid 不合法',
+    },
+  ];
+
+  for (const item of cases) {
+    const dir = makeFixture();
+    try {
+      item.mutate(dir);
+      const result = runChecks(dir);
+      const fails = failMessages(result).join('\n');
+      assert.strictEqual(result.ok, false, item.name + ' 应让预检失败');
+      assert.ok(fails.includes(item.expect), item.name + ' 缺少 FAIL 文案：' + fails);
+      if (item.noPass) {
+        const passText = result.lines.filter((l) => l.level === 'PASS').map((l) => l.msg).join('\n');
+        assert.ok(!passText.includes(item.noPass), item.name + ' 不应给出 PASS：' + item.noPass);
+      }
+    } finally {
+      cleanup(dir);
+    }
+  }
+
+  // 顶层是非法 JSON 对象（null / 数组 / 解析失败）时，字段检查会静默跳过，必须自己 FAIL
+  const dir = makeFixture();
+  try {
+    writeFixtureFile(dir, 'cloudfunctions/api/package.json', 'null');
+    writeFixtureFile(dir, 'cloudfunctions/api/config.json', '[]');
+    const result = runChecks(dir);
+    const fails = failMessages(result).join('\n');
+    assert.strictEqual(result.ok, false);
+    assert.ok(fails.includes('cloudfunctions/api/package.json 内容必须是一个 JSON 对象'), fails);
+    assert.ok(fails.includes('cloudfunctions/api/config.json 内容必须是一个 JSON 对象'), fails);
   } finally {
     cleanup(dir);
   }

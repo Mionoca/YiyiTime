@@ -353,6 +353,100 @@ function checkStructure(root, lines, warnings) {
   }
 }
 
+/**
+ * 读一个必须是 JSON 对象的配置文件；缺失 / 解析失败 / 顶层不是对象都记 FAIL 并返回 null。
+ * 顶层是 null / 数组也算配置写错——否则后续字段检查会全部静默跳过，变成假通过。
+ */
+function readJsonObject(root, rel, hint, lines) {
+  const full = path.join(root, rel);
+  if (!fs.existsSync(full)) {
+    lines.push({ level: 'FAIL', msg: '缺少 ' + rel + '（' + hint + '）' });
+    return null;
+  }
+  const text = readText(full);
+  if (!text) {
+    lines.push({ level: 'FAIL', msg: rel + ' 为空或不是 UTF-8 文本（' + hint + '）' });
+    return null;
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    lines.push({ level: 'FAIL', msg: rel + ' 无法解析：' + (err && err.message) });
+    return null;
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    lines.push({ level: 'FAIL', msg: rel + ' 内容必须是一个 JSON 对象' });
+    return null;
+  }
+  return data;
+}
+
+/**
+ * 部署配置自检：云函数的 package.json / config.json 决定云端装什么依赖、开哪些 openapi；
+ * project.config.json 的根目录与 appid 错了，开发者工具会传错目录或直接传不上去。
+ * 这三处都不在编译期报错，属于「真机/部署时才发现」的坑。
+ */
+function checkDeployConfig(root, lines) {
+  if (!fs.existsSync(path.join(root, 'cloudfunctions/api/index.js'))) {
+    lines.push({ level: 'FAIL', msg: '缺少 cloudfunctions/api/index.js（云函数入口）' });
+  }
+
+  const pkg = readJsonObject(root, 'cloudfunctions/api/package.json', '云端安装依赖要用', lines);
+  if (pkg) {
+    // main 与 triggers 按文档 6.12 的团队约定显式声明，不依赖运行时默认值
+    const mainOk = pkg.main === 'index.js';
+    if (!mainOk) {
+      lines.push({ level: 'FAIL', msg: 'cloudfunctions/api/package.json 的 main 必须是 index.js' });
+    }
+    const sdk = pkg.dependencies && pkg.dependencies['wx-server-sdk'];
+    if (!sdk) {
+      lines.push({ level: 'FAIL', msg: 'cloudfunctions/api/package.json 缺少 wx-server-sdk 依赖' });
+    }
+    if (mainOk && sdk) {
+      lines.push({ level: 'PASS', msg: '云函数 package.json 依赖与入口正确（wx-server-sdk ' + sdk + '）' });
+    }
+  }
+
+  const cfg = readJsonObject(root, 'cloudfunctions/api/config.json', 'openapi 权限/触发器配置', lines);
+  if (cfg) {
+    const openapi = cfg.permissions && cfg.permissions.openapi;
+    if (!Array.isArray(openapi)) {
+      lines.push({ level: 'FAIL', msg: 'cloudfunctions/api/config.json 的 permissions.openapi 必须是数组' });
+    }
+    if (!Array.isArray(cfg.triggers)) {
+      lines.push({ level: 'FAIL', msg: 'cloudfunctions/api/config.json 的 triggers 必须是数组' });
+    }
+    if (Array.isArray(openapi) && Array.isArray(cfg.triggers)) {
+      lines.push({ level: 'PASS', msg: '云函数 config.json 权限/触发器格式正确（openapi ' + openapi.length + ' 项）' });
+    }
+  }
+
+  const proj = readJsonObject(root, 'project.config.json', '开发者工具项目配置', lines);
+  if (proj) {
+    let projProblems = 0;
+    if (proj.miniprogramRoot !== 'miniprogram/') {
+      lines.push({ level: 'FAIL', msg: 'project.config.json 的 miniprogramRoot 必须是 miniprogram/' });
+      projProblems += 1;
+    }
+    if (proj.cloudfunctionRoot !== 'cloudfunctions/') {
+      lines.push({ level: 'FAIL', msg: 'project.config.json 的 cloudfunctionRoot 必须是 cloudfunctions/' });
+      projProblems += 1;
+    }
+    if (proj.compileType !== 'miniprogram') {
+      lines.push({ level: 'FAIL', msg: 'project.config.json 的 compileType 必须是 miniprogram' });
+      projProblems += 1;
+    }
+    if (typeof proj.appid !== 'string' || !/^wx[0-9a-f]{16}$/.test(proj.appid)) {
+      lines.push({ level: 'FAIL', msg: 'project.config.json 的 appid 不合法' });
+      projProblems += 1;
+    }
+    if (!projProblems) {
+      lines.push({ level: 'PASS', msg: 'project.config.json 的根目录 / appid / compileType 正确' });
+    }
+  }
+}
+
 function checkTemplate(root, lines) {
   const candidates = [
     'miniprogram/pages/example',
@@ -471,8 +565,9 @@ function checkConsole(root, lines, warnings) {
 function checkGit(root, lines, warnings) {
   const probe = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd: root, encoding: 'utf8', timeout: 10000 });
   if (probe.error || probe.status !== 0) {
-    warnings.push('无法执行 git（沙箱限制？）→ 请手动确认 git ls-files miniprogram/config/env.js 为空');
+    warnings.push('无法执行 git（沙箱限制？）→ 请手动确认 env.js / project.private.config.json 没被跟踪');
     lines.push({ level: 'TODO', msg: '手动确认：git ls-files miniprogram/config/env.js 输出为空' });
+    lines.push({ level: 'TODO', msg: '手动确认：git ls-files project.private.config.json 输出为空' });
     return;
   }
   const tracked = spawnSync('git', ['ls-files', 'miniprogram/config/env.js'], { cwd: root, encoding: 'utf8', timeout: 10000 });
@@ -483,6 +578,15 @@ function checkGit(root, lines, warnings) {
     lines.push({ level: 'FAIL', msg: 'miniprogram/config/env.js 被 Git 跟踪了，请 git rm --cached 并确认 .gitignore' });
   } else {
     lines.push({ level: 'PASS', msg: 'miniprogram/config/env.js 未被 Git 跟踪' });
+  }
+  const privateTracked = spawnSync('git', ['ls-files', 'project.private.config.json'], { cwd: root, encoding: 'utf8', timeout: 10000 });
+  if (privateTracked.error || privateTracked.status !== 0) {
+    warnings.push('git ls-files 执行失败 → 请手动确认 project.private.config.json 没被跟踪');
+    lines.push({ level: 'TODO', msg: '手动确认：git ls-files project.private.config.json 输出为空' });
+  } else if (privateTracked.stdout && privateTracked.stdout.trim()) {
+    lines.push({ level: 'FAIL', msg: 'project.private.config.json 被 Git 跟踪了，请 git rm --cached 并确认 .gitignore' });
+  } else {
+    lines.push({ level: 'PASS', msg: 'project.private.config.json 未被 Git 跟踪' });
   }
   const status = spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8', timeout: 10000 });
   if (status.stdout && status.stdout.trim()) {
@@ -495,6 +599,7 @@ function runChecks(root) {
   const warnings = [];
   const app = checkPages(root, lines);
   checkStructure(root, lines, warnings);
+  checkDeployConfig(root, lines);
   checkTemplate(root, lines);
   checkAssets(root, lines, warnings);
   checkPrivacy(app, root, lines);
@@ -532,6 +637,7 @@ if (require.main === module) main();
 module.exports = {
   runChecks,
   checkStructure,
+  checkDeployConfig,
   scanTextForSecrets,
   scanConsoleStatement,
   extractConsoleStatements,
