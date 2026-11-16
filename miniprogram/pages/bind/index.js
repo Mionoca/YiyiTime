@@ -12,6 +12,7 @@ Page({
     submitting: false,
     error: '',
     nickname: '',
+    nicknameMax: constants.LIMITS.nickname,
     avatarFileID: '',
     avatarPreview: DEFAULT_AVATAR,
     startDate: '',

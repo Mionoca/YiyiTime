@@ -18,7 +18,7 @@
           class="nickname-input"
           type="nickname"
           value="{{nickname}}"
-          maxlength="12"
+          maxlength="{{nicknameMax}}"
           placeholder="你的昵称"
           placeholder-class="input-placeholder"
           bindinput="onNicknameInput"
