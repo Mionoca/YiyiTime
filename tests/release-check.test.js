@@ -138,9 +138,17 @@ test('发布预检：当前仓库静态检查全部通过', () => {
 
   // 只能人工在控制台/公众平台做的项必须打印出来，否则真机验收前容易漏（超时/内存不在代码里，删掉没人发现）
   const todoText = result.lines.filter((l) => l.level === 'TODO').map((l) => l.msg).join('\n');
-  ['8 个集合', '已重新上传部署', '超时 10s、内存 256MB', '用户隐私保护指引', 'F1–F8'].forEach((needle) => {
+  // 集合数从「云函数只用了预期的 N 个集合」这条 PASS 里取，避免新增集合后两处数字漂移
+  const collectionPass = passText.split('\n').find((m) => m.includes('云函数只用了预期的'));
+  const collectionCount = (collectionPass && collectionPass.match(/预期的 (\d+) 个集合/) || [])[1];
+  assert.ok(collectionCount, '缺少「云函数只用了预期的 N 个集合」检查项');
+  ['个集合', '已重新上传部署', '超时 10s、内存 256MB', '用户隐私保护指引', 'F1–F8'].forEach((needle) => {
     assert.ok(todoText.includes(needle), '缺少 TODO 提醒：' + needle);
   });
+  assert.ok(
+    todoText.includes(collectionCount + ' 个集合'),
+    '云开发控制台 TODO 的集合数（' + collectionCount + '）与集合白名单不一致'
+  );
 });
 
 test('发布预检：图片位置 / 单张体积 / 包体预算 / 默认头像尺寸', () => {

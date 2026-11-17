@@ -24,15 +24,16 @@ YiyiTime/
 │  ├─ pages/
 │  │  ├─ home/                      # 今天（天数卡 / 抱抱卡 / 心情卡 / 四宫格入口）
 │  │  ├─ bind/                      # 双人绑定与邀请码
-│  │  ├─ profile/                   # 我的（昵称头像、开始日期、隐私保护指引 / 数据与隐私说明）
+│  │  ├─ profile/                   # 我的（昵称头像、开始日期、记账本入口、解绑、隐私保护指引 / 数据与隐私说明）
 │  │  ├─ safety/                    # 报平安（我到家了 + 时间线）
 │  │  ├─ diary/                     # 台灯下的日记（当天上锁，次日解锁）
 │  │  ├─ wish/                      # 下次见面想做的事
-│  │  └─ mood/                      # 心情记录（两人按天倒序，只读时间线）
+│  │  ├─ mood/                      # 心情记录（两人按天倒序，只读时间线）
+│  │  └─ ledger/                    # 记账本（我的 / TA 的，按天分组 + 合计）
 │  ├─ custom-tab-bar/               # 自定义 tabBar（只两项：今天 / 我的）
 │  ├─ components/                   # avatar-bubble / mood-picker / hug-banner / bottom-sheet /
 │  │                                # timeline-item / diary-card / wish-item / empty-state / privacy-guard
-│  ├─ utils/                        # api（唯一云函数入口）、constants、tabbar、time、format、me、upload、haptics、privacy
+│  ├─ utils/                        # api（唯一云函数入口）、constants、tabbar、time、format（含元/分换算）、me、upload、haptics、privacy
 │  ├─ styles/tokens.wxss            # 手绘涂鸦风设计变量（颜色 / 描边 / 硬阴影 / 间距 / 字号）
 │  ├─ config/env.example.js         # 环境 ID 模板（env.js 不入库）
 │  └─ images/avatars/               # 默认头像
@@ -50,13 +51,13 @@ YiyiTime/
    该文件已被 `.gitignore` 忽略，**不要提交**。
 3. 用微信开发者工具导入仓库根目录（appid 见 `project.config.json`）。
 4. 云函数：右键 `cloudfunctions/api` →「上传并部署：云端安装依赖」。**每次云函数代码有改动都要重新部署。**
-5. 云数据库：手动创建 8 个集合（见下方「云开发控制台一次性配置」）。
+5. 云数据库：手动创建 9 个集合（见下方「云开发控制台一次性配置」）。
 6. 删除云端模板遗留的 `quickstartFunctions` 云函数（本地代码已清理，云端需手动删）。
 7. 隐私：微信公众平台 →「设置 - 服务内容声明 - 用户隐私保护指引」声明头像、昵称用途，否则隐私接口会被拦截。
 
 ## 云开发控制台一次性配置
 
-- 集合：`users`、`couples`、`bind_invites`、`moods`、`hugs`、`safety_checkins`、`diaries`、`wishes`
+- 集合：`users`、`couples`、`bind_invites`、`moods`、`hugs`、`safety_checkins`、`diaries`、`wishes`、`ledger_entries`
 - 权限：全部设置为「所有用户不可读写」（只允许云函数访问）
 - 索引：
   - `bind_invites`：`creatorOpenid`+`status`、`applicantOpenid`+`status`、`expiresAt`
@@ -66,12 +67,13 @@ YiyiTime/
   - `safety_checkins`：`coupleId`+`date`、`coupleId`+`createdAt`
   - `diaries`：`coupleId`+`date`
   - `wishes`：`coupleId`+`done`+`createdAt`、`coupleId`+`createdAt`
+  - `ledger_entries`：`openid`+`month`+`date`+`createdAt`（我的账本按月查）、`openid`+`coupleId`+`month`+`date`+`createdAt`（伴侣视角按月查；后两位是同一天内的时间倒序）
 - 存储：头像由前端上传到云存储 `avatars/` 目录，默认权限即可；客户端上传前校验格式（JPG / PNG）与单张 ≤2MB（文档 11.9 / 3442），格式不符或超限直接提示、不发起上传
 
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 544 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 596 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 

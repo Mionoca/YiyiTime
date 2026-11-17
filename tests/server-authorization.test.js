@@ -368,3 +368,61 @@ test('couple 成员列表不含当前用户时按 FORBIDDEN 拒绝，首页同�
   const homeLogs = errors.filter((args) => args[0] === '[home.get] couple missing or invalid');
   assert.strictEqual(homeLogs.length, 1);
 });
+
+test('记账本：伴侣账本只读、别家改删一律拒绝、未绑定不读库', async () => {
+  seedTwoCouples();
+  const mine = await ok(A, 'ledger.add', { amount: 1200, category: 'food', note: '午饭' });
+  const entryId = mine.entry.entryId;
+  const partnerEntry = await ok(B, 'ledger.add', { amount: 800, category: 'daily' });
+
+  // 伴侣能看，但不能改 / 删
+  const viewed = await ok(A, 'ledger.list', { who: 'partner' });
+  assert.deepStrictEqual(viewed.items.map((item) => item.entryId), [partnerEntry.entry.entryId]);
+  await fail(A, 'ledger.update', { entryId: partnerEntry.entry.entryId, amount: 1 }, 'FORBIDDEN');
+  await fail(A, 'ledger.remove', { entryId: partnerEntry.entry.entryId }, 'FORBIDDEN');
+
+  // 别家的人拿着 entryId 也不能改 / 删
+  await fail(C, 'ledger.update', { entryId, amount: 1 }, 'FORBIDDEN');
+  await fail(C, 'ledger.remove', { entryId }, 'FORBIDDEN');
+  assert.strictEqual(h.fake().get('ledger_entries', entryId).amount, 1200, '别家不能改掉金额');
+
+  // 别家的账本里看不到我的账
+  const otherView = await ok(C, 'ledger.list', { who: 'partner' });
+  assert.deepStrictEqual(otherView.items, []);
+
+  // 未绑定用户：自己的账本是空的（只有本人文档，读不到别家），伴侣视角一律 NOT_BOUND
+  const emptyMine = await ok(E, 'ledger.list', {});
+  assert.deepStrictEqual(emptyMine.items, [], '未绑定用户看不到任何人的账');
+  assert.strictEqual(emptyMine.bound, false);
+  await fail(E, 'ledger.list', { who: 'partner' }, 'NOT_BOUND');
+  // 个人账本允许未绑定记账，但记的那笔属于自己、不挂任何关系
+  const own = await ok(E, 'ledger.add', { amount: 100, category: 'food' });
+  assert.strictEqual(h.fake().get('ledger_entries', own.entry.entryId).coupleId, null);
+});
+
+test('解绑：别家不能替别人确认，跨对的解绑状态互不干扰', async () => {
+  seedTwoCouples();
+
+  const requested = await ok(A, 'couple.requestUnbind', {});
+  assert.strictEqual(requested.unbind.status, 'pending');
+
+  // C 已经绑定在 CD 上：他调用确认只会看自己那一对，AB 的申请跟他无关
+  await fail(C, 'couple.confirmUnbind', {}, 'UNBIND_NOT_PENDING');
+  await fail(C, 'couple.cancelUnbind', {}, 'UNBIND_NOT_PENDING');
+  assert.strictEqual(h.fake().get('couples', COUPLE_AB).unbindStatus, 'pending');
+
+  // CD 的申请也不能被 A 确认
+  await ok(C, 'couple.requestUnbind', {});
+  await fail(A, 'couple.confirmUnbind', {}, 'UNBIND_WAIT_PARTNER', 'A 自己发起了 AB 的解绑，只能等 B 确认');
+  assert.strictEqual(h.fake().get('couples', COUPLE_CD).unbindStatus, 'pending');
+
+  // 各自由对方确认
+  await ok(D, 'couple.confirmUnbind', {});
+  await ok(B, 'couple.confirmUnbind', {});
+  assert.strictEqual(h.fake().get('couples', COUPLE_AB).status, 'closed');
+  assert.strictEqual(h.fake().get('couples', COUPLE_CD).status, 'closed');
+  // 解绑后：自己的账本还能看（个人数据），但看不到「TA 的」
+  const mineAfter = await ok(A, 'ledger.list', {});
+  assert.strictEqual(mineAfter.bound, false);
+  await fail(A, 'ledger.list', { who: 'partner' }, 'NOT_BOUND');
+});

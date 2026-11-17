@@ -785,3 +785,51 @@ test('home: 新的抱抱回应只在首次出现时播心形动画，并写入�
     restoreWx();
   }
 });
+
+/* M9 解绑提示条（文档 9.2）：只有「对方发起」才在首页提示，点了 switchTab 去「我的」 */
+test('home: 对方申请解绑时首屏出现提示条，点了去「我的」', async () => {
+  const { page, navs } = setup(
+    {
+      'home.get': () => baseHome({
+        unbind: { status: 'pending', requestedByMe: false, requestedAt: '2026-11-16T04:00:00.000Z' },
+      }),
+    },
+    { nextTick: (fn) => fn() }
+  );
+  try {
+    page.onShow();
+    await page.loadingPromise;
+    assert.strictEqual(page.data.unbindNotice, true);
+    assert.match(page.data.unbindNoticeText, /TA 申请了解绑/);
+    page.onTapUnbindNotice();
+    assert.deepStrictEqual(navs, [{ kind: 'switchTab', url: constants.ROUTES.profile }]);
+    // 等首屏入场定时器（16ms）跑完再拆 wx，否则回调里摸 wx 会报错
+    await new Promise((r) => setTimeout(r, 50));
+  } finally {
+    restoreWx();
+  }
+});
+
+test('home: 自己发起 / 没有申请时不出现提示条', async () => {
+  const cases = [
+    { status: 'pending', requestedByMe: true, requestedAt: '2026-11-16T04:00:00.000Z' },
+    { status: 'none', requestedByMe: false, requestedAt: null },
+  ];
+  for (const unbind of cases) {
+    const { page } = setup(
+      {
+        'home.get': () => baseHome({ unbind }),
+      },
+      { nextTick: (fn) => fn() }
+    );
+    try {
+      page.onShow();
+      await page.loadingPromise;
+      assert.strictEqual(page.data.unbindNotice, false, JSON.stringify(unbind));
+      assert.strictEqual(page.data.unbindNoticeText, '');
+      await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      restoreWx();
+    }
+  }
+});

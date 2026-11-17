@@ -1,0 +1,11 @@
+{
+  "navigationBarTitleText": "记账本",
+  "navigationBarBackgroundColor": "#FFFEF5",
+  "navigationBarTextStyle": "black",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#FFFEF5",
+  "usingComponents": {
+    "empty-state": "/components/empty-state/index",
+    "bottom-sheet": "/components/bottom-sheet/index"
+  }
+}

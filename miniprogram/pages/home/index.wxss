@@ -52,8 +52,38 @@
   border-bottom: 2rpx dashed var(--accent-ink);
 }
 
-/* ── 首屏失败 ───────────────────────────────────────────────── */
-.error-card {
+/* 解绑提示条（M9 / 文档 9.2）：细条，不用卡片样式，避免抢日子卡的视觉位置 */
+.unbind-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+  padding: 8rpx 8rpx 8rpx 24rpx;
+  background-color: var(--card);
+  border: 2rpx dashed var(--danger);
+  border-radius: var(--radius-md);
+}
+
+.unbind-bar__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  color: var(--danger);
+}
+
+.unbind-bar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 160rpx;
+  min-height: 88rpx;
+  padding: 0 16rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+/* ── 首屏失败 ───────────────────────────────────────────────── */.error-card {
   margin-top: 48rpx;
   padding: 48rpx 32rpx;
   text-align: center;

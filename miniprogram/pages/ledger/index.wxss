@@ -1,0 +1,308 @@
+/* 记账本：涂鸦风（文档 8.7 / 8.3.8） */
+.page {
+  min-height: 100vh;
+  /* 底部留出「记一笔」按钮的高度，最后一条不被压住 */
+  padding: 24rpx 24rpx calc(220rpx + env(safe-area-inset-bottom));
+  background-color: var(--bg);
+}
+
+/* ---------- 页头：账本切换 + 月份 + 合计 ---------- */
+.head {
+  margin-bottom: 24rpx;
+}
+
+.seg {
+  display: flex;
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.seg__item {
+  flex: 1;
+  min-height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  font-size: var(--font-md);
+  color: var(--muted);
+}
+
+.seg__item.is-on {
+  background-color: var(--marker-yellow);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20rpx;
+}
+
+.month__btn {
+  width: 88rpx;
+  height: 88rpx;
+  line-height: 84rpx;
+  text-align: center;
+  font-size: 40rpx;
+  color: var(--ink);
+}
+
+.month__btn.is-off {
+  color: var(--ink-faint);
+}
+
+.month__text {
+  min-width: 220rpx;
+  text-align: center;
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.summary {
+  margin-top: 12rpx;
+  padding: 24rpx;
+  background-color: var(--wall);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.summary__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.summary__label {
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.summary__count {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.summary__num {
+  display: block;
+  margin-top: 8rpx;
+  font-size: var(--font-xl);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+/* ---------- 一天一组 ---------- */
+.day {
+  margin-bottom: 20rpx;
+  padding: 20rpx 24rpx;
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.day__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 10rpx;
+  border-bottom: 2rpx dashed var(--ink-faint);
+}
+
+.day__label {
+  font-size: var(--font-sm);
+  font-weight: 800;
+  color: var(--accent-ink);
+}
+
+.day__total {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 96rpx;
+  padding: 12rpx 0;
+}
+
+.row + .row {
+  border-top: 2rpx dashed var(--ink-faint);
+}
+
+.row__emoji {
+  flex: none;
+  width: 56rpx;
+  font-size: 34rpx;
+  line-height: 1.2;
+}
+
+.row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row__cat {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.row__note {
+  margin-top: 4rpx;
+  font-size: var(--font-xs);
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.row__amount {
+  flex: none;
+  margin-left: 16rpx;
+  font-size: var(--font-md);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* ---------- 状态 ---------- */
+.hint {
+  padding: 32rpx 0;
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.hint--faint {
+  color: var(--muted);
+}
+
+/* 文档 12.9：列表失败保留内容 + 底部可点重试 */
+.hint--error {
+  display: inline-block;
+  min-height: 88rpx;
+  line-height: 88rpx;
+  color: var(--accent-ink);
+  border-bottom: 2rpx dashed var(--accent-ink);
+}
+
+/* ---------- 固定底部按钮 ---------- */
+.fab {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  background-color: var(--bg);
+  border-top: 2rpx dashed var(--line);
+}
+
+.fab__btn {
+  width: 100%;
+  min-height: 96rpx;
+  line-height: 96rpx;
+}
+
+/* ---------- 记一笔弹层 ---------- */
+.form {
+  padding: 8rpx 0 16rpx;
+}
+
+.field {
+  margin-bottom: 24rpx;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 10rpx;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.field__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 0 20rpx;
+  font-size: var(--font-md);
+  color: var(--ink);
+  background-color: var(--card);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.field__input--num {
+  font-size: var(--font-lg);
+  font-weight: 800;
+}
+
+.field__picker {
+  min-height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 20rpx;
+  font-size: var(--font-md);
+  color: var(--ink);
+  background-color: var(--card);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.input-placeholder {
+  color: var(--ink-faint);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  min-height: 88rpx;
+  margin: 0 16rpx 16rpx 0;
+  padding: 0 20rpx;
+  background-color: var(--card);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.chip.is-on {
+  background-color: var(--marker-yellow);
+  border-color: var(--line);
+}
+
+.chip__emoji {
+  font-size: 30rpx;
+  line-height: 1;
+}
+
+.chip__text {
+  margin-left: 8rpx;
+  font-size: var(--font-sm);
+  color: var(--ink);
+}
+
+.chip.is-on .chip__text {
+  font-weight: 800;
+}
+
+.form__save {
+  width: 100%;
+  min-height: 96rpx;
+  line-height: 96rpx;
+  margin-top: 8rpx;
+}
+
+.form__delete {
+  min-height: 88rpx;
+  line-height: 88rpx;
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--danger);
+}

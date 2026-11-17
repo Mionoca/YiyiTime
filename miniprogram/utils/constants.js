@@ -15,6 +15,7 @@ const ROUTES = {
   diary: '/pages/diary/index',
   wish: '/pages/wish/index',
   mood: '/pages/mood/index',
+  ledger: '/pages/ledger/index',
 };
 
 /**
@@ -39,8 +40,26 @@ const LIMITS = {
   wishTitle: 30,
   wishNote: 100,
   wishCount: 100,
+  // 记账本（文档 6.5 / 7.13）：备注 ≤30 字、单笔 1 分–10,000 元、每人每月 60 笔
+  ledgerNote: 30,
+  ledgerAmountMin: 1,
+  ledgerAmountMax: 1000000,
+  ledgerMonthCount: 60,
 };
+
+/**
+ * 记账分类（文档 7.13）：key 与云函数 CATEGORIES 必须一致，
+ * emoji 只做辅助，文字一定同时出现（8.9）。
+ */
+const LEDGER_CATEGORIES = [
+  { key: 'food', label: '吃饭', emoji: '🍜' },
+  { key: 'transport', label: '交通', emoji: '🚌' },
+  { key: 'shopping', label: '购物', emoji: '🛍️' },
+  { key: 'fun', label: '玩乐', emoji: '🎡' },
+  { key: 'daily', label: '日用', emoji: '🧴' },
+  { key: 'other', label: '其他', emoji: '📦' },
+];
 
 const DEFAULT_AVATAR = '/images/avatars/default.png';
 
-module.exports = { MOODS, ROUTES, TAB_ROUTES, isTabRoute, LIMITS, DEFAULT_AVATAR };
+module.exports = { MOODS, ROUTES, TAB_ROUTES, isTabRoute, LIMITS, LEDGER_CATEGORIES, DEFAULT_AVATAR };

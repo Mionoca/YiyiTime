@@ -35,12 +35,22 @@ Page({
     privacySheet: false,
     privacySections: privacy.SECTIONS,
     privacyFooter: privacy.FOOTER,
+    // 解绑（M9 / 文档 8.3.6）：none / pending_me / pending_partner
+    unbindStatus: 'none',
+    unbindText: '解绑',
+    unbinding: false,
   },
 
   onShow() {
     // 自定义 tabBar 的选中态要页面自己报（文档 8.2）
     tabbar.sync(this, constants.ROUTES.profile);
     this.load();
+  },
+
+  onUnload() {
+    // 解绑成功后的延迟跳转：页面已经卸载就别再 reLaunch
+    this._unloaded = true;
+    if (this.leaveTimer) clearTimeout(this.leaveTimer);
   },
 
   onPullDownRefresh() {
@@ -60,9 +70,14 @@ Page({
   async load(force) {
     // 正在改昵称时，别用服务端旧值把输入框覆盖掉
     if (this.data.editing && !force) return;
+    // 请求令牌：下拉刷新 / onShow / 解绑后的刷新可能并发，旧响应不能覆盖新的解绑状态
+    const token = (this._seq = (this._seq || 0) + 1);
+    const stale = () => this._unloaded || token !== this._seq;
     try {
       const home = await api.call('home.get');
+      if (stale()) return;
       const user = home.user || {};
+      const unbind = this.unbindView(home);
       const patch = {
         loading: false,
         error: '',
@@ -72,6 +87,8 @@ Page({
         avatarPreview: user.avatarFileID || DEFAULT_AVATAR,
         bound: home.bind.state === 'bound',
         bindStateText: this.bindText(home.bind),
+        unbindStatus: unbind.status,
+        unbindText: unbind.text,
         // 上限用服务端 todayKey（文档 13.5：日期规则以服务端为准），取不到再退回本机
         maxStartDate: home.todayKey || timeUtil.todayKey(),
         startDateSelect: home.couple ? home.couple.startDate : '',
@@ -96,6 +113,7 @@ Page({
       if (this.data.editing) patch.nickname = this.data.nickname;
       this.setData(patch);
     } catch (err) {
+      if (stale()) return;
       this.setData({ loading: false, error: (err && err.message) || '小屋暂时打不开' });
     }
   },
@@ -251,6 +269,130 @@ Page({
       return;
     }
     wx.navigateTo({ url: constants.ROUTES.mood });
+  },
+
+  /** 记账本（文档 8.3.8）：普通页面，navigateTo 进入；个人账本未绑定也能进（只有 TA 的账本要绑定） */
+  onOpenLedger() {
+    wx.navigateTo({ url: constants.ROUTES.ledger });
+  },
+
+  /** 三态对应文案（文档 8.3.6）：三处（load / 申请 / 撤回）用同一份，避免某一处写成「解绑」 */
+  unbindTextOf(status) {
+    if (status === 'pending_me') return '等 TA 确认解绑（点击撤回）';
+    if (status === 'pending_partner') return 'TA 申请解绑（点击确认）';
+    return '解绑';
+  },
+
+  /** 解绑三态（文档 8.3.6）：只认服务端 requestedByMe，不自己推断发起者 */
+  unbindView(home) {
+    const unbind = (home && home.unbind) || { status: 'none', requestedByMe: false };
+    // requestedByMe 不是布尔说明服务端出了新形状：按「没有待确认解绑」处理（点一下会重新同步），
+    // 绝不把它当成「TA 申请」——那会给出一个确认解绑的按钮
+    if (!home || !home.couple || unbind.status !== 'pending') {
+      return { status: 'none', text: this.unbindTextOf('none') };
+    }
+    if (typeof unbind.requestedByMe !== 'boolean') {
+      return { status: 'none', text: this.unbindTextOf('none') };
+    }
+    const status = unbind.requestedByMe ? 'pending_me' : 'pending_partner';
+    return { status, text: this.unbindTextOf(status) };
+  },
+
+  /** 解绑：申请 / 撤回 / 确认按当前状态分流，每种都先二次确认（文档 8.3.6） */
+  onTapUnbind() {
+    if (!this.data.bound || this.data.unbinding) return;
+    const status = this.data.unbindStatus;
+
+    if (status === 'pending_me') {
+      wx.showModal({
+        title: '撤回解绑申请？',
+        content: '撤回后你们还是在一起的，TA 也不会再看到申请。',
+        confirmText: '撤回',
+        cancelText: '不了',
+        success: (res) => {
+          if (res.confirm) this.cancelUnbind();
+        },
+      });
+      return;
+    }
+
+    if (status === 'pending_partner') {
+      wx.showModal({
+        title: '确认解绑？',
+        content: '确认后小屋会关掉，你们都不再看到对方的记录；以前记下的还在原处。',
+        confirmText: '解绑',
+        cancelText: '再想想',
+        success: (res) => {
+          if (res.confirm) this.confirmUnbind();
+        },
+      });
+      return;
+    }
+
+    wx.showModal({
+      title: '申请解绑？',
+      content: '要 TA 也点确认才会解绑；在那之前你可以随时撤回。',
+      confirmText: '申请',
+      cancelText: '再想想',
+      success: (res) => {
+        if (res.confirm) this.requestUnbind();
+      },
+    });
+  },
+
+  async requestUnbind() {
+    if (this.data.unbinding) return;
+    this.setData({ unbinding: true });
+    try {
+      const res = await api.call('couple.requestUnbind');
+      const pending = !!(res && res.unbind && res.unbind.status === 'pending');
+      const status = pending ? (res.unbind.requestedByMe ? 'pending_me' : 'pending_partner') : 'none';
+      this.setData({
+        unbinding: false,
+        unbindStatus: status,
+        unbindText: this.unbindTextOf(status),
+      });
+      this.toast(status === 'pending_me' ? '已经申请啦，等 TA 确认' : 'TA 也申请了解绑，点确认就能解绑');
+      await this.load(true);
+    } catch (err) {
+      this.setData({ unbinding: false });
+      api.showError(err);
+    }
+  },
+
+  async cancelUnbind() {
+    if (this.data.unbinding) return;
+    this.setData({ unbinding: true });
+    try {
+      await api.call('couple.cancelUnbind');
+      this.setData({ unbinding: false, unbindStatus: 'none', unbindText: this.unbindTextOf('none') });
+      this.toast('撤回啦');
+      await this.load(true);
+    } catch (err) {
+      // 已经没待确认的解绑（对方刚撤回）：按最新状态刷新，不让按钮停在旧文案上
+      this.setData({ unbinding: false });
+      api.showError(err);
+      this.load(true);
+    }
+  },
+
+  async confirmUnbind() {
+    if (this.data.unbinding) return;
+    this.setData({ unbinding: true });
+    try {
+      await api.call('couple.confirmUnbind');
+      this.setData({ unbinding: false });
+      wx.showToast({ title: '已经解绑了', icon: 'none' });
+      // 与绑定成功一致：清掉页面栈回首页，避免停在已失效的资料页
+      this.leaveTimer = setTimeout(() => {
+        if (this._unloaded) return;
+        wx.reLaunch({ url: constants.ROUTES.home });
+      }, 700);
+    } catch (err) {
+      this.setData({ unbinding: false });
+      api.showError(err);
+      this.load(true);
+    }
   },
 
   /** 隐私保护指引（文档 13.8：隐私弹窗与授权口径要能被用户随时查到） */

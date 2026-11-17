@@ -161,6 +161,9 @@ test('文档 6.5 长度限制表与客户端 LIMITS 一致', () => {
     ['日记正文', 'diary', 1],
     ['愿望标题', 'wishTitle', 1],
     ['愿望备注', 'wishNote', 0],
+    ['记账备注', 'ledgerNote', 0],
+    ['记账金额（分）', 'ledgerAmountMax', 1],
+    ['记账笔数', 'ledgerMonthCount', 0],
   ];
   expected.forEach(([field, key, min]) => {
     assert.ok(table[field], '6.5 表缺少字段 ' + field);
@@ -177,6 +180,10 @@ test('服务端 handler 的长度上限常量与客户端 LIMITS 一致', () => 
   assert.strictEqual(constantIn(HANDLERS + 'wish.js', 'TITLE_MAX'), LIMITS.wishTitle, 'wish.TITLE_MAX');
   assert.strictEqual(constantIn(HANDLERS + 'wish.js', 'NOTE_MAX'), LIMITS.wishNote, 'wish.NOTE_MAX');
   assert.strictEqual(constantIn(HANDLERS + 'wish.js', 'WISH_MAX'), LIMITS.wishCount, 'wish.WISH_MAX');
+  assert.strictEqual(constantIn(HANDLERS + 'ledger.js', 'NOTE_MAX'), LIMITS.ledgerNote, 'ledger.NOTE_MAX');
+  assert.strictEqual(constantIn(HANDLERS + 'ledger.js', 'MONTH_LIMIT'), LIMITS.ledgerMonthCount, 'ledger.MONTH_LIMIT');
+  assert.strictEqual(constantIn(HANDLERS + 'ledger.js', 'AMOUNT_MIN'), LIMITS.ledgerAmountMin, 'ledger.AMOUNT_MIN');
+  assert.strictEqual(constantIn(HANDLERS + 'ledger.js', 'AMOUNT_MAX'), LIMITS.ledgerAmountMax, 'ledger.AMOUNT_MAX');
 
   // user.js 的昵称上限写在 validate.string 选项里，不是独立常量；要求紧跟逗号/右花括号，防止 max: 12 + 1 被读成 12
   const masked = maskCommentsOnly(read(HANDLERS + 'user.js'));
@@ -208,6 +215,7 @@ test('输入框 maxlength 全部走数据绑定，昵称不再硬编码 12', () 
     'miniprogram/pages/diary/index.wxml': ['{{contentMax}}'],
     'miniprogram/pages/safety/index.wxml': ['{{noteMax}}'],
     'miniprogram/pages/wish/index.wxml': ['{{noteMax}}', '{{titleMax}}'],
+    'miniprogram/pages/ledger/index.wxml': ['{{amountMaxLength}}', '{{noteMax}}'],
     'miniprogram/components/mood-picker/index.wxml': ['{{noteMax}}'],
   };
   assert.deepStrictEqual(Object.keys(byFile).sort(), Object.keys(expected).sort(), '出现未登记 / 缺少的含 maxlength 的 wxml：' + Object.keys(byFile).join(', '));
@@ -228,6 +236,14 @@ test('输入框 maxlength 全部走数据绑定，昵称不再硬编码 12', () 
     const wish = loadPage('miniprogram/pages/wish/index.js');
     assert.strictEqual(wish.data.titleMax, LIMITS.wishTitle);
     assert.strictEqual(wish.data.noteMax, LIMITS.wishNote);
+    const ledger = loadPage('miniprogram/pages/ledger/index.js');
+    assert.strictEqual(ledger.data.noteMax, LIMITS.ledgerNote);
+    assert.strictEqual(
+      ledger.data.amountMaxLength,
+      String(Math.floor(LIMITS.ledgerAmountMax / 100)).length + 3,
+      '金额输入框的字符上限必须由 LIMITS.ledgerAmountMax 推导，不能硬编码'
+    );
+    assert.ok(ledger.data.amountMaxLength >= 7, '至少要放得下「10000.00」');
     assert.strictEqual(loadComponent('miniprogram/components/mood-picker/index.js').data.noteMax, LIMITS.moodNote);
   } finally {
     restoreWx();

@@ -70,11 +70,20 @@
         <text>心情记录</text>
         <text class="list-arrow">›</text>
       </view>
-      <view class="list-item list-item--disabled">
-        <text>见面基金（即将上线）</text>
+      <view class="list-item" bindtap="onOpenLedger" aria-role="button" aria-label="记账本">
+        <text>记账本</text>
+        <text class="list-arrow">›</text>
       </view>
-      <view class="list-item list-item--disabled">
-        <text>解绑（联系开发者）</text>
+      <!-- M9 解绑：已绑定才出现；三态文案由服务端 unbind.requestedByMe 决定（文档 8.3.6） -->
+      <view
+        class="list-item"
+        wx:if="{{bound}}"
+        bindtap="onTapUnbind"
+        aria-role="button"
+        aria-label="{{unbindText}}"
+      >
+        <text class="{{unbindStatus === 'none' ? '' : 'list-danger'}}">{{unbindText}}</text>
+        <text class="list-arrow">›</text>
       </view>
       <view class="list-item">
         <text>振动反馈</text>

@@ -31,6 +31,18 @@
 
   <block wx:if="{{home}}">
 
+    <!-- 解绑提示条（M9 / 文档 9.2）：细条，不参与卡片旋转；点了去「我的」处理 -->
+    <view
+      class="unbind-bar"
+      wx:if="{{unbindNotice}}"
+      bindtap="onTapUnbindNotice"
+      aria-role="button"
+      aria-label="{{unbindNoticeText}}"
+    >
+      <text class="unbind-bar__text">{{unbindNoticeText}}</text>
+      <text class="unbind-bar__btn">去看看 ›</text>
+    </view>
+
     <!-- 未绑定 / 邀请中：只留一张邀请卡，其他卡片进去也是空态（文档 9.12） -->
     <view class="dk-card invite-card dk-card--tilt-l" wx:if="{{!home.couple}}">
       <view class="dk-tape"></view>

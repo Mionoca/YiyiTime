@@ -1,0 +1,185 @@
+<view class="page">
+
+  <view class="head">
+    <!-- 我的 / TA 的（对方账本只读）；未绑定时只有一本，不显示分段 -->
+    <view wx:if="{{bound}}" class="seg" aria-role="tablist" aria-label="切换账本">
+      <view
+        class="seg__item {{who === 'me' ? 'is-on' : ''}}"
+        data-who="me"
+        bindtap="onSwitchWho"
+        aria-role="tab"
+        aria-selected="{{who === 'me'}}"
+      >我的</view>
+      <view
+        class="seg__item {{who === 'partner' ? 'is-on' : ''}}"
+        data-who="partner"
+        bindtap="onSwitchWho"
+        aria-role="tab"
+        aria-selected="{{who === 'partner'}}"
+      >{{partnerName}}的</view>
+    </view>
+
+    <!-- 月份切换：到当前月就不能再往后 -->
+    <view class="month">
+      <view class="month__btn" bindtap="onPrevMonth" aria-role="button" aria-label="上一个月">‹</view>
+      <text class="month__text">{{monthText}}</text>
+      <view
+        class="month__btn {{canGoNext ? '' : 'is-off'}}"
+        bindtap="onNextMonth"
+        aria-role="button"
+        aria-label="下一个月"
+        aria-disabled="{{!canGoNext}}"
+      >›</view>
+    </view>
+
+    <view class="summary">
+      <view class="summary__top">
+        <text class="summary__label">{{summaryLabel}}</text>
+        <text class="summary__count">共 {{summaryCount}} 笔</text>
+      </view>
+      <text class="summary__num">{{summaryText}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="hint">正在翻开账本…</view>
+
+  <empty-state
+    wx:elif="{{error}}"
+    title="{{error}}"
+    action-text="再试一次"
+    bind:action="onRetry"
+  />
+
+  <block wx:else>
+    <view
+      class="day"
+      wx:for="{{groups}}"
+      wx:for-item="group"
+      wx:key="date"
+      aria-role="list"
+      aria-label="{{group.a11y}}"
+    >
+      <view class="day__head">
+        <text class="day__label">{{group.label}}</text>
+        <text class="day__total">{{group.totalText}}</text>
+      </view>
+      <view
+        class="row"
+        wx:for="{{group.items}}"
+        wx:key="entryId"
+        data-id="{{item.entryId}}"
+        bindtap="onTapEntry"
+        aria-role="button"
+        aria-label="{{item.a11y}}"
+      >
+        <text class="row__emoji">{{item.emoji}}</text>
+        <view class="row__main">
+          <text class="row__cat">{{item.categoryLabel}}</text>
+          <text class="row__note" wx:if="{{item.note}}">{{item.note}}</text>
+        </view>
+        <text class="row__amount">{{item.amountText}}</text>
+      </view>
+    </view>
+
+    <empty-state
+      wx:if="{{!groups.length}}"
+      icon="🧾"
+      title="这个月还没记账"
+      desc="点下面的「记一笔」，把花销记下来"
+    />
+
+    <view
+      wx:if="{{listError}}"
+      class="hint hint--error"
+      bindtap="onRetryList"
+      aria-role="button"
+      aria-label="重新加载账本"
+    >{{listError}}</view>
+    <view wx:elif="{{groups.length && who === 'partner'}}" class="hint hint--faint">TA 的账本只能看，不能改</view>
+  </block>
+
+  <!-- 记一笔：只在「我的」视角出现（TA 的账本是只读的），固定底部不挡列表 -->
+  <view wx:if="{{who === 'me'}}" class="fab">
+    <button class="btn-primary btn-solid fab__btn" bindtap="onOpenForm">记一笔</button>
+  </view>
+
+  <bottom-sheet
+    show="{{formOpen}}"
+    title="{{editing ? '改这一笔' : '记一笔'}}"
+    mask-closable="{{!saving}}"
+    bind:close="onCloseForm"
+  >
+    <view class="form">
+      <view class="field">
+        <text class="field__label">金额（元）</text>
+        <input
+          class="field__input field__input--num"
+          type="digit"
+          value="{{form.amountText}}"
+          maxlength="{{amountMaxLength}}"
+          placeholder="0.00"
+          placeholder-class="input-placeholder"
+          bindinput="onAmountInput"
+        />
+      </view>
+
+      <view class="field">
+        <text class="field__label">分类</text>
+        <view class="chips">
+          <view
+            class="chip {{form.category === item.key ? 'is-on' : ''}}"
+            wx:for="{{categories}}"
+            wx:key="key"
+            data-key="{{item.key}}"
+            bindtap="onPickCategory"
+            aria-role="button"
+            aria-label="{{item.label}}"
+            aria-selected="{{form.category === item.key}}"
+          >
+            <text class="chip__emoji">{{item.emoji}}</text>
+            <text class="chip__text">{{item.label}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="field">
+        <text class="field__label">备注</text>
+        <input
+          class="field__input"
+          value="{{form.note}}"
+          maxlength="{{noteMax}}"
+          placeholder="买的什么？（可不填）"
+          placeholder-class="input-placeholder"
+          bindinput="onNoteInput"
+        />
+      </view>
+
+      <view class="field">
+        <text class="field__label">日期</text>
+        <picker
+          mode="date"
+          value="{{form.date}}"
+          start="2000-01-01"
+          end="{{maxDate}}"
+          bindchange="onDateChange"
+        >
+          <view class="field__picker" aria-role="button" aria-label="选择消费日期">{{form.date}}</view>
+        </picker>
+      </view>
+
+      <button
+        class="btn-primary btn-solid form__save"
+        bindtap="onSaveEntry"
+        disabled="{{saving}}"
+      >{{saving ? '保存中…' : (editing ? '保存' : '记下来')}}</button>
+
+      <view
+        class="form__delete"
+        wx:if="{{editing}}"
+        bindtap="onDeleteEntry"
+        aria-role="button"
+        aria-label="删除这笔"
+      >删除这笔</view>
+    </view>
+  </bottom-sheet>
+</view>

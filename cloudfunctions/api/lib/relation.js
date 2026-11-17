@@ -27,4 +27,17 @@ function publicUserBrief(user, openid) {
   };
 }
 
-module.exports = { coupleIdOf, partnerOpenidOf, iso, publicUserBrief };
+/**
+ * 解绑状态视图（文档 7.14）：home.get / couple.*Unbind 共用同一份形状，
+ * 客户端只按 status + requestedByMe 决定文案，不自己推断谁是发起者。
+ */
+function unbindView(couple, openid) {
+  const pending = !!(couple && couple.unbindStatus === 'pending');
+  return {
+    status: pending ? 'pending' : 'none',
+    requestedByMe: pending && couple.unbindRequestedBy === openid,
+    requestedAt: pending ? iso(couple.unbindRequestedAt) : null,
+  };
+}
+
+module.exports = { coupleIdOf, partnerOpenidOf, iso, publicUserBrief, unbindView };

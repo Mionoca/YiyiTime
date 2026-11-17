@@ -1,10 +1,13 @@
 'use strict';
 
 const time = require('../lib/time');
+const relation = require('../lib/relation');
 const bind = require('./bind');
 const blocks = require('../lib/home-blocks');
 
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+/** 未绑定 / 未确认时统一返回「没有解绑申请」，客户端只按这一个形状渲染（文档 7.14） */
+const NO_UNBIND = { status: 'none', requestedByMe: false, requestedAt: null };
 
 function publicUser(user) {
   return {
@@ -35,7 +38,16 @@ async function get(payload, ctx) {
     phase: time.phaseOf(ctx.now),
     user: publicUser(ctx.user),
   };
-  const empty = { couple: null, partner: null, mood: null, hug: null, safety: null, diary: null, wish: null };
+  const empty = {
+    couple: null,
+    partner: null,
+    mood: null,
+    hug: null,
+    safety: null,
+    diary: null,
+    wish: null,
+    unbind: NO_UNBIND,
+  };
 
   if (!ctx.user.coupleId) {
     return Object.assign({}, base, empty, { bind: await bind.computeStatus(ctx) });
@@ -102,6 +114,7 @@ async function get(payload, ctx) {
     safety,
     diary,
     wish,
+    unbind: relation.unbindView(couple, ctx.openid),
   });
 }
 

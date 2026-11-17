@@ -226,6 +226,7 @@ test('查询预算：列表接口每页只多一次数据读（分页不 N+1）'
     ['safety.list', 'safety_checkins'],
     ['wish.list', 'wishes'],
     ['mood.list', 'moods'],
+    ['ledger.list', 'ledger_entries'],
   ];
   for (const [action, collection] of cases) {
     q.reset();

@@ -343,3 +343,134 @@ test('profile: 数据与隐私的 wxml 绑定与 bottom-sheet 注册真的存在
   const json = JSON.parse(fs.readFileSync(path.join(root, 'miniprogram', 'pages', 'profile', 'index.json'), 'utf8'));
   assert.strictEqual(json.usingComponents['bottom-sheet'], '/components/bottom-sheet/index', 'profile 页没有注册 bottom-sheet 组件');
 });
+
+/* M9 解绑（文档 8.3.6）：三态文案只认服务端 unbind.requestedByMe，三种操作各自二次确认。 */
+function unbindSetup(unbind) {
+  const calls = [];
+  const toasts = [];
+  const navs = [];
+  installWx({
+    showToast: (opts) => toasts.push(opts.title),
+    showModal: (opts) => {
+      if (unbindSetup.confirm !== false && opts.success) opts.success({ confirm: true, cancel: false });
+    },
+    reLaunch: (opts) => navs.push(opts.url),
+  });
+  api.call = async (action, payload) => {
+    calls.push({ action, payload });
+    if (action === 'home.get') {
+      return baseHome({ unbind: unbind.current });
+    }
+    if (action === 'couple.requestUnbind') {
+      unbind.current = { status: 'pending', requestedByMe: true, requestedAt: '2026-11-16T04:00:00.000Z' };
+      return { unbind: unbind.current };
+    }
+    if (action === 'couple.cancelUnbind') {
+      unbind.current = { status: 'none', requestedByMe: false, requestedAt: null };
+      return { unbind: unbind.current };
+    }
+    if (action === 'couple.confirmUnbind') {
+      unbind.current = { status: 'none', requestedByMe: false, requestedAt: null };
+      return { status: 'unbound' };
+    }
+    throw new Error('unexpected action: ' + action);
+  };
+  api.showError = () => {};
+  return { page: newPage(), calls, toasts, navs };
+}
+
+test('profile: 解绑三态文案来自服务端 unbind.requestedByMe', async () => {
+  const cases = [
+    [{ status: 'none', requestedByMe: false }, 'none', '解绑'],
+    [{ status: 'pending', requestedByMe: true }, 'pending_me', '等 TA 确认解绑（点击撤回）'],
+    [{ status: 'pending', requestedByMe: false }, 'pending_partner', 'TA 申请解绑（点击确认）'],
+  ];
+  for (const [unbind, status, text] of cases) {
+    const state = { current: unbind };
+    const { page } = unbindSetup(state);
+    try {
+      await page.load();
+      assert.strictEqual(page.data.unbindStatus, status, JSON.stringify(unbind));
+      assert.strictEqual(page.data.unbindText, text);
+    } finally {
+      restoreWx();
+    }
+  }
+});
+
+test('profile: 申请解绑先二次确认，成功进入等待态并刷新', async () => {
+  const state = { current: { status: 'none', requestedByMe: false, requestedAt: null } };
+  const { page, calls, toasts } = unbindSetup(state);
+  try {
+    await page.load();
+    page.onTapUnbind();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const request = calls.filter((call) => call.action === 'couple.requestUnbind');
+    assert.strictEqual(request.length, 1);
+    assert.strictEqual(page.data.unbindStatus, 'pending_me');
+    assert.strictEqual(toasts[toasts.length - 1], '已经申请啦，等 TA 确认');
+    assert.strictEqual(calls.filter((call) => call.action === 'home.get').length, 2, '写成功后要重拉 home.get');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('profile: 取消二次确认时不发请求', async () => {
+  const state = { current: { status: 'none', requestedByMe: false, requestedAt: null } };
+  unbindSetup.confirm = false;
+  const { page, calls } = unbindSetup(state);
+  try {
+    await page.load();
+    page.onTapUnbind();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.strictEqual(calls.filter((call) => call.action === 'couple.requestUnbind').length, 0);
+    assert.strictEqual(page.data.unbindStatus, 'none');
+  } finally {
+    unbindSetup.confirm = true;
+    restoreWx();
+  }
+});
+
+test('profile: 自己发起的解绑点一下是撤回', async () => {
+  const state = { current: { status: 'pending', requestedByMe: true, requestedAt: '2026-11-16T04:00:00.000Z' } };
+  const { page, calls, toasts } = unbindSetup(state);
+  try {
+    await page.load();
+    assert.strictEqual(page.data.unbindStatus, 'pending_me');
+    page.onTapUnbind();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.strictEqual(calls.filter((call) => call.action === 'couple.cancelUnbind').length, 1);
+    assert.strictEqual(page.data.unbindStatus, 'none');
+    assert.strictEqual(page.data.unbindText, '解绑');
+    assert.strictEqual(toasts[toasts.length - 1], '撤回啦');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('profile: 对方发起的解绑确认后提示并延迟回首页', async () => {
+  const state = { current: { status: 'pending', requestedByMe: false, requestedAt: '2026-11-16T04:00:00.000Z' } };
+  const { page, calls, toasts, navs } = unbindSetup(state);
+  try {
+    await page.load();
+    assert.strictEqual(page.data.unbindStatus, 'pending_partner');
+    page.onTapUnbind();
+    await new Promise((resolve) => setTimeout(resolve, 780));
+    assert.strictEqual(calls.filter((call) => call.action === 'couple.confirmUnbind').length, 1);
+    assert.strictEqual(toasts[0], '已经解绑了');
+    assert.deepStrictEqual(navs, ['/pages/home/index'], '解绑成功后要回首页');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('profile: 解绑 / 记账本入口的 wxml 接线存在，见面基金占位已下线', () => {
+  const root = path.join(__dirname, '..');
+  const wxml = fs.readFileSync(path.join(root, 'miniprogram', 'pages', 'profile', 'index.wxml'), 'utf8');
+  assert.ok(wxml.indexOf('bindtap="onTapUnbind"') >= 0, '解绑行没有绑定 onTapUnbind');
+  assert.ok(wxml.indexOf('wx:if="{{bound}}"') >= 0, '解绑行只在已绑定时出现');
+  assert.ok(wxml.indexOf('bindtap="onOpenLedger"') >= 0, '记账本入口没有绑定 onOpenLedger');
+  assert.ok(wxml.indexOf('{{unbindText}}') >= 0, '解绑行文案要走数据绑定');
+  assert.strictEqual(wxml.indexOf('见面基金'), -1, '见面基金已被个人记账本替代');
+  assert.strictEqual(wxml.indexOf('解绑（联系开发者）'), -1, '解绑已改为应用内双方确认');
+});

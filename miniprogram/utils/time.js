@@ -87,11 +87,45 @@ function formatAgo(iso, nowMs) {
   return formatMonthDay(day);
 }
 
+/** YYYY-MM-DD → YYYY-MM（记账本按月查，月份由日期推导，不允许两者不一致）；非法返回 '' */
+function monthOf(dateKey) {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])-\d{2}$/.exec(String(dateKey || ''));
+  return match ? match[1] + '-' + match[2] : '';
+}
+
+/** YYYY-MM 加减月份（跨年正确）；非法输入返回 '' */
+function shiftMonthKey(month, delta) {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month || ''));
+  if (!match) return '';
+  const total = Number(match[1]) * 12 + (Number(match[2]) - 1) + Number(delta || 0);
+  const year = Math.floor(total / 12);
+  const m = total % 12;
+  if (!(year >= 1970 && year <= 9999)) return '';
+  return year + '-' + pad2(m + 1);
+}
+
+/** YYYY-MM → 2026年11月 */
+function formatMonthCN(month) {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month || ''));
+  if (!match) return '';
+  return match[1] + '年' + Number(match[2]) + '月';
+}
+
 /** 东八区的今天（用于日期选择器默认值/上限） */
 function todayKey() {
   return dateKeyOf(new Date());
 }
 
 module.exports = {
-  dateKeyOf, formatTime, formatHM, shiftDateKey, formatDateCN, formatMonthDay, formatAgo, todayKey,
+  dateKeyOf,
+  formatTime,
+  formatHM,
+  shiftDateKey,
+  formatDateCN,
+  formatMonthDay,
+  formatAgo,
+  todayKey,
+  monthOf,
+  shiftMonthKey,
+  formatMonthCN,
 };

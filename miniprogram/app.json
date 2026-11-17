@@ -6,7 +6,8 @@
     "pages/safety/index",
     "pages/diary/index",
     "pages/wish/index",
-    "pages/mood/index"
+    "pages/mood/index",
+    "pages/ledger/index"
   ],
   "window": {
     "backgroundColor": "#FFFEF5",

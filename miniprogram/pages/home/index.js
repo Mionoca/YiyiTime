@@ -87,6 +87,9 @@ Page({
     bindTitle: UNBOUND_TEXT.title,
     bindSub: UNBOUND_TEXT.sub,
     bindActionText: UNBOUND_TEXT.action,
+    // 解绑提示条（M9 / 文档 9.2）：只有对方发起时才在首页提示，自己发起的看「我的」
+    unbindNotice: false,
+    unbindNoticeText: '',
   },
 
   onLoad() {
@@ -191,6 +194,12 @@ Page({
       wishSub: wishSubText(wish),
       safetySub: safetySubText(home.couple, safety, nowMs),
     };
+
+    // 解绑提示条：只有「对方发起」才提示（自己发起的去「我的」撤回，首页不重复打扰）。
+    // requestedByMe 必须是明确的 false 才算「对方发起」：字段缺失时宁可不提示，也不能吓用户一跳
+    const unbind = home.unbind || { status: 'none', requestedByMe: false };
+    patch.unbindNotice = !!(home.couple && unbind.status === 'pending' && unbind.requestedByMe === false);
+    patch.unbindNoticeText = patch.unbindNotice ? 'TA 申请了解绑，去「我的」看看' : '';
 
     const bindState = (home.bind && home.bind.state) || 'unbound';
     if (!home.couple) {
@@ -357,6 +366,11 @@ Page({
 
   onTapBind() {
     wx.navigateTo({ url: constants.ROUTES.bind });
+  },
+
+  /** 解绑提示条（文档 9.2）：「我的」是 tab 页，只能 switchTab */
+  onTapUnbindNotice() {
+    wx.switchTab({ url: constants.ROUTES.profile });
   },
 
   /** 点我的头像：打开心情打卡弹层 */

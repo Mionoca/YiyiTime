@@ -19,7 +19,7 @@ const { createHarness } = require('./helpers/cloud-entry');
 const DOC_PATH = path.join(__dirname, '..', 'docs', '技术设计文档.md');
 const COLLECTIONS = [
   'users', 'couples', 'bind_invites', 'moods',
-  'hugs', 'safety_checkins', 'diaries', 'wishes',
+  'hugs', 'safety_checkins', 'diaries', 'wishes', 'ledger_entries',
 ];
 
 function stripTicks(text) {
@@ -138,6 +138,7 @@ async function runHappyFlow(h) {
   const wishId = (wish.wish && wish.wish.wishId) || wish.wishId;
   await call(A, 'wish.update', { wishId, title: '去看海吧' });
   await call(A, 'wish.setDone', { wishId, done: true });
+  await call(A, 'ledger.add', { amount: 2350, category: 'food', note: '牛肉面' });
   return { A, B };
 }
 
@@ -234,6 +235,15 @@ test('数据模型：唯一键 / 日期格式 / 跨集合不变量', async () =>
   assert.strictEqual(wish.done, true);
   assert.strictEqual(wish.doneBy, A);
   assert.ok(isDate(wish.doneAt));
+  const ledgerDoc = one('ledger_entries');
+  assert.match(ledgerDoc._id, /^le_[0-9a-f]{16}$/);
+  assert.strictEqual(ledgerDoc.openid, A);
+  assert.strictEqual(ledgerDoc.coupleId, couple._id);
+  assert.strictEqual(ledgerDoc.amount, 2350);
+  assert.strictEqual(ledgerDoc.category, 'food');
+  assert.strictEqual(ledgerDoc.month, ledgerDoc.date.slice(0, 7));
+  assert.ok(Number.isInteger(ledgerDoc.amount) && ledgerDoc.amount > 0);
+  assert.ok(isDate(ledgerDoc.createdAt));
 });
 
 test('数据模型校验器本身能拦住未定义字段 / 缺必填 / 类型错 / 非法 null', () => {

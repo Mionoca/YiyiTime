@@ -77,6 +77,7 @@ function makeWx() {
       if (opts && opts.success) opts.success({ confirm: true, cancel: false });
     },
     navigateTo(opts) { navs.push(opts && opts.url); },
+    switchTab(opts) { navs.push(opts && opts.url); },
     reLaunch(opts) { navs.push(opts && opts.url); },
     setClipboardData(opts) { if (opts && opts.success) opts.success(); },
     showShareMenu() {},
@@ -561,4 +562,100 @@ test('抱抱：过期 pending 在首页被惰性置为 expired，双方都不出
 
   pageA.onUnload();
   pageB.onUnload();
+});
+
+test('记账本：A 记一笔后 B 切到 TA 的账本能看到，B 改不了别人的账', async () => {
+  setup();
+  await seedBound();
+  const todayKey = cloudTime.dateKeyOf(new Date());
+
+  currentOpenid = A;
+  const page = openPage('miniprogram/pages/ledger/index.js');
+  page.onLoad();
+  await waitFor(() => !page.data.loading, 'A 记账本加载');
+  assert.strictEqual(page.data.month, todayKey.slice(0, 7), '默认月份必须与服务端 todayKey 一致');
+  assert.strictEqual(page.data.maxDate, todayKey, '日期选择上限是服务端今天');
+
+  page.onOpenForm();
+  page.onAmountInput({ detail: { value: '23.5' } });
+  page.onPickCategory({ currentTarget: { dataset: { key: 'food' } } });
+  page.onNoteInput({ detail: { value: '牛肉面' } });
+  await page.onSaveEntry();
+  await waitFor(() => page.data.groups.length === 1, '记完一笔后列表出现记录');
+  assert.strictEqual(page.data.summaryText, '¥23.50');
+  assert.strictEqual(page.data.summaryCount, 1);
+  assert.strictEqual(page.data.groups[0].totalText, '¥23.50');
+  const entryId = page.data.groups[0].items[0].entryId;
+  assert.strictEqual(h.fake().get('ledger_entries', entryId).amount, 2350, '落库金额必须是整数分');
+
+  currentOpenid = B;
+  const pageB = openPage('miniprogram/pages/ledger/index.js');
+  pageB.onLoad();
+  await waitFor(() => !pageB.data.loading, 'B 记账本加载');
+  assert.deepStrictEqual(pageB.data.groups, [], 'B 自己的账本应为空');
+
+  pageB.onSwitchWho({ currentTarget: { dataset: { who: 'partner' } } });
+  await waitFor(() => pageB.data.groups.length === 1, 'B 切到 TA 的账本看到记录');
+  assert.strictEqual(pageB.data.groups[0].items[0].note, '牛肉面');
+  assert.strictEqual(pageB.data.groups[0].items[0].amountText, '¥23.50');
+  assert.strictEqual(pageB.data.summaryLabel, '小怡这个月花了', '看对方账本时用对方昵称');
+
+  pageB.onTapEntry({ currentTarget: { dataset: { id: entryId } } });
+  assert.strictEqual(pageB.data.formOpen, false, 'TA 的账不打开编辑表单');
+  assert.strictEqual(toasts[toasts.length - 1], 'TA 的账本只能看');
+
+  // 绕过页面直接调接口也会被服务端拒绝
+  currentOpenid = B;
+  const res = await h.callAs(B, 'ledger.update', { entryId, amount: 1 });
+  assert.strictEqual(res.ok, false);
+  assert.strictEqual(res.code, 'FORBIDDEN');
+  assert.strictEqual(h.fake().get('ledger_entries', entryId).amount, 2350);
+
+  page.onUnload();
+  pageB.onUnload();
+});
+
+test('解绑：A 在我的页申请，B 首页出现提示，B 确认后双方回到未绑定', async () => {
+  setup();
+  await seedBound();
+
+  currentOpenid = A;
+  const profileA = openPage('miniprogram/pages/profile/index.js');
+  profileA.onShow();
+  await waitFor(() => !profileA.data.loading, 'A 资料页加载');
+  assert.strictEqual(profileA.data.unbindStatus, 'none');
+  assert.strictEqual(profileA.data.unbindText, '解绑');
+
+  profileA.onTapUnbind(); // showModal 桩自动确认
+  await waitFor(() => profileA.data.unbindStatus === 'pending_me', 'A 发起解绑后进入等待');
+  assert.strictEqual(profileA.data.unbindText, '等 TA 确认解绑（点击撤回）');
+
+  const homeB = await openHome(B);
+  assert.strictEqual(homeB.data.unbindNotice, true, 'B 首页要出现解绑提示条');
+  assert.match(homeB.data.unbindNoticeText, /TA 申请了解绑/);
+  homeB.onTapUnbindNotice();
+  assert.strictEqual(navs[navs.length - 1], constants.ROUTES.profile, '提示条点了去「我的」');
+  homeB.onUnload();
+
+  currentOpenid = B;
+  const profileB = openPage('miniprogram/pages/profile/index.js');
+  profileB.onShow();
+  await waitFor(() => !profileB.data.loading, 'B 资料页加载');
+  assert.strictEqual(profileB.data.unbindStatus, 'pending_partner');
+  assert.strictEqual(profileB.data.unbindText, 'TA 申请解绑（点击确认）');
+
+  profileB.onTapUnbind();
+  await waitFor(() => navs.indexOf(constants.ROUTES.home) >= 0, '确认解绑后回首页', 3000);
+  assert.strictEqual(h.fake().get('users', A).coupleId, null);
+  assert.strictEqual(h.fake().get('users', B).coupleId, null);
+  assert.strictEqual(h.fake().all('couples')[0].status, 'closed');
+
+  // 回到首页是未绑定视图，且没有解绑提示残留
+  const homeA = await openHome(A);
+  assert.strictEqual(homeA.data.home.couple, null);
+  assert.strictEqual(homeA.data.unbindNotice, false);
+  homeA.onUnload();
+
+  profileA.onUnload();
+  profileB.onUnload();
 });

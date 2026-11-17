@@ -217,6 +217,12 @@
   color: var(--muted);
 }
 
+/* 待处理的解绑（文档 8.3.6）：用 --danger，在纸底上仍 ≥4.5:1 */
+.list-danger {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .list-version {
   color: var(--muted);
   font-size: var(--font-sm);
