@@ -1,10 +1,10 @@
 # 交接说明（WorkBuddy 接手用）
 
 > 更新时间：2026-11-17 15:20（Asia/Shanghai）
-> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：以 `git ls-remote origin hjj` 为准（最近一次代码提交 `d390555`，其后另有交接文档提交；接手时先 `git pull origin hjj`）
+> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：以 `git ls-remote origin hjj` 为准（最近一次代码提交 `a000369`；接手时先 `git pull origin hjj`）
 > 单测基线：535 pass / 0 fail / 0 skip；`release-check`：21 PASS + 5 TODO + 0 FAIL + 0 WARN；`check-secrets`：exit 0。
 
-## 一、当前状态（M7 已在本地提交；推送状态以 `git ls-remote origin hjj` 为准）
+## 一、当前状态（已全部推送）
 
 - 代码侧 M0–M6 与 F1–F8 全部实现（历史轮次与每轮验证记录见 `docs/开发进度.md` → 六、变更记录）。
 - 本轮交付 **M7 心情记录时间线**（P1 首个补齐功能）：新增只读 `mood.list`（按天倒序合并两人心情、以天为粒度分页、一次查询不 N+1、成员异常时不猜伴侣）+ 新页面 `pages/mood`（今天 / 昨天 / 月日、没说占位、空态、下拉刷新、翻页与底部重试、刷新与翻页并发用请求令牌互斥）+「我的」里的占位改成真入口；契约同步 7.2 / 7.6 / 8.2 / 8.3.6 / 8.3.7 / 16.3。
