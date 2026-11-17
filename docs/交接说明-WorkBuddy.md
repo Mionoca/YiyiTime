@@ -1,7 +1,7 @@
 # 交接说明（WorkBuddy 接手用）
 
 > 更新时间：2026-11-17 13:00（Asia/Shanghai）
-> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：`7d9c25c`（= `origin/hjj`，工作区干净）
+> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：`d390555`（= `origin/hjj`，工作区干净）
 > 单测基线：497 pass / 0 fail / 0 skip；`release-check`：21 PASS + 5 TODO + 0 FAIL + 0 WARN；`check-secrets`：exit 0。
 
 ## 一、当前状态（已全部推送）
@@ -9,7 +9,8 @@
 - 代码侧 M0–M6 与 F1–F8 全部实现，多轮加固已推送；本轮 `7d9c25c` 交付「首页静默刷新失败保留场景 + 底部浮层『小屋的门卡住了』/『再试一次』」（技术设计文档 9.12 / 10.3）。
 - 生产代码只改 `miniprogram/pages/home/index.js` / `index.wxml` / `index.wxss`，云函数无改动。
 - `tests/client-home.test.js` 23→26；文档同步 `README.md`、`docs/开发进度.md`、`docs/M6-真机验收与发布.md`。
-- 本轮验证记录：`node --test` 497 pass；`node --test tests/client-home.test.js` 26 pass；`node scripts/release-check.js` 21 PASS + 5 TODO + 0 FAIL + 1 WARN（仅因当时工作区未提交）；`node scripts/check-secrets.js` exit 0。
+- 复审（delta）：PASS（0 P0/P1；1 条 P2 已修于 `d390555`，1 条 P3 措辞不统一不影响语义）；验证记录：`node --test` 497 pass；`node --test tests/client-home.test.js` 26 pass；`node scripts/release-check.js` 21 PASS + 5 TODO + 0 FAIL + 1 WARN（仅因当时工作区未提交）；`node scripts/check-secrets.js` exit 0。
+- 补充：`d390555` 修掉 delta 复审发现的 P2（静态断言原先锚在骨架屏 `class="scene skeleton-scene"`，把浮层挪到真实场景之前仍会绿；已改用真实场景 `class="scene {{sceneEnter` 作锚点并补「锚点存在」断言，变异复验已拦红）。
 - 审查：功能代码独立审查 PASS（0 阻断）；文档一致性审查 FAIL（3 条 P2 + 6 条 P3）已按要求全部修复；加固变异 M9–M13（不清 `_retryingRefresh`、浮层挪到场景前、删 aria、删 88rpx 热区、删夜间降亮）全部拦红。
 
 ## 二、接手第一步
