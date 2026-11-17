@@ -1,7 +1,7 @@
 # 交接说明（WorkBuddy 接手用）
 
 > 更新时间：2026-11-17 13:00（Asia/Shanghai）
-> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：`d390555`（= `origin/hjj`，工作区干净）
+> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：以 `git ls-remote origin hjj` 为准（最近一次代码提交 `d390555`，其后另有交接文档提交；接手时先 `git pull origin hjj`）
 > 单测基线：497 pass / 0 fail / 0 skip；`release-check`：21 PASS + 5 TODO + 0 FAIL + 0 WARN；`check-secrets`：exit 0。
 
 ## 一、当前状态（已全部推送）
