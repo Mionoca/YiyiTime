@@ -1,0 +1,57 @@
+<view class="page">
+  <view class="intro">
+    <view class="intro__title">你们的心情</view>
+    <view class="intro__desc">每天的一点点天气，都收在这里</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="hint">正在翻开心情记录…</view>
+
+  <empty-state
+    wx:elif="{{error}}"
+    title="{{error}}"
+    action-text="再试一次"
+    bind:action="onRetry"
+  />
+
+  <block wx:else>
+    <view class="days" aria-role="list">
+      <view class="day" wx:for="{{days}}" wx:key="date" aria-role="listitem" aria-label="{{item.a11y}}">
+        <view class="day__head">
+          <text class="day__label">{{item.label}}</text>
+          <text class="day__date">{{item.dateText}}</text>
+        </view>
+        <view
+          class="mood {{row.mood ? '' : 'mood--empty'}}"
+          wx:for="{{item.rows}}"
+          wx:for-item="row"
+          wx:key="who"
+        >
+          <view class="mood__head">
+            <text class="mood__who">{{row.who}}</text>
+            <text class="mood__emoji">{{row.mood ? row.mood.emoji : '？'}}</text>
+            <text class="mood__label">{{row.mood ? row.mood.label : '没说'}}</text>
+            <text class="mood__time" wx:if="{{row.mood}}">{{row.mood.time}}</text>
+          </view>
+          <view class="mood__note" wx:if="{{row.mood && row.mood.note}}">{{row.mood.note}}</view>
+        </view>
+      </view>
+    </view>
+
+    <empty-state
+      wx:if="{{!days.length}}"
+      icon="🌤️"
+      title="还没有心情记录"
+      desc="回小屋点一下自己的头像，就能记下今天的心情"
+    />
+
+    <view wx:if="{{loadingMore}}" class="hint">正在翻页…</view>
+    <view
+      wx:elif="{{listError}}"
+      class="hint hint--error"
+      bindtap="onRetryList"
+      aria-role="button"
+      aria-label="重新加载心情记录"
+    >{{listError}}</view>
+    <view wx:elif="{{!hasMore && days.length > 1}}" class="hint hint--faint">没有更多啦</view>
+  </block>
+</view>

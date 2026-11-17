@@ -47,6 +47,7 @@ test('pull-down: 非自定义导航的子页都开启了 enablePullDownRefresh�
   assert.deepStrictEqual(subPages().slice().sort(), [
     'pages/bind/index',
     'pages/diary/index',
+    'pages/mood/index',
     'pages/profile/index',
     'pages/safety/index',
     'pages/wish/index',

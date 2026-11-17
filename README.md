@@ -27,7 +27,8 @@ YiyiTime/
 │  │  ├─ profile/                   # 我的（昵称头像、开始日期、隐私保护指引 / 数据与隐私说明）
 │  │  ├─ safety/                    # 报平安（我到家了 + 时间线）
 │  │  ├─ diary/                     # 台灯下的日记（当天上锁，次日解锁）
-│  │  └─ wish/                      # 下次见面想做的事
+│  │  ├─ wish/                      # 下次见面想做的事
+│  │  └─ mood/                      # 心情记录（两人按天倒序，只读时间线）
 │  ├─ components/                   # avatar-bubble / mood-picker / hug-banner / bottom-sheet /
 │  │                                # timeline-item / diary-card / wish-item / empty-state / privacy-guard
 │  ├─ utils/                        # api（唯一云函数入口）、constants、time、format、me、upload、haptics、privacy
@@ -59,7 +60,7 @@ YiyiTime/
 - 索引：
   - `bind_invites`：`creatorOpenid`+`status`、`applicantOpenid`+`status`、`expiresAt`
   - `couples`：`memberOpenids`（单字段）
-  - `moods`：`coupleId`+`date`
+  - `moods`：`coupleId`+`date`（心情记录按 `openid in [我, TA]` 过滤，两人数据量极小可先用这条；若真机翻页监控显示慢，再加 `coupleId`+`openid`+`date`）
   - `hugs`：`coupleId`+`toOpenid`+`status`+`createdAt`（倒序）、`coupleId`+`fromOpenid`+`createdAt`
   - `safety_checkins`：`coupleId`+`date`、`coupleId`+`createdAt`
   - `diaries`：`coupleId`+`date`
@@ -69,7 +70,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 497 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 535 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 
@@ -94,7 +95,7 @@ node scripts/release-check.js   # 页面/组件路径与注册（`usingComponent
 ## 开发约定
 
 - 前端只能通过 `miniprogram/utils/api.js` 调云函数，不允许直接 `wx.cloud.database()`。
-- action 用「域.动词」命名：`user.get`、`bind.create`、`home.get`、`mood.set`、`hug.send`、`safety.checkin`、`diary.save`、`wish.add`。
+- action 用「域.动词」命名：`user.get`、`bind.create`、`home.get`、`mood.set` / `mood.list`、`hug.send`、`safety.checkin`、`diary.save`、`wish.add`。
 - 所有时间规则（今天 / 第几天 / 纪念日 / 日记解锁）以云函数 `lib/time.js` 为准，客户端只做展示。
 - 不信任客户端传来的 `openid` / `coupleId`，一律从上下文取。
 - handler 只返回纯数据，不返回 `bindFailCount` / `lastActiveAt` 等内部字段。

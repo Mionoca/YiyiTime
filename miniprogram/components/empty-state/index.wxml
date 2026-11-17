@@ -6,6 +6,7 @@
     class="es__action"
     wx:if="{{actionText}}"
     bindtap="onAction"
+    aria-role="button"
     aria-label="{{actionText}}"
   >{{actionText}}</view>
 </view>

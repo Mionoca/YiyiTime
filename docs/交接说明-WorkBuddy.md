@@ -1,17 +1,16 @@
 # 交接说明（WorkBuddy 接手用）
 
-> 更新时间：2026-11-17 13:00（Asia/Shanghai）
+> 更新时间：2026-11-17 15:20（Asia/Shanghai）
 > 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：以 `git ls-remote origin hjj` 为准（最近一次代码提交 `d390555`，其后另有交接文档提交；接手时先 `git pull origin hjj`）
-> 单测基线：497 pass / 0 fail / 0 skip；`release-check`：21 PASS + 5 TODO + 0 FAIL + 0 WARN；`check-secrets`：exit 0。
+> 单测基线：535 pass / 0 fail / 0 skip；`release-check`：21 PASS + 5 TODO + 0 FAIL + 0 WARN；`check-secrets`：exit 0。
 
-## 一、当前状态（已全部推送）
+## 一、当前状态（M7 已在本地提交；推送状态以 `git ls-remote origin hjj` 为准）
 
-- 代码侧 M0–M6 与 F1–F8 全部实现，多轮加固已推送；本轮 `7d9c25c` 交付「首页静默刷新失败保留场景 + 底部浮层『小屋的门卡住了』/『再试一次』」（技术设计文档 9.12 / 10.3）。
-- 生产代码只改 `miniprogram/pages/home/index.js` / `index.wxml` / `index.wxss`，云函数无改动。
-- `tests/client-home.test.js` 23→26；文档同步 `README.md`、`docs/开发进度.md`、`docs/M6-真机验收与发布.md`。
-- 复审（delta）：PASS（0 P0/P1；1 条 P2 已修于 `d390555`，1 条 P3 措辞不统一不影响语义）；验证记录：`node --test` 497 pass；`node --test tests/client-home.test.js` 26 pass；`node scripts/release-check.js` 21 PASS + 5 TODO + 0 FAIL + 1 WARN（仅因当时工作区未提交）；`node scripts/check-secrets.js` exit 0。
-- 补充：`d390555` 修掉 delta 复审发现的 P2（静态断言原先锚在骨架屏 `class="scene skeleton-scene"`，把浮层挪到真实场景之前仍会绿；已改用真实场景 `class="scene {{sceneEnter` 作锚点并补「锚点存在」断言，变异复验已拦红）。
-- 审查：功能代码独立审查 PASS（0 阻断）；文档一致性审查 FAIL（3 条 P2 + 6 条 P3）已按要求全部修复；加固变异 M9–M13（不清 `_retryingRefresh`、浮层挪到场景前、删 aria、删 88rpx 热区、删夜间降亮）全部拦红。
+- 代码侧 M0–M6 与 F1–F8 全部实现（历史轮次与每轮验证记录见 `docs/开发进度.md` → 六、变更记录）。
+- 本轮交付 **M7 心情记录时间线**（P1 首个补齐功能）：新增只读 `mood.list`（按天倒序合并两人心情、以天为粒度分页、一次查询不 N+1、成员异常时不猜伴侣）+ 新页面 `pages/mood`（今天 / 昨天 / 月日、没说占位、空态、下拉刷新、翻页与底部重试、刷新与翻页并发用请求令牌互斥）+「我的」里的占位改成真入口；契约同步 7.2 / 7.6 / 8.2 / 8.3.6 / 8.3.7 / 16.3。
+- 改动范围：云函数 `handlers/mood.js` / `handlers/index.js`；小程序端新增 `pages/mood/*`，改 `pages/profile/*`、`utils/constants.js`、`utils/time.js`、`app.json`、`components/empty-state/*`（按钮 88rpx + aria-role）；其余为测试与文档。
+- 验证记录：`node --test` **535 pass / 0 fail**；`mood-list` 18、`client-mood` 19、`e2e-page` 10；`release-check` 21 PASS + 5 TODO + 0 FAIL（工作区未提交时多 1 条 WARN）；`check-secrets` exit 0。
+- 独立只读审查：0 P0；1 条 P1 + 4 条 P2 + 17 条 P3。已修 P1（手工换绑残留 3 人时旧伴侣被当成 TA、分页提前结束 → 查询限定 `openid in [我, 伴侣]`，成员数 ≠ 2 时不猜伴侣）、P2-1（请求令牌 + `loadMore` 与刷新互斥 + 卸载守卫）、P2-2（8.3.7 的 `days` 结构改成实际的 `rows`）、P2-4（补 onShow / 连点 / 空列表静默失败 / 卸载 / 页面↔真实 handler 链路共 6+5 个用例）、P2-3（本节重写），以及低成本 P3：`shiftDateKey` 日历合法性、列表语义 role、空态按钮热区、`beforeDate` 夹取、`note` 类型归一、对比度注释、部署顺序。未做的 P3 已记入 `docs/开发进度.md` 偏差表（成员只有 1 人时页面仍渲染 TA 一行「没说」属同一类脏数据边界）。
 
 ## 二、接手第一步
 
@@ -33,14 +32,14 @@ node scripts/check-secrets.js
 4. 微信开发者工具上传体验版，并把对方微信号加为体验成员。
 5. 发布前在控制台导出一次数据库备份。
 
-注意：本轮只改小程序端，云函数不用重部署、小程序端需重新上传。
+注意：M7 同时改了云函数（`handlers/mood.js` / `handlers/index.js`）与小程序端（新页面、profile、constants、app.json、utils/time），**先「上传并部署：云端安装依赖」`cloudfunctions/api`，再上传小程序端**；顺序反了旧云函数没有 `mood.list`，心情页会报「这个操作还不存在」。
 
 ## 四、尚未完成的代码侧事项（按优先级）
 
-1. **等用户真机验收反馈**：F1–F8 + 14.4 的 A/B 14 步 + `docs/M6-真机验收与发布.md` 第 2–4 节；重点核对本轮新增的断网浮层项、夜间观感、读屏 aria。收到问题按 P0/P1 修。
+1. **等用户真机验收反馈**：F1–F8 + 14.4 的 A/B 14 步 + `docs/M6-真机验收与发布.md` 第 2–4 节；重点核对心情记录页（今天 / 昨天文案、没说占位、翻页 / 下拉、读屏 role）、断网浮层项、夜间观感。收到问题按 P0/P1 修。
 2. 若继续做自动化加固（非阻塞）：`home-layout.test.js` 未建模 `refresh-bar`（in-flow 卡片，失败态场景高度缩约 98rpx，四档模拟仍满足 9.9）；`release-check` 客户端云访问边界只覆盖点号 / 括号普通字符串键直接写法（可选链、别名、模板键只 WARN）；日志脱敏静态检查对 `*Tail` 键 + 裸变量不设防。
-3. P1 明确不在当前范围：订阅消息提醒、见面基金、应用内解绑（MVP 由控制台手工）、内容安全审核 —— 见技术设计文档 :63 / :202 / :122。
-4. 已实现功能的边界说明、已知偏差（52 条）与手动项都记在 `docs/开发进度.md`，改功能时同步更新。
+3. 仍是 P1 的功能：订阅消息提醒（需模板与授权）、见面基金（需新建 `fund_goals` / `fund_entries`）、应用内解绑（MVP 由控制台手工）、内容安全审核（公开传播前必须接 `msgSecCheck`）—— 见技术设计文档 :63 / :202 / :122；心情记录已在本轮补齐，不再是占位。
+4. 已实现功能的边界说明、已知偏差（55 条）与手动项都记在 `docs/开发进度.md`，改功能时同步更新。
 
 ## 五、工作流约定（沿用）
 

@@ -337,7 +337,18 @@ test('F4 心情打卡：四态 / 每天一条（重复是更新）/ 备注 50 �
   assert.strictEqual(homeA.mood.mine.mood, 'rainy');
   assert.strictEqual(homeA.mood.partner.mood, 'cloudy');
 
-  // 跨天：昨天的心情不算今天（历史不展示，P1 才做心情日历）
+  // 心情记录（文档 7.6 mood.list / 14.9 F4）：当天两人合并成一条，备注双方可见
+  const history = await callAs(A, 'mood.list', {});
+  assert.strictEqual(history.todayKey, todayKey);
+  assert.strictEqual(history.days.length, 1);
+  assert.strictEqual(history.days[0].date, todayKey);
+  assert.strictEqual(history.days[0].mine.mood, 'rainy');
+  assert.strictEqual(history.days[0].mine.note, '今天有点累');
+  assert.strictEqual(history.days[0].partner.mood, 'cloudy');
+  assert.strictEqual(history.days[0].partner.note, note50);
+  assert.strictEqual(history.nextBeforeDate, null);
+
+  // 跨天：昨天的心情不算今天（首页只给今天），但心情记录里能看到历史
   const yesterday = time.addDays(todayKey, -1);
   const dayAgo = new Date(Date.now() - 24 * 3600 * 1000);
   // 两个人昨天都打过卡，今天仍然都是 null：证明跨天时不会把昨天的数据当今天（审查 P3-3）
@@ -368,6 +379,15 @@ test('F4 心情打卡：四态 / 每天一条（重复是更新）/ 备注 50 �
   const homeCross = await callAs(A, 'home.get', {});
   assert.strictEqual(homeCross.mood.mine, null, '昨天的心情不能显示成今天');
   assert.strictEqual(homeCross.mood.partner, null);
+
+  // 首页跨天不带旧数据，但心情记录按天保留：这里用种库模拟「昨天写过、今天没写」，
+  // 只证明列表不只返回今天；「今天记录次日变历史」由 _id=openid_date 与按 date 查询保证
+  const crossHistory = await callAs(A, 'mood.list', {});
+  assert.strictEqual(crossHistory.days.length, 1);
+  assert.strictEqual(crossHistory.days[0].date, yesterday);
+  assert.strictEqual(crossHistory.days[0].mine.note, '昨天的');
+  assert.strictEqual(crossHistory.days[0].partner.note, 'TA 昨天的');
+  assert.strictEqual(crossHistory.nextBeforeDate, null);
 });
 
 // ---------------------------------------------------------------- F5 抱抱

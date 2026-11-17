@@ -66,8 +66,9 @@
       <view class="list-item list-item--disabled">
         <text>每日提醒（即将上线）</text>
       </view>
-      <view class="list-item list-item--disabled">
-        <text>心情记录（即将上线）</text>
+      <view class="list-item" bindtap="onOpenMood" aria-role="button" aria-label="心情记录">
+        <text>心情记录</text>
+        <text class="list-arrow">›</text>
       </view>
       <view class="list-item list-item--disabled">
         <text>见面基金（即将上线）</text>

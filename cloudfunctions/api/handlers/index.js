@@ -21,6 +21,7 @@ module.exports = {
   'bind.status': require('./bind').status,
   'couple.updateStartDate': require('./couple').updateStartDate,
   'mood.set': require('./mood').set,
+  'mood.list': require('./mood').list,
   'hug.send': require('./hug').send,
   'hug.respond': require('./hug').respond,
   'safety.checkin': require('./safety').checkin,

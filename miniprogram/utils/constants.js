@@ -13,6 +13,7 @@ const ROUTES = {
   safety: '/pages/safety/index',
   diary: '/pages/diary/index',
   wish: '/pages/wish/index',
+  mood: '/pages/mood/index',
 };
 
 const LIMITS = {

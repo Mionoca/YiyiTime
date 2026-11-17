@@ -197,7 +197,7 @@ test('8.8 列表头像（timeline-item）开启 lazy-load', () => {
 test('8.9 首页 disableScroll 一屏，其余页面可下拉刷新且不禁滚动', () => {
   const app = JSON.parse(read(path.join(ROOT, 'app.json')));
   const pages = app.pages.map((p) => p.replace(/^pages\//, '').replace(/\/index$/, ''));
-  assert.deepStrictEqual(pages.slice().sort(), ['bind', 'diary', 'home', 'profile', 'safety', 'wish'], '页面集合变了，请同步本测试与发布文档');
+  assert.deepStrictEqual(pages.slice().sort(), ['bind', 'diary', 'home', 'mood', 'profile', 'safety', 'wish'], '页面集合变了，请同步本测试与发布文档');
   const home = JSON.parse(read(path.join(ROOT, 'pages', 'home', 'index.json')));
   assert.strictEqual(home.disableScroll, true, '首页必须 disableScroll（8.9 / 13.8）');
   assert.strictEqual(home.navigationStyle, 'custom');

@@ -39,6 +39,7 @@ const UNBOUND_SAFE = {
 const BOUND_REQUIRED = [
   'couple.updateStartDate',
   'mood.set',
+  'mood.list',
   'hug.send',
   'hug.respond',
   'safety.checkin',
@@ -117,7 +118,7 @@ function requireBoundIndex(src) {
 
 test('双人 handler 必须调用 ctx.requireBound()（文档 11.9）', () => {
   const registered = Object.keys(handlers).sort();
-  assert.strictEqual(registered.length, 23, '登记的 action 数量变了，请同步分类');
+  assert.strictEqual(registered.length, 24, '登记的 action 数量变了，请同步分类');
   const classified = registered.filter((action) => !Object.prototype.hasOwnProperty.call(UNBOUND_SAFE, action));
   assert.deepStrictEqual(classified, BOUND_REQUIRED.slice().sort(),
     '新增/删除 action 后必须更新 UNBOUND_SAFE 或 BOUND_REQUIRED；新双人 handler 若确实允许未绑定，'

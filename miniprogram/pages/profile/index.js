@@ -241,6 +241,15 @@ Page({
     wx.navigateTo({ url: constants.ROUTES.bind });
   },
 
+  /** 心情记录（文档 8.3.7）：只读时间线，未绑定时入口不可用 */
+  onOpenMood() {
+    if (!this.data.bound) {
+      this.toast('先邀请 TA 住进来吧');
+      return;
+    }
+    wx.navigateTo({ url: constants.ROUTES.mood });
+  },
+
   /** 隐私保护指引（文档 13.8：隐私弹窗与授权口径要能被用户随时查到） */
   onOpenPrivacy() {
     if (typeof wx.openPrivacyContract === 'function') {

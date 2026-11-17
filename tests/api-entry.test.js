@@ -5,7 +5,7 @@
  *
  * 用 tests/helpers/cloud-entry.js 的夹具把 wx-server-sdk 换成本地假库，
  * 覆盖：未知 action / 未识别用户 / 成功信封 / payload 归一化 / 业务错误原样返回 /
- * 内部异常不泄露 / 日志脱敏 / 23 个已注册 action 在「空库 + 未绑定」下都不崩溃。
+ * 内部异常不泄露 / 日志脱敏 / 24 个已注册 action 在「空库 + 未绑定」下都不崩溃。
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -19,7 +19,7 @@ const EXPECTED_ACTIONS = [
   'system.ping', 'user.get', 'user.updateProfile',
   'bind.create', 'bind.preview', 'bind.apply', 'bind.confirm', 'bind.cancel', 'bind.status',
   'couple.updateStartDate',
-  'mood.set', 'hug.send', 'hug.respond',
+  'mood.set', 'mood.list', 'hug.send', 'hug.respond',
   'safety.checkin', 'safety.list',
   'diary.save', 'diary.list',
   'wish.add', 'wish.update', 'wish.setDone', 'wish.remove', 'wish.list',
@@ -184,7 +184,7 @@ test('SDK 风格 errCode 写入服务端日志 code，但客户端仍是固定 I
   assert.strictEqual(logged.openidTail, '123456');
 });
 
-test('23 个已注册 action 与清单一致，且空库未绑定下都返回可识别结果（无 INTERNAL_ERROR）', async (t) => {
+test('24 个已注册 action 与清单一致，且空库未绑定下都返回可识别结果（无 INTERNAL_ERROR）', async (t) => {
   reset('oA');
   const logs = captureConsoleError(t);
   assert.deepStrictEqual(Object.keys(handlers).sort(), EXPECTED_ACTIONS.slice().sort());

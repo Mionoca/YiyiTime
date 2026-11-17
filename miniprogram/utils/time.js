@@ -30,6 +30,32 @@ function formatTime(iso, todayKey) {
   return pad2(s.getUTCMonth() + 1) + '-' + pad2(s.getUTCDate()) + ' ' + hm;
 }
 
+/** ISO 时间 → HH:mm（东八区）；日期已经单独展示时用，避免重复 */
+function formatHM(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const s = shifted(d);
+  return pad2(s.getUTCHours()) + ':' + pad2(s.getUTCMinutes());
+}
+
+/** YYYY-MM-DD 加减天数（只用于「昨天」这类相对日期展示，业务日期仍以服务端为准） */
+function shiftDateKey(dateKey, delta) {
+  const parts = String(dateKey || '').split('-');
+  if (parts.length !== 3) return '';
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  // 先做日历合法性校验：2026-02-30 / 2026-13-01 这类输入不能被 Date 静默归一化
+  if (!(y >= 1970 && y <= 9999) || !(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return '';
+  const base = Date.UTC(y, m - 1, d);
+  const probe = new Date(base);
+  if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) return '';
+  const shiftedDay = new Date(base + Number(delta) * 86400000);
+  if (isNaN(shiftedDay.getTime())) return '';
+  return shiftedDay.getUTCFullYear() + '-' + pad2(shiftedDay.getUTCMonth() + 1) + '-' + pad2(shiftedDay.getUTCDate());
+}
+
 /** YYYY-MM-DD → 2026年11月15日 */
 function formatDateCN(dateKey) {
   if (!dateKey) return '';
@@ -66,4 +92,6 @@ function todayKey() {
   return dateKeyOf(new Date());
 }
 
-module.exports = { dateKeyOf, formatTime, formatDateCN, formatMonthDay, formatAgo, todayKey };
+module.exports = {
+  dateKeyOf, formatTime, formatHM, shiftDateKey, formatDateCN, formatMonthDay, formatAgo, todayKey,
+};

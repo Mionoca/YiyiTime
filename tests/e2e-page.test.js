@@ -33,6 +33,7 @@ const BIND = 'miniprogram/pages/bind/index.js';
 const SAFETY = 'miniprogram/pages/safety/index.js';
 const DIARY = 'miniprogram/pages/diary/index.js';
 const WISH = 'miniprogram/pages/wish/index.js';
+const MOOD = 'miniprogram/pages/mood/index.js';
 
 let currentOpenid = A;
 let toasts = [];
@@ -274,6 +275,29 @@ test('心情：A 在首页打卡后，B 的首页看到对方心情', async () =
 
   pageA.onUnload();
   pageB.onUnload();
+});
+
+test('心情记录：A/B 各自打卡后，心情页按天合并双方（页面 ↔ 真实 handler 字段对齐）', async () => {
+  setup();
+  await seedBound();
+  const todayKey = (await ok(A, 'home.get')).todayKey;
+  await ok(A, 'mood.set', { mood: 'rainy', note: '今天有点累' });
+  await ok(B, 'mood.set', { mood: 'sunny', note: '想你了' });
+
+  currentOpenid = B;
+  const page = openPage(MOOD);
+  page.onLoad();
+  await waitFor(() => !page.data.loading, '心情记录加载完成');
+  assert.strictEqual(page.data.todayKey, todayKey, '日期标签要用服务端 todayKey');
+  assert.strictEqual(page.data.days.length, 1, '同一天两人合并成一张卡');
+  const day = page.data.days[0];
+  assert.strictEqual(day.label, '今天');
+  assert.deepStrictEqual(day.rows.map((row) => row.who), ['我', 'TA']);
+  assert.strictEqual(day.rows[0].mood.label, '晴');
+  assert.strictEqual(day.rows[0].mood.note, '想你了');
+  assert.strictEqual(day.rows[1].mood.label, '雨');
+  assert.strictEqual(day.rows[1].mood.note, '今天有点累');
+  assert.strictEqual(page.data.hasMore, false);
 });
 
 test('抱抱：A 发抱抱、B 首页回应、A 再回首页看到已抱', async () => {

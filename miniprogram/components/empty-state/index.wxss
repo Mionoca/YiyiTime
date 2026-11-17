@@ -26,7 +26,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 80rpx;
+  /* 8.9：可点区域 ≥88rpx */
+  height: 88rpx;
   margin-top: 40rpx;
   padding: 0 56rpx;
   border-radius: 999rpx;
