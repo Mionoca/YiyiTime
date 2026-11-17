@@ -165,6 +165,12 @@
 
   </view>
 
+  <!-- 静默刷新失败：保留上次场景，底部浮层提示 + 再试一次（文档 9.12 / 10.3） -->
+  <view class="refresh-bar" wx:if="{{home && refreshError}}" aria-role="alert" aria-label="{{refreshError}}">
+    <text class="refresh-bar-text">{{refreshError}}</text>
+    <view class="refresh-bar-btn" bindtap="onRetryRefresh" aria-role="button" aria-label="重试加载首页">再试一次</view>
+  </view>
+
   <!-- 底部动作 -->
   <view class="action-bar" wx:if="{{home}}">
     <block wx:if="{{home.bind.state === 'unbound'}}">

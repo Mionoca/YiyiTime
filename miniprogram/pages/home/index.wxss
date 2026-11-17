@@ -893,6 +893,58 @@
   width: 320rpx;
 }
 
+/* ---------- 静默刷新失败：底部浮层（文档 9.12 / 10.3） ---------- */
+/* 放在场景与底部动作之间的 flow 行，天然避开安全区与底部按钮，不遮挡热区 */
+.refresh-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin: 0 32rpx 12rpx;
+  /* 按钮本身要 88rpx 热区，外层只留 8rpx 上下内边距，避免场景被压太多 */
+  padding: 8rpx 16rpx 8rpx 24rpx;
+  background-color: var(--card);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8rpx 24rpx rgba(63, 58, 54, 0.12);
+}
+
+.refresh-bar-text {
+  flex: 1;
+  font-size: var(--font-sm);
+  /* 文档 8.9：提示文字 ≥4.5:1（--ink #3F3A36 在 --card #FFFDF9 上按 WCAG 约 11.05:1） */
+  color: var(--ink);
+}
+
+.refresh-bar-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 文档 8.9：可点热区 ≥88rpx；这是失败态唯一的恢复入口 */
+  min-height: 88rpx;
+  margin-left: 16rpx;
+  padding: 0 32rpx;
+  border: 2rpx solid var(--accent-strong);
+  border-radius: 999rpx;
+  font-size: var(--font-sm);
+  font-weight: 500;
+  /* 描边按钮文字用 --accent-ink（--accent 在浅底对比度不足，文档 8.9） */
+  color: var(--accent-ink);
+}
+
+/* 文档 9.6：夜间整体降亮，导航与底部动作区一起变暗；浮层跟着降亮，暖白文字保证对比度 */
+.phase-night .refresh-bar {
+  background-color: #2C3048;
+}
+
+.phase-night .refresh-bar-text {
+  color: #EDE2D1;
+}
+
+.phase-night .refresh-bar-btn {
+  border-color: #D5C7B2;
+  color: #F3E9DA;
+}
+
 /* ---------- 底部动作 ---------- */
 .action-bar {
   flex-shrink: 0;

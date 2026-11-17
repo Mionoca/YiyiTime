@@ -20,6 +20,8 @@ Page({
   data: {
     loading: true,
     error: '',
+    // 文档 9.12：静默刷新失败保留上次场景，底部浮层「小屋的门卡住了」+「再试一次」
+    refreshError: '',
     home: null,
     statusBarHeight: 20,
     phase: 'day',
@@ -114,7 +116,7 @@ Page({
    */
   load(silent, force) {
     if (this.loadingPromise && !force) return this.loadingPromise;
-    if (!silent) this.setData({ loading: true, error: '' });
+    if (!silent) this.setData({ loading: true, error: '', refreshError: '' });
 
     const seq = (this._loadSeq = (this._loadSeq || 0) + 1);
     const promise = api.call('home.get')
@@ -122,7 +124,7 @@ Page({
         if (seq !== this._loadSeq) return;
         this.loadingPromise = null;
         const firstHome = !this.data.home;
-        this.setData(Object.assign({ loading: false, error: '', home }, this.derive(home)));
+        this.setData(Object.assign({ loading: false, error: '', refreshError: '', home }, this.derive(home)));
         if (firstHome) this.playSceneEnter();
         this.maybeCelebrate(home);
       })
@@ -131,7 +133,9 @@ Page({
         if (seq !== this._loadSeq) return;
         this.loadingPromise = null;
         if (silent && this.data.home) {
-          // 文档 10.3：静默刷新失败保留旧数据，toast 不打断
+          // 文档 10.3：静默刷新失败保留旧数据，toast 不打断；
+          // 文档 9.12：底部浮层「小屋的门卡住了」+「再试一次」，给一个持久的恢复入口
+          this.setData({ refreshError: '小屋的门卡住了' });
           this.toast((err && err.message) || '刷新失败，稍后再试');
           return;
         }
@@ -334,6 +338,18 @@ Page({
 
   onRetry() {
     this.load(false, true);
+  },
+
+  /** 底部浮层「再试一次」（文档 9.12）：保留当前场景静默重拉；连点复用同一请求 */
+  onRetryRefresh() {
+    if (this._retryingRefresh) return this._retryingRefresh;
+    const run = this.load(true, true);
+    this._retryingRefresh = run;
+    const clear = () => {
+      this._retryingRefresh = null;
+    };
+    run.then(clear, clear);
+    return run;
   },
 
   onTapBind() {

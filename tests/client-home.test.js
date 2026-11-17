@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const test = require('node:test');
 const assert = require('node:assert');
 
@@ -104,7 +105,7 @@ test('home: 首屏加载成功后落数据并清 loading；失败进错误态，
   }
 });
 
-test('home: 已有数据时静默刷新失败保留旧数据只 toast', async () => {
+test('home: 已有数据时静默刷新失败保留旧数据，toast 与底部浮层同时在', async () => {
   let fail = false;
   const { page, toasts } = setup({
     'home.get': () => {
@@ -116,13 +117,108 @@ test('home: 已有数据时静默刷新失败保留旧数据只 toast', async ()
     await page.load();
     fail = true;
     await page.load(true);
-    assert.ok(page.data.home);
-    assert.strictEqual(page.data.error, '');
-    assert.ok(toasts.some((t) => t.title === '刷新挂了'));
+    assert.ok(page.data.home, '失败也要保留上次场景');
+    assert.strictEqual(page.data.error, '', '不能进整页错误态');
+    // 文档 9.12：底部浮层「小屋的门卡住了」+「再试一次」
+    assert.strictEqual(page.data.refreshError, '小屋的门卡住了');
+    assert.ok(toasts.some((t) => t.title === '刷新挂了'), '原有的 toast 不打断仍保留');
   } finally {
     teardown(page);
     restoreWx();
   }
+});
+
+test('home: 点底部浮层「再试一次」成功后清提示并更新场景，连点复用同一请求', async () => {
+  let mode = 'ok';
+  let pending = null;
+  const updated = baseHome({ couple: Object.assign({}, baseHome().couple, { daysTogether: 912 }) });
+  const { page } = setup({
+    'home.get': () => {
+      if (mode === 'fail') throw new Error('刷新挂了');
+      if (mode === 'pending') {
+        return new Promise((resolve) => {
+          pending = { resolve };
+        });
+      }
+      return mode === 'updated' ? updated : baseHome();
+    },
+  });
+  try {
+    await page.load();
+    mode = 'fail';
+    await page.load(true);
+    assert.strictEqual(page.data.refreshError, '小屋的门卡住了');
+
+    mode = 'pending';
+    const first = page.onRetryRefresh();
+    const second = page.onRetryRefresh();
+    assert.strictEqual(first, second, '连点必须复用同一在途请求');
+    assert.ok(pending, '重试应真的发出 home.get');
+
+    mode = 'updated';
+    pending.resolve(updated);
+    await first;
+    // 竞态检查：等微任务都落完，确认没有第二个请求把状态覆盖回去
+    await new Promise((r) => setTimeout(r, 10));
+    assert.strictEqual(page.data.refreshError, '');
+    assert.strictEqual(page.data.error, '');
+    assert.strictEqual(page.data.home.couple.daysTogether, 912, '重试成功后场景要更新');
+  } finally {
+    teardown(page);
+    restoreWx();
+  }
+});
+
+test('home: 再试一次仍失败保留浮层提示，不整页报错也不丢场景，且能反复重试', async () => {
+  let fail = false;
+  let gets = 0;
+  const { page, toasts } = setup({
+    'home.get': () => {
+      gets += 1;
+      if (fail) throw new Error('还是失败');
+      return baseHome();
+    },
+  });
+  try {
+    await page.load();
+    fail = true;
+    await page.load(true);
+    const before = toasts.length;
+    await page.onRetryRefresh();
+    assert.strictEqual(gets, 3, '重试要重新请求，不能只复用失败结果');
+    assert.strictEqual(page.data.refreshError, '小屋的门卡住了');
+    assert.strictEqual(page.data.error, '');
+    assert.ok(page.data.home);
+    assert.strictEqual(page.data.loading, false, '静默重试不整页 loading');
+    assert.ok(toasts.length > before, '重试失败仍然 toast');
+    // 失败一次后 _retryingRefresh 必须已清空，否则浮层会永久点不动
+    await page.onRetryRefresh();
+    assert.strictEqual(gets, 4, '连续失败后仍然要能再发一次请求');
+    assert.strictEqual(page.data.refreshError, '小屋的门卡住了');
+  } finally {
+    teardown(page);
+    restoreWx();
+  }
+});
+
+test('home: 底部浮层在模板里接上 onRetryRefresh，位于场景之后、底部动作之前', () => {
+  const path = require('node:path');
+  const wxml = fs.readFileSync(path.join(__dirname, '..', 'miniprogram/pages/home/index.wxml'), 'utf8');
+  const wxss = fs.readFileSync(path.join(__dirname, '..', 'miniprogram/pages/home/index.wxss'), 'utf8');
+  assert.ok(wxml.includes('wx:if="{{home && refreshError}}"'), '浮层要按 home && refreshError 条件渲染');
+  assert.ok(wxml.includes('bindtap="onRetryRefresh"'), '浮层按钮必须接上重试方法');
+  assert.ok(wxml.includes('aria-role="button"'), '浮层按钮要声明无障碍角色');
+  assert.ok(wxml.includes('aria-label="重试加载首页"'), '浮层按钮要有区分于可见文字的 aria-label');
+  assert.ok(!wxml.includes('小屋的门卡住了'), '文案只放在 data.refreshError，模板不再硬编码一份');
+  const sceneAt = wxml.indexOf('class="scene');
+  const barAt = wxml.indexOf('refresh-bar');
+  const actionAt = wxml.indexOf('<!-- 底部动作 -->');
+  assert.ok(barAt > 0, '模板里应有 refresh-bar');
+  assert.ok(sceneAt > 0 && sceneAt < barAt, '浮层要排在场景之后');
+  assert.ok(actionAt > 0 && barAt < actionAt, '浮层要插在场景之后、底部动作之前，避免遮挡热区');
+  const btnRule = wxss.slice(wxss.indexOf('.refresh-bar-btn {'), wxss.indexOf('}', wxss.indexOf('.refresh-bar-btn {')));
+  assert.ok(btnRule.includes('min-height: 88rpx'), '失败态唯一恢复入口要满足 88rpx 热区（文档 8.9）');
+  assert.ok(wxss.includes('.phase-night .refresh-bar'), '夜间浮层要跟着整体降亮（文档 9.6）');
 });
 
 test('home: 心情打卡成功后先更新气泡、关弹层、提示并静默刷新', async () => {
