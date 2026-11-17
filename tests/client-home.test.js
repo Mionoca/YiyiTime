@@ -315,7 +315,7 @@ test('home: 未绑定时点对方头像与四个入口只提示，不跳转', as
   }
 });
 
-test('home: 四个入口按 tab / 非 tab 分别用 switchTab 与 navigateTo（文档 8.2）', async () => {
+test('home: 四个入口都走 navigateTo（它们都是普通页，文档 8.2）', async () => {
   const { page, navs } = setup({ 'home.get': () => baseHome() });
   try {
     await page.load();
@@ -324,11 +324,17 @@ test('home: 四个入口按 tab / 非 tab 分别用 switchTab 与 navigateTo（�
     page.onTapMoodHistory();
     page.onTapSafety();
     assert.deepStrictEqual(navs, [
-      { kind: 'switchTab', url: constants.ROUTES.diary },
-      { kind: 'switchTab', url: constants.ROUTES.wish },
-      { kind: 'switchTab', url: constants.ROUTES.mood },
+      { kind: 'navigateTo', url: constants.ROUTES.diary },
+      { kind: 'navigateTo', url: constants.ROUTES.wish },
+      { kind: 'navigateTo', url: constants.ROUTES.mood },
       { kind: 'navigateTo', url: constants.ROUTES.safety },
     ]);
+    // 只有 2 个 tab，跳这四个入口时不该出现 switchTab
+    assert.strictEqual(
+      navs.some((n) => n.kind === 'switchTab'),
+      false,
+      '日记/愿望/心情都不是 tab 页，用 switchTab 会 fail'
+    );
   } finally {
     teardown(page);
     restoreWx();

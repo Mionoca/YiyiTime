@@ -1,9 +1,9 @@
 {
   "navigationBarTitleText": "台灯下的日记",
-  "navigationBarBackgroundColor": "#FBF6EE",
+  "navigationBarBackgroundColor": "#FFFEF5",
   "navigationBarTextStyle": "black",
   "enablePullDownRefresh": true,
-  "backgroundColor": "#FBF6EE",
+  "backgroundColor": "#FFFEF5",
   "usingComponents": {
     "diary-card": "/components/diary-card/index",
     "empty-state": "/components/empty-state/index"

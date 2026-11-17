@@ -1,9 +1,9 @@
 {
   "navigationBarTitleText": "下次见面想做的事",
-  "navigationBarBackgroundColor": "#FBF6EE",
+  "navigationBarBackgroundColor": "#FFFEF5",
   "navigationBarTextStyle": "black",
   "enablePullDownRefresh": true,
-  "backgroundColor": "#FBF6EE",
+  "backgroundColor": "#FFFEF5",
   "usingComponents": {
     "wish-item": "/components/wish-item/index",
     "bottom-sheet": "/components/bottom-sheet/index",

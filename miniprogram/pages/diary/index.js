@@ -2,7 +2,6 @@
 
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
-const tabbar = require('../../utils/tabbar');
 const timeUtil = require('../../utils/time');
 
 const PAGE_SIZE = 10;
@@ -31,8 +30,6 @@ Page({
   },
 
   onShow() {
-    // 自定义 tabBar 的选中态要页面自己报（文档 8.2）
-    tabbar.sync(this, constants.ROUTES.diary);
     // onLoad 已经拉过第一页，首屏不重复请求；之后每次回到页面刷新第一页（文档 10.7 跨天重拉）
     if (this._firstShow) {
       this._firstShow = false;

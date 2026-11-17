@@ -2,7 +2,6 @@
 
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
-const tabbar = require('../../utils/tabbar');
 const format = require('../../utils/format');
 
 const LIMITS = constants.LIMITS;
@@ -32,8 +31,6 @@ Page({
   },
 
   onShow() {
-    // 自定义 tabBar 的选中态要页面自己报（文档 8.2）
-    tabbar.sync(this, constants.ROUTES.wish);
     if (this._firstShow) {
       this._firstShow = false;
       return;

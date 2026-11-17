@@ -56,13 +56,14 @@ function walk(dir, out) {
 const ALL_WXSS = walk(MINI).filter((f) => f.endsWith('.wxss'));
 const relOf = (f) => path.relative(MINI, f).split(path.sep).join('/');
 
-test('8.2 tabBar：5 个 tab，顺序与 constants.TAB_ROUTES 一致', () => {
+test('8.2 tabBar：2 个 tab（今天 / 我的），顺序与 constants.TAB_ROUTES 一致', () => {
   const tabBar = APP_JSON.tabBar;
   assert.ok(tabBar, 'app.json 缺 tabBar');
   assert.strictEqual(tabBar.custom, true, '外观由 custom-tab-bar 组件渲染，必须 custom: true');
-  assert.strictEqual(tabBar.list.length, 5, '小程序 tabBar 最多 5 项');
+  assert.strictEqual(tabBar.list.length, 2, '只有「今天」「我的」两个 tab，其余功能从首页卡片进');
   const list = tabBar.list.map((item) => '/' + item.pagePath);
   assert.deepStrictEqual(list, constants.TAB_ROUTES, 'tabBar.list 与 TAB_ROUTES 顺序不一致');
+  assert.deepStrictEqual(constants.TAB_ROUTES, ['/pages/home/index', '/pages/profile/index']);
   for (const item of tabBar.list) {
     assert.ok(item.text && item.text.length <= 4, item.pagePath + ' 的 tab 文案要短（≤4 字）');
     assert.ok(APP_JSON.pages.indexOf(item.pagePath) >= 0, item.pagePath + ' 未在 pages 注册');
@@ -70,26 +71,37 @@ test('8.2 tabBar：5 个 tab，顺序与 constants.TAB_ROUTES 一致', () => {
     const json = JSON.parse(read(item.pagePath + '.json'));
     assert.notStrictEqual(json.navigationStyle, 'custom', item.pagePath + ' 不该再用自定义导航');
   }
+  // 日记 / 愿望 / 心情 / 报平安都退成普通页：不在 tabBar 里，也不在 TAB_ROUTES 里
+  for (const page of ['diary', 'wish', 'mood', 'safety']) {
+    assert.strictEqual(constants.isTabRoute('/pages/' + page + '/index'), false, page + ' 不该再是 tab 页');
+    assert.strictEqual(list.indexOf('/pages/' + page + '/index'), -1, page + ' 还留在 tabBar.list 里');
+  }
 });
 
-test('8.2 tab 页之间只走 switchTab：首页与我的都不再用 navigateTo 跳 tab', () => {
+test('8.2 tab 页之间只走 switchTab：两个 tab 之外一律 navigateTo', () => {
   const homeJs = read('pages/home/index.js');
   assert.ok(homeJs.includes('constants.isTabRoute(route)'), '首页要按 tab / 非 tab 分流');
   assert.ok(homeJs.includes('wx.switchTab({ url: route })'), 'tab 页要用 switchTab');
-  assert.ok(homeJs.includes('wx.navigateTo({ url: route })'), '非 tab 页（报平安）仍用 navigateTo');
+  assert.ok(homeJs.includes('wx.navigateTo({ url: route })'), '非 tab 页（日记/愿望/报平安/心情）用 navigateTo');
   const profileJs = read('pages/profile/index.js');
   assert.ok(
-    /onOpenMood[\s\S]{0,220}wx\.switchTab\(\{\s*url:\s*constants\.ROUTES\.mood/.test(profileJs),
-    '我的页的「心情记录」入口要改成 switchTab'
+    /onOpenMood[\s\S]{0,220}wx\.navigateTo\(\{\s*url:\s*constants\.ROUTES\.mood/.test(profileJs),
+    '我的页的「心情记录」入口要用 navigateTo（它已是普通页）'
+  );
+  assert.strictEqual(
+    /wx\.switchTab/.test(profileJs),
+    false,
+    '我的页不再有 switchTab：唯一要跳的 tab 是首页，而首页就在旁边'
   );
   // isTabRoute 要认路径，也要认带 query 的 url（分享卡片会带 ?code=）
-  assert.strictEqual(constants.isTabRoute('/pages/mood/index'), true);
-  assert.strictEqual(constants.isTabRoute('/pages/mood/index?from=home'), true);
+  assert.strictEqual(constants.isTabRoute('/pages/home/index?from=share'), true);
+  assert.strictEqual(constants.isTabRoute('/pages/profile/index'), true);
+  assert.strictEqual(constants.isTabRoute('/pages/mood/index'), false);
   assert.strictEqual(constants.isTabRoute('/pages/safety/index'), false);
 });
 
-test('8.2 每个 tab 页在 onShow 里同步选中态（getTabBar 判空）', () => {
-  for (const page of ['home', 'diary', 'wish', 'mood', 'profile']) {
+test('8.2 只有 tab 页在 onShow 里同步选中态（getTabBar 判空）', () => {
+  for (const page of ['home', 'profile']) {
     const js = read('pages/' + page + '/index.js');
     assert.match(
       js,
@@ -97,6 +109,11 @@ test('8.2 每个 tab 页在 onShow 里同步选中态（getTabBar 判空）', ()
       page + ' 页没有同步 tabBar 选中态'
     );
     assert.match(js, /onShow\s*\(\)\s*\{[\s\S]{0,200}tabbar\.sync/, page + ' 的 sync 要写在 onShow 里（每次切回都同步）');
+  }
+  // 普通页不该再引 tabBar：多引一次就多一个「看似是 tab」的误解
+  for (const page of ['diary', 'wish', 'mood', 'safety', 'bind']) {
+    const js = read('pages/' + page + '/index.js');
+    assert.strictEqual(/utils\/tabbar/.test(js), false, page + ' 不是 tab 页，不该依赖 utils/tabbar');
   }
   const util = read('utils/tabbar.js');
   assert.ok(util.includes("typeof page.getTabBar !== 'function'"), 'getTabBar 不存在时要判空（非 tab 页/单测）');

@@ -1,9 +1,9 @@
 {
   "navigationBarTitleText": "住进来",
-  "navigationBarBackgroundColor": "#FBF6EE",
+  "navigationBarBackgroundColor": "#FFFEF5",
   "navigationBarTextStyle": "black",
   "enablePullDownRefresh": true,
-  "backgroundColor": "#FBF6EE",
+  "backgroundColor": "#FFFEF5",
   "usingComponents": {
     "privacy-guard": "/components/privacy-guard/index"
   }

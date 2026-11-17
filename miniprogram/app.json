@@ -28,18 +28,6 @@
         "text": "今天"
       },
       {
-        "pagePath": "pages/diary/index",
-        "text": "日记"
-      },
-      {
-        "pagePath": "pages/wish/index",
-        "text": "愿望"
-      },
-      {
-        "pagePath": "pages/mood/index",
-        "text": "心情"
-      },
-      {
         "pagePath": "pages/profile/index",
         "text": "我的"
       }

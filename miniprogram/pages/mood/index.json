@@ -1,9 +1,9 @@
 {
   "navigationBarTitleText": "心情记录",
-  "navigationBarBackgroundColor": "#FBF6EE",
+  "navigationBarBackgroundColor": "#FFFEF5",
   "navigationBarTextStyle": "black",
   "enablePullDownRefresh": true,
-  "backgroundColor": "#FBF6EE",
+  "backgroundColor": "#FFFEF5",
   "usingComponents": {
     "empty-state": "/components/empty-state/index"
   }

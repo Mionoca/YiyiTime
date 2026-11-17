@@ -11,10 +11,7 @@ const ROUTES = require('./constants').ROUTES;
 
 const INDEX = {
   [ROUTES.home]: 0,
-  [ROUTES.diary]: 1,
-  [ROUTES.wish]: 2,
-  [ROUTES.mood]: 3,
-  [ROUTES.profile]: 4,
+  [ROUTES.profile]: 1,
 };
 
 function tabIndexOf(route) {

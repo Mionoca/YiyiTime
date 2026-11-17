@@ -29,7 +29,7 @@ YiyiTime/
 │  │  ├─ diary/                     # 台灯下的日记（当天上锁，次日解锁）
 │  │  ├─ wish/                      # 下次见面想做的事
 │  │  └─ mood/                      # 心情记录（两人按天倒序，只读时间线）
-│  ├─ custom-tab-bar/               # 自定义 tabBar（今天 / 日记 / 愿望 / 心情 / 我的）
+│  ├─ custom-tab-bar/               # 自定义 tabBar（只两项：今天 / 我的）
 │  ├─ components/                   # avatar-bubble / mood-picker / hug-banner / bottom-sheet /
 │  │                                # timeline-item / diary-card / wish-item / empty-state / privacy-guard
 │  ├─ utils/                        # api（唯一云函数入口）、constants、tabbar、time、format、me、upload、haptics、privacy
@@ -71,7 +71,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 540 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 544 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 
@@ -103,7 +103,7 @@ node scripts/release-check.js   # 页面/组件路径与注册（`usingComponent
 - 日志不打日记正文、愿望备注、完整邀请码；客户端 `console` 不打 openid/coupleId/邀请码。
 - 文字对比度按 8.9：正文 `--ink`、次要文字 `--muted`（两者在 `--paper` / `--card` 上都 ≥4.5:1）；`--marker-red` / `--marker-teal` / `--marker-yellow` 只做底块与描边，不当正文色；`--ink-faint` 只做装饰。
 - 视觉按 8.7「手绘涂鸦风（hand-drawn-doodle）」：3rpx 虚线描边 + 4/6rpx 小圆角 + 彩色硬阴影（`8rpx 8rpx 0`）、150ms linear、`:active` 位移 3rpx 且阴影归零；禁渐变、禁 999rpx 胶囊、不引网络字体（字体栈本地降级）。
-- 导航：`pages/home` / `diary` / `wish` / `mood` / `profile` 是 tab 页，一律 `wx.switchTab` 并按 `utils/constants.js` 的 `TAB_ROUTES` 判断；`bind` / `safety` 不是 tab，用 `wx.navigateTo`；每个 tab 页 `onShow` 首行 `tabbar.sync(this, ROUTES.x)` 维持自定义 tabBar 选中态。
+- 导航：只有 `pages/home`（今天）与 `pages/profile`（我的）是 tab 页，一律 `wx.switchTab` 并按 `utils/constants.js` 的 `TAB_ROUTES` 判断；`diary` / `wish` / `mood` / `safety` / `bind` 都是普通页，用 `wx.navigateTo`（日记 / 愿望 / 心情记录 / 报平安从首页四宫格进）；两个 tab 页 `onShow` 首行 `tabbar.sync(this, ROUTES.x)` 维持自定义 tabBar 选中态。
 
 ## 进度
 

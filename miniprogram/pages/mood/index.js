@@ -2,7 +2,6 @@
 
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
-const tabbar = require('../../utils/tabbar');
 const timeUtil = require('../../utils/time');
 
 const PAGE_SIZE = 10;
@@ -50,8 +49,6 @@ Page({
   },
 
   onShow() {
-    // 自定义 tabBar 的选中态要页面自己报（文档 8.2）
-    tabbar.sync(this, constants.ROUTES.mood);
     // onLoad 已经拉过第一页；之后回到页面静默刷新，保留旧列表不闪 loading（10.3）
     if (this._firstShow) {
       this._firstShow = false;
@@ -157,7 +154,7 @@ Page({
     } catch (err) {
       if (stale()) return;
       if (err && err.code === 'NOT_BOUND') {
-        // 未绑定不该看到这里（入口在「我的」已拦截），兜底提示后返回上一页
+        // 未绑定不该看到这里（首页四宫格与「我的」入口都已拦截），兜底提示后返回上一页
         this.setData({ loading: false, loadingMore: false, error: '', listError: '' });
         api.showError(err);
         wx.navigateBack({

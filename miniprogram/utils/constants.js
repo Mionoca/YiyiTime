@@ -18,11 +18,12 @@ const ROUTES = {
 };
 
 /**
- * tabBar 页（文档 8.2）：这些页面只能 wx.switchTab，
- * 用 navigateTo 会 fail（tab 页不在页面栈里）。
+ * tabBar 页（文档 8.2）：只有「今天」和「我的」两个。
+ * 日记 / 愿望 / 心情 / 报平安都是普通页面，从首页卡片 wx.navigateTo 进入。
+ * 这些页面只能 wx.switchTab，用 navigateTo 会 fail（tab 页不在页面栈里）。
  * 顺序必须与 app.json 的 tabBar.list 一致，custom-tab-bar 的 selected 下标依赖它。
  */
-const TAB_ROUTES = [ROUTES.home, ROUTES.diary, ROUTES.wish, ROUTES.mood, ROUTES.profile];
+const TAB_ROUTES = [ROUTES.home, ROUTES.profile];
 
 /** 把带 query 的 url 也判定成 tab（分享卡片可能带 ?code=） */
 function isTabRoute(url) {

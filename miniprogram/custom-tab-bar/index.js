@@ -1,17 +1,17 @@
 /**
  * 自定义 tabBar（文档 8.2 / 8.7）。
  *
- * 为什么自定义：规范要求「虚线边框 + 马克笔高亮 + 极小圆角」，系统 tabBar 只能配颜色与
- * 位图图标，做不出虚线顶边，也会多出 5 套 PNG 与二倍图维护成本。
+ * 只有两个 tab：「今天」放聚合与四个入口，「我的」放资料与设置；
+ * 日记 / 愿望 / 心情 / 报平安都从首页卡片 wx.navigateTo 进入，不再占底部。
  *
- * 选中态由各 tab 页在 onShow 里通过 getTabBar().setData({ selected }) 同步：
+ * 为什么自定义：规范要求「虚线边框 + 马克笔高亮 + 极小圆角」，系统 tabBar 只能配颜色与
+ * 位图图标，做不出虚线顶边，也会多出两套 PNG 与二倍图维护成本。
+ *
+ * 选中态由两个 tab 页在 onShow 里通过 getTabBar().setData({ selected }) 同步：
  * 自定义 tabBar 是独立组件实例，页面切换时不会自动更新 selected。
  */
 const LIST = [
   { path: '/pages/home/index', text: '今天' },
-  { path: '/pages/diary/index', text: '日记' },
-  { path: '/pages/wish/index', text: '愿望' },
-  { path: '/pages/mood/index', text: '心情' },
   { path: '/pages/profile/index', text: '我的' },
 ];
 

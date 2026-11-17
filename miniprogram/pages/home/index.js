@@ -550,7 +550,8 @@ Page({
   },
 
   /**
-   * 四个入口（文档 9.2）：tab 页只能 switchTab，报平安走 navigateTo。
+   * 四个入口（文档 9.2）：日记 / 愿望 / 报平安 / 心情记录都是普通页面，navigateTo 进入；
+   * 仍然先判 isTabRoute，将来把它们收进 tabBar 也只改 TAB_ROUTES。
    * 没绑定时不跳转，只提示 —— 进去也全是空态。
    */
   openEntry(route) {
