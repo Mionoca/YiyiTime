@@ -210,11 +210,12 @@ test('home: 底部浮层在模板里接上 onRetryRefresh，位于场景之后�
   assert.ok(wxml.includes('aria-role="button"'), '浮层按钮要声明无障碍角色');
   assert.ok(wxml.includes('aria-label="重试加载首页"'), '浮层按钮要有区分于可见文字的 aria-label');
   assert.ok(!wxml.includes('小屋的门卡住了'), '文案只放在 data.refreshError，模板不再硬编码一份');
-  const sceneAt = wxml.indexOf('class="scene');
+  const sceneAt = wxml.indexOf('class="scene {{sceneEnter');
   const barAt = wxml.indexOf('refresh-bar');
   const actionAt = wxml.indexOf('<!-- 底部动作 -->');
   assert.ok(barAt > 0, '模板里应有 refresh-bar');
-  assert.ok(sceneAt > 0 && sceneAt < barAt, '浮层要排在场景之后');
+  assert.ok(sceneAt > 0, '真实场景（class="scene {{sceneEnter…"）应存在');
+  assert.ok(sceneAt < barAt, '浮层要排在真实场景之后，不能只排在骨架屏之后');
   assert.ok(actionAt > 0 && barAt < actionAt, '浮层要插在场景之后、底部动作之前，避免遮挡热区');
   const btnRule = wxss.slice(wxss.indexOf('.refresh-bar-btn {'), wxss.indexOf('}', wxss.indexOf('.refresh-bar-btn {')));
   assert.ok(btnRule.includes('min-height: 88rpx'), '失败态唯一恢复入口要满足 88rpx 热区（文档 8.9）');
