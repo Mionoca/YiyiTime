@@ -106,3 +106,4 @@ node scripts/release-check.js   # 页面/组件路径与注册（`usingComponent
 - 技术设计文档：`docs/技术设计文档.md`
 - 已完成功能、已知偏差、手动操作与下一步：`docs/开发进度.md`
 - M6 双人真机验收与发布清单：`docs/M6-真机验收与发布.md`
+- 接手交接说明（当前状态与待办）：`docs/交接说明-WorkBuddy.md`
