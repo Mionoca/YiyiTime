@@ -22,7 +22,7 @@ async function buildContext({ openid }) {
   }
 
   if (!user) {
-    user = {
+    const blank = {
       _id: openid,
       openid,
       nickname: '',
@@ -35,8 +35,19 @@ async function buildContext({ openid }) {
       createdAt: now,
       updatedAt: now,
     };
-    const { _id, ...userData } = user;
-    await db.collection('users').doc(openid).set({ data: userData });
+    const { _id, ...userData } = blank;
+    try {
+      // 用 add（而不是 set）建档：同一用户并发两个请求时只有第一个能成功，
+      // 第二个撞 _id 唯一性，而不是把第一个刚写进去的 coupleId 覆盖回 null。
+      await db.collection('users').add({ data: Object.assign({ _id: openid }, userData) });
+      user = blank;
+    } catch (err) {
+      // 别人抢先建好了：重读它的文档继续用，不要把冲突抛给用户
+      user = await db.collection('users').doc(openid).get()
+        .then((res) => (res && res.data) || null)
+        .catch(() => null);
+      if (!user) throw err;
+    }
   }
 
   let couple = null;

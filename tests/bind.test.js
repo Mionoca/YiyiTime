@@ -431,6 +431,7 @@ test('bind.status 自愈：couples 文档丢失时清掉 user.coupleId 并回到
     console.error = originalError;
   }
   assert.strictEqual(fake.get('users', 'oA').coupleId, null);
+  assert.strictEqual(fake.get('users', 'oA').reminderEnabled, false, '关系没了，提醒开关要一起关掉');
 });
 
 test('bind.create 校验：未设置昵称 / 已绑定 / 开始日期非法都报文档约定的错误码', async () => {

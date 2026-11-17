@@ -137,7 +137,7 @@ test('内容安全：空文本不浪费调用（不传备注时一次都不审�
 });
 
 test('内容安全：超时按不可用处理，放行走（1.5s 上限）', async (t) => {
-  captureConsoleError(t);
+  const logs = captureConsoleError(t);
   const h = setup();
   h.setOpenapi({ security: { msgSecCheck: () => new Promise(() => {}) } });
 
@@ -145,6 +145,11 @@ test('内容安全：超时按不可用处理，放行走（1.5s 上限）', asy
   const res = await h.callAs(A, 'mood.set', { mood: 'sunny', note: '慢一点也没关系' });
   assert.strictEqual(res.ok, true, JSON.stringify(res));
   assert.ok(Date.now() - started < 4000, '超时保护应尽快返回');
+  // 放行是兜底，但必须留痕：不然审核一直超时也没人知道
+  const securityLogs = logs.filter((args) => String(args[0]).indexOf('[security]') !== -1);
+  assert.strictEqual(securityLogs.length, 1, '超时放行要记一条日志：' + JSON.stringify(logs));
+  assert.ok(String(securityLogs[0][1]).indexOf('call-failed') !== -1, '日志应标出 call-failed');
+  assert.ok(String(securityLogs[0][1]).indexOf('慢一点也没关系') === -1, '日志不能带原文');
 });
 
 test('内容安全：昵称走 scene=1（资料），愿望标题走 scene=3（论坛）', async () => {

@@ -520,3 +520,19 @@ test('cloud-entry.setFault: method 写错时直接抛错，避免故障没注入
   assert.doesNotThrow(() => h.setFault({ collection: 'users', method: 'get', error: new Error('x') }));
   assert.doesNotThrow(() => h.setFault(null));
 });
+
+test('buildContext：新用户并发建档只留一份，第二次撞 _id 时重读而不是 set 覆盖', async () => {
+  const h = createHarness();
+  h.reset({ users: [] });
+
+  // 两个请求同时进来，都会先读到「文档不存在」；用 add 而不是 set，
+  // 后到的那个撞 _id 唯一性后重读，不会把先到者的数据抹掉
+  const [r1, r2] = await Promise.all([
+    h.callAs('oNew', 'user.get'),
+    h.callAs('oNew', 'user.get'),
+  ]);
+  assert.strictEqual(r1.ok, true, JSON.stringify(r1));
+  assert.strictEqual(r2.ok, true, JSON.stringify(r2));
+  assert.strictEqual(h.fake().all('users').length, 1, '只应留下一份用户文档');
+  assert.strictEqual(h.fake().get('users', 'oNew').profileComplete, false);
+});

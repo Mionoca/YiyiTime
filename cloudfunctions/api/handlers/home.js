@@ -61,7 +61,7 @@ async function get(payload, ctx) {
       coupleIdTail: String(ctx.user.coupleId || '').slice(-6),
     }));
     await ctx.db.collection('users').doc(ctx.openid).update({
-      data: { coupleId: null, updatedAt: ctx.now },
+      data: { coupleId: null, reminderEnabled: false, updatedAt: ctx.now },
     }).catch(() => {});
     ctx.user.coupleId = null;
     ctx.couple = null;

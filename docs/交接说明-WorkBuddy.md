@@ -2,7 +2,7 @@
 
 > 更新时间：2026-11-17 23:30（Asia/Shanghai）
 > 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：以 `git ls-remote origin hjj` 为准（交接时先 `git pull origin hjj`）
-> 单测基线：648 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
+> 单测基线：649 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
 
 ## 一、当前状态
 
@@ -13,7 +13,7 @@
   2. **内容安全（F12）**：新增 `lib/security.js` 的 `assertText`，七个自由文本字段在写库前送 `security.msgSecCheck` v2 —— 昵称（scene 1）、心情备注 / 日记 / 愿望备注 / 报平安备注 / 记账备注（4）、愿望标题（3）。`risky` 与 `review` 都抛 `CONTENT_RISKY`（这里没有人工复审环节，放过等于没人管）；**接口不可用时放行**（没有 `cloud.openapi`、`errCode` 非 0、1.5s 超时）并记 `[security]` 日志 —— 内容只在两个人之间可见、不是公开传播，审核服务抖动不能把写日记的路堵死。日志只记 `scene` / 长度 / `suggest` / `label`，不记原文。
   3. **页面**：「我的」页把「每日提醒（即将上线）」换成真实设置（`switch` + `time` picker + 剩余额度文案）。开启顺序严格是「先 `wx.requestSubscribeMessage` 拿授权 → `reminder.grant` 攒额度 → `reminder.set` 打开」，反了会出现「开关开着但永远发不出去」；拒绝授权开关回滚。`profile.load` 里 `reminder.get` 单独 `catch`，提醒设置挂了不影响整页。`couple.confirmUnbind` 事务内顺手关掉双方提醒开关。
 - 改动范围：**云函数**（新增 `handlers/reminder.js`、`lib/security.js`、`index.js` 加 Timer 分流、`handlers/index.js` 注册 3 个 action 共 34 个、`lib/time.js` 加 `hhmmOf` / `normalizeHhmm`、`config.json` 加 `permissions.openapi` 与 `triggers`、七个 handler 接入 `assertText`、`couple.confirmUnbind` 关提醒）；**小程序端**（`pages/profile` 提醒面板 + `index.js` 四个方法、`index.wxss` 四个类）；**文档**（技术设计文档 2.4 / 2.5 / 5.3.1 / 5.6 / 7.12 / 7.15 / 7.16 / 8.3.6 / 11.7 / 11.9 / 16.2 / 16.3 / 16.4 / 16.6 / 16.8 同步，16.8 记 `v0.1.3`）。
-- 验证记录：`node --test` **648 pass / 0 fail**（新增 `security` 13、`reminder` 18，`client-profile` 扩到 32；随动 `api-entry` / `handler-boundary` 34 个 action、`contract`、`release-check` 的 TODO 与 F1–F12）；`release-check` 21 PASS + 7 TODO + 0 FAIL；`check-secrets` exit 0。
+- 验证记录：`node --test` **649 pass / 0 fail**（新增 `security` 15、`reminder` 20，`client-profile` 扩到 35、`user` 到 27；随动 `api-entry` / `handler-boundary` 34 个 action、`contract`、`release-check` 的 TODO 与 F1–F12）；`release-check` 21 PASS + 7 TODO + 0 FAIL；`check-secrets` exit 0。
 - 已知边界（不阻断）：订阅消息「攒授权」是微信能力的硬限制，用户只点一次授权就只够发一条，所以额度为 0 时不会发；`runTimer` 单批最多 100 人（云函数单次 `get` 上限），用户量大起来要补 `skip` 分页；模板关键词（默认 `thing1` / `time2`）必须和公众平台上选的模板一致，否则 47003，失败只记日志不扣额度；内容安全是 fail-open，微信接口整体挂掉时等于没审（靠日志发现）。
 
 ## 二、接手第一步

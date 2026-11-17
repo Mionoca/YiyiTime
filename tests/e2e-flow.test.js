@@ -299,7 +299,10 @@ test('过期的 pending 抱抱首页不展示，并惰性写回 expired', async 
 test('user.coupleId 指向不存在的 couple 时，home.get 自愈回未绑定', async (t) => {
   const errors = captureConsoleError(t);
   h.reset({
-    users: [userDoc(A, '小怡', 'c_00000000deadbeef')],
+    // 带着「已开启提醒」的脏数据进自愈：开关必须一起关掉
+    users: [Object.assign(userDoc(A, '小怡', 'c_00000000deadbeef'), {
+      reminderEnabled: true, reminderAt: '21:00', reminderQuota: 2,
+    })],
   });
 
   const home = await callAs(A, 'home.get', {});
@@ -308,6 +311,8 @@ test('user.coupleId 指向不存在的 couple 时，home.get 自愈回未绑定'
   assert.strictEqual(home.partner, null);
   assert.strictEqual(home.mood, null);
   assert.strictEqual(h.fake().get('users', A).coupleId, null);
+  // 关系已经不存在了，提醒开关不能留在「开着」状态（否则「我的」页显示已开启、却永远不会发）
+  assert.strictEqual(h.fake().get('users', A).reminderEnabled, false);
 
   // 失败日志只带尾部 6 位，不打印完整 openid
   const line = errors.map((args) => args.join(' ')).find((text) => text.includes('couple missing'));

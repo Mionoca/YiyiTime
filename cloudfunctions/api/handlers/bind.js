@@ -511,7 +511,7 @@ async function computeStatus(ctx) {
       coupleIdTail: String(ctx.user.coupleId || '').slice(-6),
     }));
     await db.collection('users').doc(ctx.openid).update({
-      data: { coupleId: null, updatedAt: now },
+      data: { coupleId: null, reminderEnabled: false, updatedAt: now },
     }).catch(() => {});
     ctx.user.coupleId = null;
     ctx.couple = null;

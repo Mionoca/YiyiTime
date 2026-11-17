@@ -8,11 +8,17 @@ const { createHarness, captureConsoleError } = require('./helpers/cloud-entry');
 const A = 'oA';
 const B = 'oB';
 const COUPLE = 'c_1';
-/** UTC 13:05 = 东八区 21:05 */
+/** UTC 13:05 = 东八区 21:05；只喂给 runTimer({ now: NOW }) 这类可注入时间的用例 */
 const NOW = new Date('2026-11-17T13:05:00.000Z');
 const TODAY = '2026-11-17';
 
 const reminder = require('../cloudfunctions/api/handlers/reminder');
+const time = require('../cloudfunctions/api/lib/time');
+/**
+ * reminder.get / set 走的是 ctx.now（`new Date()`，没法注入），
+ * 所以涉及「今天」的断言必须按运行时算：写死日期的话，跨天跑测试就会莫名其妙红。
+ */
+const LIVE_TODAY = time.dateKeyOf(new Date());
 
 function userDoc(id, extra) {
   return Object.assign({
@@ -81,7 +87,7 @@ test('reminder.get：默认关闭，返回默认时间与额度上限，未配�
 test('reminder.get：今天报过平安时 checkedInToday=true，未绑定时恒为 false', async () => {
   const h = setup({
     safety_checkins: [{
-      _id: 's1', coupleId: COUPLE, openid: A, note: '', date: TODAY, createdAt: NOW,
+      _id: 's1', coupleId: COUPLE, openid: A, note: '', date: LIVE_TODAY, createdAt: NOW,
     }],
   });
   const res = await h.callAs(A, 'reminder.get');
