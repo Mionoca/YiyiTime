@@ -1,6 +1,6 @@
 # 小怡怡安（YiyiTime）
 
-只属于两个人的微信小程序小屋：今天的心情、一个抱抱、到家报平安、第二天才解锁的日记、下次见面想做的事，都收在同一间屋子里。
+只属于两个人的微信小程序小屋：今天的心情、一个抱抱、到家报平安、第二天才解锁的日记、下次见面想做的事，都收在同一间屋子里；各自还能记自己的小账本，到点没报平安会提醒一下。
 
 ## 技术栈
 
@@ -18,13 +18,14 @@ YiyiTime/
 │  ├─ handlers/                     # 按域拆分
 │  │  ├─ index.js                   # action 路由表
 │  │  ├─ system.js  user.js  bind.js  couple.js  home.js
-│  │  └─ mood.js  hug.js  safety.js  diary.js  wish.js
-│  └─ lib/                          # ctx / errors / time / validate / db / db-util / relation / home-blocks
+│  │  ├─ mood.js  hug.js  safety.js  diary.js  wish.js  ledger.js
+│  │  └─ reminder.js                # 订阅提醒（reminder.* + 定时任务 runTimer）
+│  └─ lib/                          # ctx / errors / time / validate / db / db-util / relation / home-blocks / security
 ├─ miniprogram/
 │  ├─ pages/
 │  │  ├─ home/                      # 今天（天数卡 / 抱抱卡 / 心情卡 / 四宫格入口）
 │  │  ├─ bind/                      # 双人绑定与邀请码
-│  │  ├─ profile/                   # 我的（昵称头像、开始日期、记账本入口、解绑、隐私保护指引 / 数据与隐私说明）
+│  │  ├─ profile/                   # 我的（昵称头像、开始日期、每日提醒、记账本入口、解绑、隐私保护指引 / 数据与隐私说明）
 │  │  ├─ safety/                    # 报平安（我到家了 + 时间线）
 │  │  ├─ diary/                     # 台灯下的日记（当天上锁，次日解锁）
 │  │  ├─ wish/                      # 下次见面想做的事
@@ -54,6 +55,8 @@ YiyiTime/
 5. 云数据库：手动创建 9 个集合（见下方「云开发控制台一次性配置」）。
 6. 删除云端模板遗留的 `quickstartFunctions` 云函数（本地代码已清理，云端需手动删）。
 7. 隐私：微信公众平台 →「设置 - 服务内容声明 - 用户隐私保护指引」声明头像、昵称用途，否则隐私接口会被拦截。
+8. 订阅提醒（可选，不配也能跑）：公众平台「订阅消息」里选一个「打卡 / 待办提醒」类模板，把模板 ID 配到云函数环境变量 `YIYI_REMINDER_TEMPLATE_ID`；模板关键词要和 `cloudfunctions/api/handlers/reminder.js` 的 `templateData` 对齐（默认 `thing1` + `time2`），字段名不一致微信返回 47003。没配时「我的」页的提醒开关是禁用态，定时任务静默跳过。
+   云调用权限（`security.msgSecCheck`、`subscribeMessage.send`）与定时触发器（`reminder-tick`）都写在 `cloudfunctions/api/config.json` 里，随「上传并部署」一起生效，不用在控制台另配。
 
 ## 云开发控制台一次性配置
 
@@ -73,7 +76,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 596 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 648 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 

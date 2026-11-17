@@ -23,6 +23,18 @@ let installed = false;
 let originalLoad = null;
 /** 故障注入：让某个集合的 collection()/add()/doc.get/doc.update 抛指定错误（用于测读故障降级/上抛） */
 let fault = null;
+/** 云调用（内容安全 / 订阅消息）默认可用且放行，用例可整体关掉或替换某个接口 */
+function defaultOpenapi() {
+  return {
+    security: { msgSecCheck: async () => ({ errCode: 0, errMsg: 'ok', result: { suggest: 'pass', label: 100 } }) },
+    subscribeMessage: { send: async () => ({ errCode: 0, errMsg: 'ok' }) },
+  };
+}
+let openapiImpl = defaultOpenapi();
+/** false 表示宿主没有 openapi（本地没装 wx-server-sdk 的真实情形） */
+let openapiAvailable = true;
+/** 记录云调用：{ api, args }，用来断言「审了哪段文本 / 发了哪条订阅消息」 */
+let openapiCalls = [];
 
 function proxyCollection(name) {
   const real = fake.db.collection(name);
@@ -62,12 +74,39 @@ const proxyDb = {
   runTransaction: (fn) => fake.db.runTransaction(fn),
 };
 
+/**
+ * 每次读 cloud.openapi 都返回一份新的代理：lib 里在调用时才取属性，
+ * 这样 setOpenapi 换掉实现后不需要让模块重新 require。
+ */
+function currentOpenapi() {
+  if (!openapiAvailable) return undefined;
+  const openapi = {};
+  if (openapiImpl.security) {
+    openapi.security = {
+      msgSecCheck(args) {
+        openapiCalls.push({ api: 'security.msgSecCheck', args });
+        return openapiImpl.security.msgSecCheck(args);
+      },
+    };
+  }
+  if (openapiImpl.subscribeMessage) {
+    openapi.subscribeMessage = {
+      send(args) {
+        openapiCalls.push({ api: 'subscribeMessage.send', args });
+        return openapiImpl.subscribeMessage.send(args);
+      },
+    };
+  }
+  return openapi;
+}
+
 const wxStub = {
   DYNAMIC_CURRENT_ENV: 'test-env',
   init() {},
   getWXContext: () => (currentOpenid === undefined ? {} : { OPENID: currentOpenid }),
   database: () => proxyDb,
 };
+Object.defineProperty(wxStub, 'openapi', { get: currentOpenapi, enumerable: true });
 
 function install() {
   if (installed) return;
@@ -93,6 +132,9 @@ function createHarness() {
   fake = makeFakeDb({});
   currentOpenid = 'oA';
   fault = null;
+  openapiImpl = defaultOpenapi();
+  openapiAvailable = true;
+  openapiCalls = [];
   const api = require('../../cloudfunctions/api/index');
   const handlers = require('../../cloudfunctions/api/handlers');
   return {
@@ -112,6 +154,9 @@ function createHarness() {
       fake = makeFakeDb(initial || {});
       currentOpenid = openid === undefined ? 'oA' : openid;
       fault = null;
+      openapiImpl = defaultOpenapi();
+      openapiAvailable = true;
+      openapiCalls = [];
     },
     /**
      * 注入故障：{ collection:'users', method:'get'|'update'|'add'|'collection', error }；传 null 清除。
@@ -129,6 +174,27 @@ function createHarness() {
     },
     fake() {
       return fake;
+    },
+    /**
+     * 替换云调用实现，用例结束（或下一个 reset）自动恢复默认。
+     * 传 { available: false } 模拟宿主没有 openapi；
+     * 传 { security: { msgSecCheck } } 只替换内容安全，订阅消息保持默认。
+     */
+    setOpenapi(next) {
+      if (!next) {
+        openapiImpl = defaultOpenapi();
+        openapiAvailable = true;
+        return;
+      }
+      if (next.available !== undefined) openapiAvailable = !!next.available;
+      const base = defaultOpenapi();
+      openapiImpl = {
+        security: next.security === undefined ? base.security : next.security,
+        subscribeMessage: next.subscribeMessage === undefined ? base.subscribeMessage : next.subscribeMessage,
+      };
+    },
+    openapiCalls() {
+      return openapiCalls;
     },
     handlers,
   };

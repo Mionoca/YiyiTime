@@ -1,6 +1,12 @@
 {
   "permissions": {
-    "openapi": []
+    "openapi": ["security.msgSecCheck", "subscribeMessage.send"]
   },
-  "triggers": []
+  "triggers": [
+    {
+      "name": "reminder-tick",
+      "type": "timer",
+      "config": "0 */10 * * * * *"
+    }
+  ]
 }

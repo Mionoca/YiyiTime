@@ -2,6 +2,7 @@
 
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
+const security = require('../lib/security');
 const time = require('../lib/time');
 const relation = require('../lib/relation');
 
@@ -28,6 +29,7 @@ async function checkin(payload, ctx) {
   ctx.requireBound();
 
   const note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
+  await security.assertText(ctx, note, 'social');
   const coupleId = relation.coupleIdOf(ctx);
   const todayKey = time.dateKeyOf(ctx.now);
   const nowMs = ctx.now.getTime();

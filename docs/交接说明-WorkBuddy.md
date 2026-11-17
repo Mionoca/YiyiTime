@@ -1,20 +1,20 @@
 # 交接说明（WorkBuddy 接手用）
 
-> 更新时间：2026-11-17 19:10（Asia/Shanghai）
+> 更新时间：2026-11-17 23:30（Asia/Shanghai）
 > 仓库：`D:/大学/YiyiTime`　分支：`hjj`　当前 HEAD：以 `git ls-remote origin hjj` 为准（交接时先 `git pull origin hjj`）
-> 单测基线：599 pass / 0 fail / 0 skip；`release-check`：21 PASS + 5 TODO + 0 FAIL + 1 WARN（工作区有未提交改动时才出现这条 WARN）；`check-secrets`：exit 0。
+> 单测基线：648 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
 
 ## 一、当前状态
 
 - 代码侧 M0–M6 与 F1–F8 全部实现（历史轮次与每轮验证记录见 `docs/开发进度.md` → 六、变更记录）。
-- 前两轮交付 **M7 心情记录时间线**（只读 `mood.list` + `pages/mood`）与 **M8 前端改版**（2 个 tab + 手绘涂鸦风）。
-- 本轮交付 **M9：记账本 + 应用内解绑**（用户决定砍掉原计划的「见面基金」）：
-  1. **记账本替代见面基金**：`F10` 改为「个人记账本」——各记各的花销，同时能切到 TA 的账本看（只读）。新集合 `ledger_entries`，字段 `openid`（归属人）/ `coupleId`（本段关系快照）/ `amount`（整数分）/ `category`（6 类）/ `note` / `date` / `month`（冗余，让按月查询变等值查询）/ `createdAt` / `updatedAt`；四个 action `ledger.add / update / remove / list`。`openid` 一律取 `ctx.openid`、`coupleId` 取 `relation.coupleIdOf(ctx)`——自己的账永远属于自己，伴侣只看得到本段关系期间的账，换绑后新伴侣看不到上一段。**个人账本不要求绑定**：`who=me` 与增删改都不调 `requireBound`，未绑定时 `coupleId` 落 `null`；只有 `who=partner` 才要绑定，`ledger.list` 出参的 `bound` 让页面收起「TA 的」分段。金额全程整数分（拒绝浮点 / 字符串 / NaN，1–1000000），每人每月 60 笔上限用 `count()` 前置校验（`update` 改到另一个月也要重查目标月），`list` 不分页、`summary` 按返回结果实时算。
-  2. **应用内解绑（双方确认）**：`F11` 从「联系开发者」占位改成真功能。`couples` 加 `unbindStatus`（`none | pending | done`）/ `unbindRequestedBy` / `unbindRequestedAt` / `unbindConfirmedBy` / `unboundAt`，`status` 收为 `active | closed`；三个 action `couple.requestUnbind / cancelUnbind / confirmUnbind` 全部在 `runTransaction` 内重读再写（并发只写一次、对方已发起时返回 `requestedByMe: false`、自确认返回 `UNBIND_WAIT_PARTNER`），确认时一次事务写关系状态并清双方 `users.coupleId`；业务数据一条不删，后续读取由 `requireBound` 自然拦成 `NOT_BOUND`。
-  3. **页面**：新增 `pages/ledger`（我的 / TA 的分段切换、月份 ‹ ›、合计卡、按天分组与小计、固定「记一笔」+ 底部表单、点 TA 的条目只提示）；「我的」删掉「见面基金（即将上线）」与「解绑（联系开发者）」两个占位，换成记账本入口 + 解绑三态（未申请 / 等 TA 确认可撤回 / TA 申请去确认）；首页只在「对方发起」时显示解绑提示条，点了 `switchTab` 去「我的」。
-- 改动范围：**云函数**（新增 `handlers/ledger.js`、`handlers/couple.js` 加 3 个 action、`lib/relation.js` 加 `unbindView`、`handlers/home.js` 出参加 `unbind`、`handlers/index.js` 注册 7 个 action 共 31 个）；**小程序端**（新增 `pages/ledger/*`、`profile` 三态与入口、`home` 提示条、`utils/format.js` 加 `formatYuan` / `parseYuan`、`utils/time.js` 加 `monthOf` / `shiftMonthKey` / `formatMonthCN`、`utils/constants.js` 加 `ROUTES.ledger` + 记账 4 个 `LIMITS` + `LEDGER_CATEGORIES`、`app.json` 注册新页面）；**文档**（技术设计文档 1.3 / 2.4 / 2.5 / 5.3.2 / 5.3.9 / 5.4 / 5.5 / 5.6 / 5.7 / 6.5 / 7.13 / 7.14 / 8.2 / 8.3.6 / 8.3.8 / 9.2 / 11.9 / 14.9 / 16.2 / 16.3 / 16.4 / 16.8 全部同步，16.8 记 `v0.1.2`）。
-- 验证记录：`node --test` **599 pass / 0 fail**（新增 `ledger` 18、`unbind` 7、`client-ledger` 17；`client-profile` 21、`client-home` 28、`server-authorization` 11、`e2e-page` 12；随动 `handler-boundary` 双人 action 24 → 31、`api-entry` 31 个 action、`limits-consistency` / `data-model` / `query-budget` / `pull-down` / `ui-standards` / `release-check` 集合白名单）；`release-check` 21 PASS + 5 TODO + 0 FAIL；`check-secrets` exit 0。
-- 已知边界（不阻断）：`ledger.list` 不分页（60 笔/月一页放得下，超了写不进去）；60 笔是「先 count 再写」的软上限，两台设备真正同时提交可能写成 61；条目 id 用 `le_` + 16 位 hex，碰撞概率可忽略；解绑后 `unbindStatus` 停在 `done`，重新绑定会新建一条 `couples`（旧记录保留作历史）；`unbindConfirmedBy` 只在确认时写入，撤回后仍为 `null`；解绑后再调解绑接口返回的是 `NOT_BOUND`（`coupleId` 已清空，定位不到关系），客户端把它和 `UNBIND_NOT_PENDING` 一样当「没有待确认解绑」。
+- 前几轮交付：**M7 心情记录时间线**（只读 `mood.list` + `pages/mood`）、**M8 前端改版**（2 个 tab + 手绘涂鸦风）、**M9 记账本 + 应用内解绑**。
+- 本轮交付 **M10：订阅提醒（F9）+ 内容安全审核（F12）**，把文档里剩下的两个 P1 清掉：
+  1. **订阅提醒（F9）**：语义从「提醒对方」改成**提醒自己** —— 微信订阅消息是一次性授权，用 A 的授权给 B 发消息，B 从没同意过，收到只会莫名其妙，模板还有被封风险。所以额度只用来提醒攒额度的那个人自己：到点还没报平安，就给他发一条「今天还没给 TA 报平安」。开关 / 时间 / 额度 / 最近发送日期都在 `users` 的 `reminder*` 五个字段里，**没有新建 `subscription_authorizations` 集合**（5.6 已删掉这条预留）—— `buildContext` 本来就读 `users`，放子字段让 `reminder.get` 零额外查询。三个 action：`reminder.get`（不要求绑定）、`reminder.set`（只有 `enabled: true` 才 `requireBound`）、`reminder.grant`（授权成功后 +1，封顶 7）。定时任务 `runTimer` 由 `config.json` 的 `reminder-tick`（每 10 分钟）触发，入口按 `event.Type === 'Timer'` 分流，**不注册成 action**（客户端传 `reminder.tick` 得到 `UNKNOWN_ACTION`）；判定顺序：模板未配 → 静默返回、没到点 / 今天已发 / 额度为 0 / 今天已报平安 → 跳过；发送成功扣额度写日期，43101（用户拒收）关开关清额度，其它错误不扣额度留到下一个窗口重试。不依赖 cron 时区，只比东八区 `HH:mm`。
+  2. **内容安全（F12）**：新增 `lib/security.js` 的 `assertText`，七个自由文本字段在写库前送 `security.msgSecCheck` v2 —— 昵称（scene 1）、心情备注 / 日记 / 愿望备注 / 报平安备注 / 记账备注（4）、愿望标题（3）。`risky` 与 `review` 都抛 `CONTENT_RISKY`（这里没有人工复审环节，放过等于没人管）；**接口不可用时放行**（没有 `cloud.openapi`、`errCode` 非 0、1.5s 超时）并记 `[security]` 日志 —— 内容只在两个人之间可见、不是公开传播，审核服务抖动不能把写日记的路堵死。日志只记 `scene` / 长度 / `suggest` / `label`，不记原文。
+  3. **页面**：「我的」页把「每日提醒（即将上线）」换成真实设置（`switch` + `time` picker + 剩余额度文案）。开启顺序严格是「先 `wx.requestSubscribeMessage` 拿授权 → `reminder.grant` 攒额度 → `reminder.set` 打开」，反了会出现「开关开着但永远发不出去」；拒绝授权开关回滚。`profile.load` 里 `reminder.get` 单独 `catch`，提醒设置挂了不影响整页。`couple.confirmUnbind` 事务内顺手关掉双方提醒开关。
+- 改动范围：**云函数**（新增 `handlers/reminder.js`、`lib/security.js`、`index.js` 加 Timer 分流、`handlers/index.js` 注册 3 个 action 共 34 个、`lib/time.js` 加 `hhmmOf` / `normalizeHhmm`、`config.json` 加 `permissions.openapi` 与 `triggers`、七个 handler 接入 `assertText`、`couple.confirmUnbind` 关提醒）；**小程序端**（`pages/profile` 提醒面板 + `index.js` 四个方法、`index.wxss` 四个类）；**文档**（技术设计文档 2.4 / 2.5 / 5.3.1 / 5.6 / 7.12 / 7.15 / 7.16 / 8.3.6 / 11.7 / 11.9 / 16.2 / 16.3 / 16.4 / 16.6 / 16.8 同步，16.8 记 `v0.1.3`）。
+- 验证记录：`node --test` **648 pass / 0 fail**（新增 `security` 13、`reminder` 18，`client-profile` 扩到 32；随动 `api-entry` / `handler-boundary` 34 个 action、`contract`、`release-check` 的 TODO 与 F1–F12）；`release-check` 21 PASS + 7 TODO + 0 FAIL；`check-secrets` exit 0。
+- 已知边界（不阻断）：订阅消息「攒授权」是微信能力的硬限制，用户只点一次授权就只够发一条，所以额度为 0 时不会发；`runTimer` 单批最多 100 人（云函数单次 `get` 上限），用户量大起来要补 `skip` 分页；模板关键词（默认 `thing1` / `time2`）必须和公众平台上选的模板一致，否则 47003，失败只记日志不扣额度；内容安全是 fail-open，微信接口整体挂掉时等于没审（靠日志发现）。
 
 ## 二、接手第一步
 
@@ -26,40 +26,41 @@ node scripts/release-check.js
 node scripts/check-secrets.js
 ```
 
-然后按顺序读：`docs/开发进度.md`（一、已完成 → M9 小节；二、已知缺口；三、手动操作；六、变更记录顶部）、`docs/M6-真机验收与发布.md`、`docs/技术设计文档.md`（5.3.9 `ledger_entries`、5.5 解绑状态机、7.13 / 7.14、8.3.8 记账本页、8.3.6 我的页、9.2 首页第 0 行）。
+然后按顺序读：`docs/开发进度.md`（一、已完成 → M10 小节；二、已知缺口；三、手动操作；六、变更记录顶部）、`docs/M6-真机验收与发布.md`、`docs/技术设计文档.md`（7.15 订阅提醒、7.16 内容安全、5.3.1 `users` 的 `reminder*` 字段、2.5 的 F9 / F12 验收、8.3.6 我的页）。
 
 ## 三、仍需用户手动完成的（卡真机验收）
 
-1. 云开发控制台：按 `docs/M6-真机验收与发布.md` 建 **9 个集合**（M9 新增 `ledger_entries`）、配权限与索引（`ledger_entries`：`openid + month + date`、`openid + coupleId + month`）。**没建 `ledger_entries` 直接记账会失败。**
-2. **部署顺序：先云函数、再小程序端。** `cloudfunctions/api` →「上传并部署：云端安装依赖」（超时 10s、内存 256MB）。本轮云函数改了（新增 `handlers/ledger.js`、`couple.*Unbind`、`home.get` 出参），必须重部署，否则记账本与解绑会报「这个操作还不存在」。
-3. **小程序端要重新上传**：本轮新增 `pages/ledger/`，漏传会点进去白屏 / 报页面不存在。
-4. 微信公众平台：配置《用户隐私保护指引》（头像、昵称用途）。
-5. 微信开发者工具上传体验版，并把对方微信号加为体验成员。
-6. 发布前在控制台导出一次数据库备份。
-7. 真机看一眼：记账金额用数字键盘输入后换算是否正确（分/元）、切「TA 的」是否只读、月份往后翻到当前月是否停住、解绑三态文案是否清楚、首页提示条会不会挡到日子卡。
+1. 云开发控制台：按 `docs/M6-真机验收与发布.md` 建 **9 个集合**、配权限与索引（本轮没有新增集合，M10 的数据都落在 `users` 里）。
+2. **部署顺序：先云函数、再小程序端。** `cloudfunctions/api` →「上传并部署：云端安装依赖」（超时 10s、内存 256MB）。本轮云函数改了（新增 `handlers/reminder.js`、`lib/security.js`、3 个 action、`config.json` 的 openapi 与触发器），必须重部署，否则提醒会报「这个操作还不存在」。
+3. **配订阅消息模板（可选，不配也能跑）**：公众平台「订阅消息」选一个「打卡 / 待办提醒」类模板 → 模板 ID 配到云函数环境变量 `YIYI_REMINDER_TEMPLATE_ID`。关键词要和 `handlers/reminder.js` 的 `templateData` 对齐（默认 `thing1` + `time2`），不一致微信返回 47003。没配时「我的」页提醒开关是禁用态、定时任务静默跳过。
+4. **小程序端要重新上传**：`pages/profile` 改了 wxml / wxss / js，漏传会看到旧占位「每日提醒（即将上线）」。
+5. 微信公众平台：配置《用户隐私保护指引》（头像、昵称用途）。
+6. 微信开发者工具上传体验版，并把对方微信号加为体验成员；发布前导出一次数据库备份。
+7. 真机看一眼：提醒开关点开会弹订阅授权、拒绝后开关是否回弹、时间 picker 改完是否马上生效、到点是否真能收到消息（需要模板已配）、发一句明显违规的文本看是否被拦（`CONTENT_RISKY`）。
 
 ## 四、尚未完成的代码侧事项（按优先级）
 
-1. **等用户真机验收反馈**：F1–F8 + 14.4 的 A/B 14 步 + `docs/M6-真机验收与发布.md` 第 2–4 节，以及本轮 F10 / F11 的验收标准（技术设计文档 2.5 节）。收到问题按 P0/P1 修。
-2. 若继续做自动化加固（非阻塞）：`ledger.list` 的 `summary` 与按天分组由客户端算，页面级用例覆盖了但没做「同一秒两条账」的排序稳定性用例；解绑的并发边界（对方确认时自己正好撤回、两边同时确认）靠事务重读兜住，没有并发压测；`release-check` 客户端云访问边界只覆盖点号 / 括号普通字符串键。
-3. 仍是 P1 的功能：订阅消息提醒（需模板与授权）、内容安全审核（公开传播前必须接 `msgSecCheck`）、账本的分类统计 / 月度趋势（当前只做合计）、导出。
+1. **等用户真机验收反馈**：F1–F12 + 14.4 的 A/B 14 步 + `docs/M6-真机验收与发布.md` 第 2–4 节。收到问题按 P0/P1 修。
+2. 唯一还剩的 P1 功能是 `diary.calendar`（心情 / 日记日历，7.12 的预留项），属于「可做可不做」的视觉增强。
+3. 若继续做自动化加固（非阻塞）：`runTimer` 没有并发压测（同一分钟两个实例同时跑到同一个用户，靠 `reminderLastSentDate` 事后去重，理论上可能发两条）；`ledger.list` 的 `summary` 与按天分组由客户端算，「同一秒两条账」的排序稳定性没锁；解绑的并发边界靠事务重读兜住，没有压测。
 4. 已实现功能的边界说明、已知偏差与手动项都记在 `docs/开发进度.md`，改功能时同步更新。
 
 ## 五、工作流约定（沿用）
 
 - 文档先行：先改 `docs/技术设计文档.md`（字段表 / 接口契约 / 页面结构 / 错误码 / 集合表），再写代码，最后用契约测试把两边锁住。
 - 每完成一个阶段或大功能：`node --test` 全量 + `node scripts/release-check.js` + `node scripts/check-secrets.js` 全绿 → 独立只读审查（只用读、不改仓）→ 修 P0/P1 → `git push origin hjj` → 更新 `docs/开发进度.md` 与 README 单测数。
-- `docs/开发进度.md` 固定四处：`:4` 头部「当前完成」、单测合计与逐文件明细（在 M6 加固小节的测试段落里）、对应「一、已完成」bullet（本轮新增 M9 小节）、`六、变更记录` 顶部新条目；涉及 M6 计数时同步 `docs/M6-真机验收与发布.md`。
+- `docs/开发进度.md` 固定四处：`:4` 头部「当前完成」、单测合计与逐文件明细（在 M6 加固小节的测试段落里）、对应「一、已完成」bullet（本轮新增 M10 小节）、`六、变更记录` 顶部新条目。
 - commit：信息写入 `.git/yiyi-commit-rNN.txt`，`git commit -F`；push 前设 `HTTPS_PROXY=http://127.0.0.1:7890` / `HTTP_PROXY=http://127.0.0.1:7890`；push 后核对 `git rev-parse HEAD` 与 `git ls-remote origin hjj` 一致、工作区干净。
-- 本机环境坑：跑 `node --test` / `release-check` 用 pwsh（run_code 内 PATH 缺 git 会让 check-secrets 用例 skip）；pwsh `*>` 重定向是 UTF-16LE；`scripts/release-check.js`、`cloudfunctions/api/handlers/hug.js`、`home.js` 是 CRLF，其余文档 / 测试是 LF；不要用 pwsh `Set-Content` 改文件（用 node:fs 并校验替换次数）；临时目录用显式 `D:/_yiyi_xxx`（bash 的 `/tmp` 与 Windows python 看到的 `/tmp` 不是同一个路径）。
+- 本机环境坑：跑 `node --test` / `release-check` 用 pwsh（run_code 内 PATH 缺 git 会让 check-secrets 用例 skip）；pwsh `*>` 重定向是 UTF-16LE；`scripts/release-check.js`、`cloudfunctions/api/handlers/hug.js`、`home.js` 是 CRLF，其余文档 / 测试是 LF（用 python 批量替换时要按文件判断换行符，否则多行锚点匹配不到）；不要用 pwsh `Set-Content` 改文件；临时目录用显式 `D:/_yiyi_xxx`。
 
 ## 六、关键文件索引
 
-- 需求与验收：`docs/技术设计文档.md`（4200+ 行）、`docs/M6-真机验收与发布.md`。
+- 需求与验收：`docs/技术设计文档.md`（4400+ 行）、`docs/M6-真机验收与发布.md`。
 - 进度与偏差：`docs/开发进度.md`（当前单测数、已完成功能、已知缺口、手动操作、变更记录）。
-- 客户端入口：`miniprogram/utils/api.js`（唯一云函数调用入口）、`miniprogram/utils/constants.js`（`LIMITS` / `ROUTES` / `TAB_ROUTES` / `LEDGER_CATEGORIES` / `isTabRoute`）、`miniprogram/utils/tabbar.js`（tabBar 选中态同步）、`miniprogram/utils/format.js`（`formatYuan` / `parseYuan`，元↔分换算唯一实现）。
-- 导航与样式：`miniprogram/app.json`（`tabBar.custom`）、`miniprogram/custom-tab-bar/`、`miniprogram/styles/tokens.wxss`、`miniprogram/app.wxss`（`dk-*` 公共类）。
-- 记账本与解绑：`cloudfunctions/api/handlers/ledger.js`、`cloudfunctions/api/handlers/couple.js`（`*Unbind`）、`cloudfunctions/api/lib/relation.js`（`unbindView` / `coupleIdOf`）、`miniprogram/pages/ledger/`、`miniprogram/pages/profile/`（三态与入口）。
-- 云函数入口：`cloudfunctions/api/index.js`，handler 在 `cloudfunctions/api/handlers/`。
-- 测试夹具：`tests/helpers/cloud-entry.js`（云函数链路）、`tests/helpers/client-page.js`（页面 / 组件）、`tests/helpers/fake-db.js`（假库，含操作计数钩子）。
+- 客户端入口：`miniprogram/utils/api.js`（唯一云函数调用入口）、`miniprogram/utils/constants.js`（`LIMITS` / `ROUTES` / `TAB_ROUTES` / `LEDGER_CATEGORIES` / `isTabRoute`）、`miniprogram/utils/tabbar.js`、`miniprogram/utils/format.js`（元↔分换算唯一实现）。
+- 订阅提醒：`cloudfunctions/api/handlers/reminder.js`（`get` / `set` / `grant` / `runTimer` / `templateData`）、`cloudfunctions/api/index.js`（Timer 分流）、`cloudfunctions/api/config.json`（openapi + triggers）、`miniprogram/pages/profile/index.js`（`onToggleReminder` / `onReminderTimeChange` / `requestReminderSubscribe`）。
+- 内容安全：`cloudfunctions/api/lib/security.js`（`assertText` / `SCENE`）。
+- 记账本与解绑（M9）：`cloudfunctions/api/handlers/ledger.js`、`handlers/couple.js`（`*Unbind`）、`lib/relation.js`（`unbindView` / `coupleIdOf`）、`miniprogram/pages/ledger/`、`miniprogram/pages/profile/`。
+- 导航与样式：`miniprogram/app.json`、`miniprogram/custom-tab-bar/`、`miniprogram/styles/tokens.wxss`、`miniprogram/app.wxss`。
+- 测试夹具：`tests/helpers/cloud-entry.js`（云函数链路 + 云调用桩 `setOpenapi` / `openapiCalls`）、`tests/helpers/client-page.js`（页面 / 组件）、`tests/helpers/fake-db.js`（假库，含操作计数钩子）。
 - 发布预检：`scripts/release-check.js`、`scripts/check-secrets.js`。

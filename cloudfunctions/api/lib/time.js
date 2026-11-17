@@ -38,8 +38,24 @@ function nextUnlockAt(dateKey) {
   return new Date(startOfDateKey(dateKey).getTime() + DAY_MS);
 }
 
-/** 首页氛围：morning / day / dusk / night */
-function phaseOf(now = new Date()) {
+/** 任意时刻 → 东八区 HH:mm（提醒时间用；定长字符串，字典序即时间序） */
+function hhmmOf(input = new Date()) {
+  const d = new Date(input.getTime() + TZ_OFFSET_MS);
+  return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+}
+
+/** 严格校验 HH:mm（00:00–23:59），接受 '9:00' 这种不补零写法并归一化为 '09:00' */
+function normalizeHhmm(value) {
+  if (typeof value !== 'string') return '';
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!m) return '';
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if (h > 23 || mm > 59) return '';
+  return `${pad2(h)}:${pad2(mm)}`;
+}
+
+/** 首页氛围：morning / day / dusk / night */function phaseOf(now = new Date()) {
   const d = new Date(now.getTime() + TZ_OFFSET_MS);
   const h = d.getUTCHours();
   if (h >= 6 && h < 9) return 'morning';
@@ -103,6 +119,8 @@ module.exports = {
   addDays,
   daysTogether,
   nextUnlockAt,
+  hhmmOf,
+  normalizeHhmm,
   phaseOf,
   nextAnniversary,
   isValidDateKey,

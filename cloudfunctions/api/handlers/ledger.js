@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
+const security = require('../lib/security');
 const time = require('../lib/time');
 const relation = require('../lib/relation');
 const dbUtil = require('../lib/db-util');
@@ -120,6 +121,7 @@ async function add(payload, ctx) {
   const amount = amountOf(p.amount);
   const category = validate.oneOf(p.category, CATEGORIES, '分类');
   const note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
+  await security.assertText(ctx, note, 'social');
   const date = dateOf(p.date, todayKey);
   const month = date.slice(0, 7);
   const coupleId = relation.coupleIdOf(ctx) || null;
@@ -156,7 +158,10 @@ async function update(payload, ctx) {
   const data = { updatedAt: ctx.now };
   if (has('amount')) data.amount = amountOf(p.amount);
   if (has('category')) data.category = validate.oneOf(p.category, CATEGORIES, '分类');
-  if (has('note')) data.note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
+  if (has('note')) {
+    data.note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
+    await security.assertText(ctx, data.note, 'social');
+  }
   if (has('date')) {
     const date = dateOf(p.date, time.dateKeyOf(ctx.now));
     data.date = date;

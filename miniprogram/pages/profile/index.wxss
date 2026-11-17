@@ -217,6 +217,40 @@
   color: var(--muted);
 }
 
+/* 每日提醒（M10 / 文档 8.3.6）：第一行开关，第二行时间；换行后仍按 list-item 的分隔线 */
+.list-item--stack {
+  display: block;
+  padding: 24rpx 0;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  min-height: 72rpx;
+}
+
+.list-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.list-sub {
+  color: var(--muted);
+  font-size: var(--font-sm);
+  line-height: 1.5;
+}
+
+.list-time {
+  display: flex;
+  align-items: center;
+  min-height: 72rpx;
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+
 /* 待处理的解绑（文档 8.3.6）：用 --danger，在纸底上仍 ≥4.5:1 */
 .list-danger {
   color: var(--danger);

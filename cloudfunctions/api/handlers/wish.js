@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
+const security = require('../lib/security');
 const time = require('../lib/time');
 const relation = require('../lib/relation');
 const dbUtil = require('../lib/db-util');
@@ -91,6 +92,8 @@ async function add(payload, ctx) {
     field: '愿望', min: 1, max: TITLE_MAX, required: true,
   });
   const note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
+  await security.assertText(ctx, title, 'forum');
+  await security.assertText(ctx, note, 'social');
   const coupleId = relation.coupleIdOf(ctx);
 
   const docs = await loadAll(ctx, coupleId);
@@ -145,9 +148,11 @@ async function update(payload, ctx) {
     data.title = validate.string(p.title, {
       field: '愿望', min: 1, max: TITLE_MAX, required: true,
     });
+    await security.assertText(ctx, data.title, 'forum');
   }
   if (hasNote) {
     data.note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
+    await security.assertText(ctx, data.note, 'social');
   }
 
   await ctx.db.collection('wishes').doc(wishId).update({ data });

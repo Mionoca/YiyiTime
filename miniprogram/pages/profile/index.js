@@ -39,6 +39,15 @@ Page({
     unbindStatus: 'none',
     unbindText: '解绑',
     unbinding: false,
+    // 每日提醒（M10 / 文档 8.3.6）：configured 由服务端给（模板 ID 没配就整行禁用）
+    reminder: {
+      configured: false, enabled: false, remindAt: '21:00',
+      quota: 0, quotaMax: 7, templateId: '',
+    },
+    reminderCheckedIn: false,
+    reminderSaving: false,
+    // 设置读不到时不要伪装成「提醒还没开通」，单独给一句可重试的提示
+    reminderError: false,
   },
 
   onShow() {
@@ -74,7 +83,11 @@ Page({
     const token = (this._seq = (this._seq || 0) + 1);
     const stale = () => this._unloaded || token !== this._seq;
     try {
-      const home = await api.call('home.get');
+      // 提醒设置是「附加信息」：它失败不该让整个「我的」页打不开，所以单独 catch 成 null
+      const [home, rem] = await Promise.all([
+        api.call('home.get'),
+        api.call('reminder.get').catch(() => null),
+      ]);
       if (stale()) return;
       const user = home.user || {};
       const unbind = this.unbindView(home);
@@ -95,6 +108,13 @@ Page({
         appVersion: this.getAppVersion(),
         hapticsEnabled: haptics.isEnabled(),
       };
+      if (rem) {
+        patch.reminder = this.normalizeReminder(rem);
+        patch.reminderCheckedIn = !!rem.checkedInToday;
+        patch.reminderError = false;
+      } else {
+        patch.reminderError = true;
+      }
       if (home.couple) {
         // 脏 startDate 时服务端会把 daysTogether/anniversary 降级为 null（home.get），
         // 这里不能拼出「第 null 天」，与首页 derive 保持同一守卫
@@ -272,6 +292,114 @@ Page({
   },
 
   /** 记账本（文档 8.3.8）：普通页面，navigateTo 进入；个人账本未绑定也能进（只有 TA 的账本要绑定） */
+  /** 服务端出参 → 页面 data（脏值一律降级，避免 switch / picker 拿到 undefined） */
+  normalizeReminder(res) {
+    return {
+      configured: !!(res && res.configured),
+      enabled: !!(res && res.enabled),
+      remindAt: (res && res.remindAt) || '21:00',
+      quota: Math.max(0, Number(res && res.quota) || 0),
+      quotaMax: Number(res && res.quotaMax) || 7,
+      templateId: (res && res.templateId) || '',
+    };
+  },
+
+  applyReminder(res) {
+    if (!res) return;
+    this.setData({
+      reminderSaving: false,
+      reminder: this.normalizeReminder(res),
+      reminderCheckedIn: !!res.checkedInToday,
+    });
+  },
+
+  /** 订阅消息授权：只有 accept 才算拿到一条额度（reject / ban / fail 一律 false） */
+  requestReminderSubscribe(templateId) {
+    return new Promise((resolve) => {
+      if (!templateId || typeof wx.requestSubscribeMessage !== 'function') {
+        resolve(false);
+        return;
+      }
+      wx.requestSubscribeMessage({
+        tmplIds: [templateId],
+        success: (res) => resolve(!!res && res[templateId] === 'accept'),
+        fail: () => resolve(false),
+      });
+    });
+  },
+
+  /**
+   * 每日提醒开关（文档 7.15 / 8.3.6）：
+   * 关掉只要一次 set；打开要先 requestSubscribeMessage 拿授权，accept 后攒额度再打开。
+   * 顺序不能反：先 set 再要授权，用户拒绝时开关已经开了，会变成「开了但永远不发」。
+   */
+  async onToggleReminder(e) {
+    const want = !!(e && e.detail && e.detail.value);
+    const prev = this.data.reminder;
+    if (this.data.reminderSaving) return;
+    if (!prev.configured) {
+      // switch 是 disabled 的，正常点不到；这里兜住从代码 / 无障碍通道触发的情况
+      this.setData({ reminder: Object.assign({}, prev, { enabled: false }) });
+      this.toast('提醒还没开通');
+      return;
+    }
+    if (want && !this.data.bound) {
+      this.setData({ reminder: Object.assign({}, prev, { enabled: false }) });
+      this.toast('先邀请 TA 住进来吧');
+      return;
+    }
+
+    // 乐观更新：switch 已经翻过去了，先跟手，失败再回滚
+    this.setData({ reminderSaving: true, reminder: Object.assign({}, prev, { enabled: want }) });
+    let granted = false;
+    try {
+      if (want) {
+        const accepted = await this.requestReminderSubscribe(prev.templateId);
+        if (this._unloaded) return;
+        if (!accepted) {
+          this.setData({ reminderSaving: false, reminder: Object.assign({}, prev, { enabled: false }) });
+          this.toast('没收到授权，提醒没打开');
+          return;
+        }
+        await api.call('reminder.grant');
+        granted = true;
+      }
+      const res = await api.call('reminder.set', { enabled: want, remindAt: prev.remindAt });
+      if (this._unloaded) return;
+      this.applyReminder(res);
+      this.toast(want ? '到点会提醒你' : '提醒已关闭');
+    } catch (err) {
+      if (this._unloaded) return;
+      this.setData({ reminderSaving: false, reminder: Object.assign({}, prev, { enabled: prev.enabled }) });
+      api.showError(err);
+      // 授权额度已经在服务端 +1 了，页面上的「还能提醒 N 次」是旧值，拉一次纠正
+      if (granted) this.load(true);
+    }
+  },
+
+  async onReminderTimeChange(e) {
+    const time = String((e && e.detail && e.detail.value) || '');
+    if (!/^\d{1,2}:\d{2}$/.test(time)) return;
+    if (this.data.reminderSaving) {
+      this.toast('正在保存，稍后再改');
+      return;
+    }
+    this.setData({ reminderSaving: true });
+    try {
+      const res = await api.call('reminder.set', {
+        enabled: this.data.reminder.enabled,
+        remindAt: time,
+      });
+      if (this._unloaded) return;
+      this.applyReminder(res);
+      this.toast('提醒时间改成 ' + res.remindAt);
+    } catch (err) {
+      if (this._unloaded) return;
+      this.setData({ reminderSaving: false });
+      api.showError(err);
+    }
+  },
+
   onOpenLedger() {
     wx.navigateTo({ url: constants.ROUTES.ledger });
   },

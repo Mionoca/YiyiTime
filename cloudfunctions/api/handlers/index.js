@@ -41,4 +41,7 @@ module.exports = {
   'ledger.remove': require('./ledger').remove,
   'ledger.list': require('./ledger').list,
   'home.get': require('./home').get,
+  'reminder.get': require('./reminder').get,
+  'reminder.set': require('./reminder').set,
+  'reminder.grant': require('./reminder').grant,
 };

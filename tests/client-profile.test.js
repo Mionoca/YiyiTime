@@ -31,8 +31,20 @@ function baseHome(patch) {
   }, patch);
 }
 
-function stubApi(home) {
-  api.call = async () => home;
+/** 提醒设置的默认出参：已配置模板、关闭、21:00 */
+const REMINDER_OFF = {
+  configured: true, enabled: false, remindAt: '21:00',
+  quota: 0, quotaMax: 7, templateId: 'tpl_test',
+  bound: true, todayKey: '2026-11-16', checkedInToday: false,
+};
+
+function stubApi(home, handlers) {
+  api.call = async (action, payload) => {
+    if (handlers && typeof handlers[action] === 'function') return handlers[action](payload);
+    // 提醒设置是 M10 新增的第二个首屏请求；给个合理默认，避免各用例都要显式桩它
+    if (action === 'reminder.get') return Object.assign({}, REMINDER_OFF);
+    return home;
+  };
 }
 
 function newPage() {
@@ -217,7 +229,9 @@ test('profile: 下拉刷新静默刷新并收起转圈，改昵称中不覆盖�
   installWx({ stopPullDownRefresh: () => stops.push(1) });
   try {
     let calls = 0;
-    api.call = async () => {
+    api.call = async (action) => {
+      // M10 起首屏还有一次 reminder.get；这条用例数的是「整页刷新发了几轮」
+      if (action !== 'home.get') return Object.assign({}, REMINDER_OFF);
       calls += 1;
       return baseHome();
     };
@@ -245,6 +259,7 @@ test('profile: 头像校验失败时提示具体原因，不覆盖原头像（�
   try {
     api.call = async (action) => {
       calls.push(action);
+      if (action === 'reminder.get') return Object.assign({}, REMINDER_OFF);
       if (action !== 'home.get') throw new Error('unexpected action: ' + action);
       return baseHome();
     };
@@ -263,7 +278,7 @@ test('profile: 头像校验失败时提示具体原因，不覆盖原头像（�
     assert.strictEqual(shown[0], err, '校验错误要原样交给 api.showError，不能换成通用文案');
     assert.strictEqual(page.data.avatarPreview, 'cloud://env/avatars/old.png', '失败要回退到原头像');
     assert.strictEqual(page.data.saving, false);
-    assert.deepStrictEqual(calls, ['home.get'], '校验失败不能提交 user.updateProfile');
+    assert.deepStrictEqual(calls.filter((a) => a !== 'reminder.get'), ['home.get'], '校验失败不能提交 user.updateProfile');
   } finally {
     api.showError = realShowError;
     restoreWx();
@@ -473,4 +488,300 @@ test('profile: 解绑 / 记账本入口的 wxml 接线存在，见面基金占�
   assert.ok(wxml.indexOf('{{unbindText}}') >= 0, '解绑行文案要走数据绑定');
   assert.strictEqual(wxml.indexOf('见面基金'), -1, '见面基金已被个人记账本替代');
   assert.strictEqual(wxml.indexOf('解绑（联系开发者）'), -1, '解绑已改为应用内双方确认');
+});
+
+/**
+ * 每日提醒（M10 / 文档 7.15 / 8.3.6）。
+ * 这里的重点是「先授权后开启」的顺序：顺序反了就会出现「开关开着但永远发不出去」。
+ */
+function reminderSetup(opts) {
+  const o = opts || {};
+  const calls = [];
+  const toasts = [];
+  const subscribe = { tmplIds: [], result: o.result === undefined ? 'accept' : o.result, called: 0 };
+  const state = Object.assign({}, REMINDER_OFF, o.reminder || {});
+  const originalShowError = api.showError;
+
+  installWx({
+    showToast: (x) => toasts.push(x.title),
+    showModal: () => {},
+    stopPullDownRefresh: () => {},
+    requestSubscribeMessage: (x) => {
+      subscribe.called += 1;
+      subscribe.tmplIds.push(x.tmplIds);
+      if (subscribe.result === 'fail') {
+        if (x.fail) x.fail({ errMsg: 'requestSubscribeMessage:fail' });
+        return;
+      }
+      const res = {};
+      (x.tmplIds || []).forEach((id) => { res[id] = subscribe.result; });
+      if (x.success) x.success(res);
+    },
+  });
+
+  api.call = async (action, payload) => {
+    calls.push({ action, payload });
+    if (action === 'home.get') {
+      if (o.homeFails) throw Object.assign(new Error('小屋打不开'), { code: 'NETWORK_ERROR' });
+      return baseHome(o.home);
+    }
+    if (action === 'reminder.get') {
+      if (o.getFails) throw Object.assign(new Error('设置读不到'), { code: 'INTERNAL_ERROR' });
+      return Object.assign({}, state);
+    }
+    if (action === 'reminder.grant') {
+      if (o.grantFails) throw Object.assign(new Error('额度没攒上'), { code: 'INTERNAL_ERROR' });
+      state.quota = Math.min(state.quota + 1, state.quotaMax);
+      return Object.assign({}, state);
+    }
+    if (action === 'reminder.set') {
+      if (o.setFails) throw Object.assign(new Error('保存失败'), { code: 'INTERNAL_ERROR' });
+      state.enabled = !!payload.enabled;
+      // 服务端会把 '9:05' 归一化成 '09:05'；桩按真实契约返回，才能验证页面是否采用服务端的值
+      if (payload.remindAt) {
+        const m = /^(\d{1,2}):(\d{2})$/.exec(payload.remindAt);
+        state.remindAt = m ? (m[1].length === 1 ? '0' + m[1] : m[1]) + ':' + m[2] : payload.remindAt;
+      }
+      return Object.assign({}, state);
+    }
+    return null;
+  };
+  api.showError = (err) => toasts.push(err && err.message);
+
+  const page = newPage();
+  return {
+    page, calls, toasts, subscribe, state,
+    restore() {
+      api.showError = originalShowError;
+      restoreWx();
+    },
+  };
+}
+
+function actionsOf(calls) {
+  return calls.map((c) => c.action);
+}
+
+test('profile: 首屏渲染提醒设置（开关、时间、剩余额度）', async () => {
+  const env = reminderSetup({
+    reminder: { enabled: true, remindAt: '22:30', quota: 3 },
+  });
+  try {
+    await env.page.load();
+    assert.strictEqual(env.page.data.reminder.enabled, true);
+    assert.strictEqual(env.page.data.reminder.remindAt, '22:30');
+    assert.strictEqual(env.page.data.reminder.quota, 3);
+    assert.strictEqual(env.page.data.reminder.configured, true);
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 开启提醒要先拿订阅授权，accept 后才 grant + set（顺序不能反）', async () => {
+  const env = reminderSetup();
+  try {
+    await env.page.load();
+    await env.page.onToggleReminder({ detail: { value: true } });
+
+    assert.deepStrictEqual(env.subscribe.tmplIds, [['tpl_test']], '必须用服务端下发的模板 ID');
+    assert.deepStrictEqual(
+      actionsOf(env.calls).filter((a) => a !== 'home.get' && a !== 'reminder.get'),
+      ['reminder.grant', 'reminder.set'],
+      '顺序必须是先攒额度再打开开关'
+    );
+    const set = env.calls.filter((c) => c.action === 'reminder.set').pop();
+    assert.strictEqual(set.payload.enabled, true);
+    assert.strictEqual(set.payload.remindAt, '21:00', '改开关不该顺手改时间');
+    assert.strictEqual(env.page.data.reminder.enabled, true);
+    assert.strictEqual(env.page.data.reminder.quota, 1);
+    assert.strictEqual(env.toasts[env.toasts.length - 1], '到点会提醒你');
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 拒绝订阅授权时开关回滚、不攒额度、不发 set', async () => {
+  const env = reminderSetup({ result: 'reject' });
+  try {
+    await env.page.load();
+    await env.page.onToggleReminder({ detail: { value: true } });
+
+    assert.deepStrictEqual(
+      actionsOf(env.calls).filter((a) => a.indexOf('reminder.') === 0 && a !== 'reminder.get'),
+      [],
+      '没授权就什么都不该提交'
+    );
+    assert.strictEqual(env.page.data.reminder.enabled, false, '开关必须回到用户操作前的状态');
+    assert.strictEqual(env.page.data.reminderSaving, false);
+    assert.strictEqual(env.toasts[env.toasts.length - 1], '没收到授权，提醒没打开');
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 授权接口直接 fail 也按「没授权」处理', async () => {
+  const env = reminderSetup({ result: 'fail' });
+  try {
+    await env.page.load();
+    await env.page.onToggleReminder({ detail: { value: true } });
+    assert.strictEqual(env.page.data.reminder.enabled, false);
+    assert.strictEqual(env.subscribe.called, 1);
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 关闭提醒不需要授权，直接 set(false)', async () => {
+  const env = reminderSetup({ reminder: { enabled: true, quota: 2 } });
+  try {
+    await env.page.load();
+    await env.page.onToggleReminder({ detail: { value: false } });
+
+    assert.strictEqual(env.subscribe.called, 0, '关掉不该再骚扰用户要授权');
+    assert.deepStrictEqual(
+      actionsOf(env.calls).filter((a) => a.indexOf('reminder.') === 0 && a !== 'reminder.get'),
+      ['reminder.set']
+    );
+    assert.strictEqual(env.calls.filter((c) => c.action === 'reminder.set')[0].payload.enabled, false);
+    assert.strictEqual(env.page.data.reminder.enabled, false);
+    assert.strictEqual(env.toasts[env.toasts.length - 1], '提醒已关闭');
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 模板没配 / 未绑定时打不开开关，并给出原因', async () => {
+  const notConfigured = reminderSetup({ reminder: { configured: false, templateId: '' } });
+  try {
+    await notConfigured.page.load();
+    await notConfigured.page.onToggleReminder({ detail: { value: true } });
+    assert.strictEqual(notConfigured.page.data.reminder.enabled, false);
+    assert.strictEqual(notConfigured.subscribe.called, 0);
+    assert.strictEqual(notConfigured.toasts[notConfigured.toasts.length - 1], '提醒还没开通');
+  } finally {
+    notConfigured.restore();
+  }
+
+  const notBound = reminderSetup({ home: { bind: { state: 'unbound', pending: null }, couple: null } });
+  try {
+    await notBound.page.load();
+    assert.strictEqual(notBound.page.data.bound, false);
+    await notBound.page.onToggleReminder({ detail: { value: true } });
+    assert.strictEqual(notBound.page.data.reminder.enabled, false);
+    assert.strictEqual(notBound.subscribe.called, 0);
+    assert.strictEqual(notBound.toasts[notBound.toasts.length - 1], '先邀请 TA 住进来吧');
+  } finally {
+    notBound.restore();
+  }
+});
+
+test('profile: 改提醒时间走 set，并把服务端归一化后的值回填', async () => {
+  const env = reminderSetup({ reminder: { enabled: true, quota: 1 } });
+  try {
+    await env.page.load();
+    await env.page.onReminderTimeChange({ detail: { value: '9:05' } });
+
+    const set = env.calls.filter((c) => c.action === 'reminder.set').pop();
+    assert.strictEqual(set.payload.enabled, true, '改时间不该把开关关掉');
+    assert.strictEqual(set.payload.remindAt, '9:05');
+    assert.strictEqual(env.page.data.reminder.remindAt, '09:05', '回填要用服务端归一化后的值');
+    assert.strictEqual(env.page.data.reminderSaving, false);
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 明显不合法的 time 值不发请求', async () => {
+  const env = reminderSetup();
+  try {
+    await env.page.load();
+    await env.page.onReminderTimeChange({ detail: { value: 'abc' } });
+    await env.page.onReminderTimeChange({ detail: { value: '' } });
+    assert.strictEqual(env.calls.filter((c) => c.action === 'reminder.set').length, 0);
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 保存失败时开关回滚并提示', async () => {
+  const env = reminderSetup({ setFails: true });
+  try {
+    await env.page.load();
+    await env.page.onToggleReminder({ detail: { value: true } });
+    assert.strictEqual(env.page.data.reminder.enabled, false);
+    assert.strictEqual(env.page.data.reminderSaving, false);
+    assert.strictEqual(env.toasts[env.toasts.length - 1], '保存失败');
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 提醒设置读不到时页面照常打开（附加信息不能拖垮整页）', async () => {
+  const env = reminderSetup({ getFails: true });
+  try {
+    await env.page.load();
+    assert.strictEqual(env.page.data.loading, false);
+    assert.strictEqual(env.page.data.error, '');
+    assert.strictEqual(env.page.data.daysText, '第 911 天');
+    assert.strictEqual(env.page.data.reminderError, true, '读不到要单独标记，不能伪装成「提醒还没开通」');
+    assert.strictEqual(env.page.data.reminder.configured, false, '同时开关是禁用态');
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 每日提醒的 wxml 接线存在（switch + time picker + 说明文案）', () => {
+  const root = path.join(__dirname, '..');
+  const wxml = fs.readFileSync(path.join(root, 'miniprogram', 'pages', 'profile', 'index.wxml'), 'utf8');
+  assert.ok(wxml.indexOf('bindchange="onToggleReminder"') >= 0, '开关没有绑定 onToggleReminder');
+  assert.ok(wxml.indexOf('bindchange="onReminderTimeChange"') >= 0, '时间选择没有绑定');
+  assert.ok(wxml.indexOf('mode="time"') >= 0, '时间要用原生 time picker');
+  assert.ok(wxml.indexOf('{{reminder.remindAt}}') >= 0, '时间要走数据绑定');
+  assert.ok(wxml.indexOf('额度用完了') >= 0, '额度为 0 要给出「关掉再开一次会重新问授权」的说明');
+  assert.strictEqual(wxml.indexOf('每日提醒（即将上线）'), -1, '每日提醒不再是占位');
+  assert.strictEqual(wxml.indexOf('list-item--disabled'), -1, '提醒行不再是禁用占位');
+});
+
+test('profile: 额度攒上了但开关没保存成功时，重新拉一次把额度纠正过来', async () => {
+  const env = reminderSetup({ setFails: true });
+  try {
+    await env.page.load();
+    await env.page.onToggleReminder({ detail: { value: true } });
+    await new Promise((r) => setTimeout(r, 10));
+
+    assert.strictEqual(env.page.data.reminder.enabled, false, '开关要回滚');
+    assert.strictEqual(env.page.data.reminderSaving, false);
+    // 默认 quota 0，grant 成功后服务端是 1；catch 里的 load(true) 要把这个新额度拉回来
+    assert.strictEqual(env.page.data.reminder.quota, 1, '不刷新的话页面会一直显示旧额度 0');
+    assert.strictEqual(env.calls.filter((c) => c.action === 'reminder.get').length, 2, '应该重新读了一次设置');
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 额度都没攒上时不用白跑一次 load', async () => {
+  const env = reminderSetup({ grantFails: true });
+  try {
+    await env.page.load();
+    await env.page.onToggleReminder({ detail: { value: true } });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.strictEqual(env.page.data.reminder.enabled, false);
+    assert.strictEqual(env.calls.filter((c) => c.action === 'reminder.get').length, 1, 'grant 都失败了就不必重拉');
+    assert.strictEqual(env.toasts[env.toasts.length - 1], '额度没攒上');
+  } finally {
+    env.restore();
+  }
+});
+
+test('profile: 保存中改时间会提示而不是静默丢弃', async () => {
+  const env = reminderSetup({ reminder: { enabled: true, quota: 1 } });
+  try {
+    await env.page.load();
+    env.page.data.reminderSaving = true;
+    await env.page.onReminderTimeChange({ detail: { value: '22:00' } });
+    assert.strictEqual(env.calls.filter((c) => c.action === 'reminder.set').length, 0);
+    assert.strictEqual(env.toasts[env.toasts.length - 1], '正在保存，稍后再改');
+  } finally {
+    env.restore();
+  }
 });

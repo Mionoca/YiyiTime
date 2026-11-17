@@ -89,8 +89,8 @@ function makeFixture() {
     dependencies: { 'wx-server-sdk': '~2.4.0' },
   }));
   writeFixtureFile(dir, 'cloudfunctions/api/config.json', JSON.stringify({
-    permissions: { openapi: [] },
-    triggers: [],
+    permissions: { openapi: ['security.msgSecCheck', 'subscribeMessage.send'] },
+    triggers: [{ name: 'reminder-tick', type: 'timer', config: '0 */10 * * * * *' }],
   }));
   writeFixtureFile(dir, '.gitignore', 'miniprogram/config/env.js\nproject.private.config.json\n');
   return dir;
@@ -120,7 +120,7 @@ test('发布预检：当前仓库静态检查全部通过', () => {
     '没有把 openid / coupleId / 邀请码 / 正文写进 console',
     '未发现云环境 ID / AppSecret / 私钥',
     '云函数 package.json 依赖与入口正确',
-    '云函数 config.json 权限/触发器格式正确',
+    '云函数 config.json 权限/触发器正确',
     'project.config.json 的根目录 / appid / compileType / 基础库 ≥ 2.32.3 正确',
     '图片资源与包体符合 8.8',
     '客户端 api.call 都已被 await / .then / .catch / return 处理',
@@ -142,7 +142,7 @@ test('发布预检：当前仓库静态检查全部通过', () => {
   const collectionPass = passText.split('\n').find((m) => m.includes('云函数只用了预期的'));
   const collectionCount = (collectionPass && collectionPass.match(/预期的 (\d+) 个集合/) || [])[1];
   assert.ok(collectionCount, '缺少「云函数只用了预期的 N 个集合」检查项');
-  ['个集合', '已重新上传部署', '超时 10s、内存 256MB', '用户隐私保护指引', 'F1–F8'].forEach((needle) => {
+  ['个集合', '已重新上传部署', '超时 10s、内存 256MB', '用户隐私保护指引', 'reminder-tick', 'YIYI_REMINDER_TEMPLATE_ID', 'F1–F12'].forEach((needle) => {
     assert.ok(todoText.includes(needle), '缺少 TODO 提醒：' + needle);
   });
   assert.ok(
@@ -687,10 +687,34 @@ test('发布预检：云函数部署配置 / 项目根目录写错都会 FAIL', 
     {
       name: 'config.json 的 triggers 写成对象',
       mutate: (dir) => writeFixtureFile(dir, 'cloudfunctions/api/config.json', JSON.stringify({
-        permissions: { openapi: [] },
+        permissions: { openapi: ['security.msgSecCheck', 'subscribeMessage.send'] },
         triggers: {},
       })),
       expect: 'triggers 必须是数组',
+    },
+    {
+      name: 'config.json 少了内容安全权限（会让审核静默 fail-open）',
+      mutate: (dir) => writeFixtureFile(dir, 'cloudfunctions/api/config.json', JSON.stringify({
+        permissions: { openapi: ['subscribeMessage.send'] },
+        triggers: [{ name: 'reminder-tick', type: 'timer', config: '0 */10 * * * * *' }],
+      })),
+      expect: '缺少云调用权限：security.msgSecCheck',
+    },
+    {
+      name: 'config.json 少了订阅消息权限',
+      mutate: (dir) => writeFixtureFile(dir, 'cloudfunctions/api/config.json', JSON.stringify({
+        permissions: { openapi: ['security.msgSecCheck'] },
+        triggers: [{ name: 'reminder-tick', type: 'timer', config: '0 */10 * * * * *' }],
+      })),
+      expect: '缺少云调用权限：subscribeMessage.send',
+    },
+    {
+      name: 'config.json 少了 reminder-tick 触发器（提醒永远不会发）',
+      mutate: (dir) => writeFixtureFile(dir, 'cloudfunctions/api/config.json', JSON.stringify({
+        permissions: { openapi: ['security.msgSecCheck', 'subscribeMessage.send'] },
+        triggers: [],
+      })),
+      expect: '缺少 reminder-tick 定时触发器',
     },
     {
       name: 'project.config.json 顶层是 null',

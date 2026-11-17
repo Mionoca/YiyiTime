@@ -2,6 +2,7 @@
 
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
+const security = require('../lib/security');
 
 const AVATAR_PREFIX = 'cloud://';
 const AVATAR_MAX_LEN = 1024;
@@ -33,6 +34,8 @@ async function updateProfile(payload, ctx) {
   if (hasNickname) {
     // 昵称 1–12 字（去首尾空格后）
     data.nickname = validate.string(p.nickname, { field: '昵称', min: 1, max: 12, required: true });
+    // 昵称会显示给对方，属于资料类内容（scene=1）
+    await security.assertText(ctx, data.nickname, 'profile');
     data.profileComplete = true;
   }
 

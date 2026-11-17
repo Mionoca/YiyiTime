@@ -131,7 +131,9 @@ async function confirmUnbind(payload, ctx) {
     });
     for (const openid of members) {
       const res = await transaction.collection('users').doc(openid).update({
-        data: { coupleId: null, updatedAt: ctx.now },
+        // 订阅提醒是「给 TA 报平安」的闹钟，解绑后没有可执行的动作，顺手关掉，
+        // 否则会留下「开关是开的、但永远不会发」的静默状态（下次绑定后也不会自动恢复）
+        data: { coupleId: null, reminderEnabled: false, updatedAt: ctx.now },
       });
       // 少清一个人就会留下「关系已关但用户还挂着 coupleId」的脏状态，直接整体回滚
       if (!res || !res.stats || res.stats.updated !== 1) {

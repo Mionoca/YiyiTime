@@ -36,14 +36,22 @@ const UNBOUND_SAFE = {
   'ledger.add': '记账本是个人数据，归属只看 openid，未绑定记的账 coupleId 为 null（文档 5.3.9）',
   'ledger.update': '同上：只能改自己名下的账，不需要伴侣',
   'ledger.remove': '同上：只能删自己名下的账，不需要伴侣',
+  'reminder.get': '读自己的提醒设置；解绑后仍要能打开页面把开关关掉（文档 7.15）',
+  'reminder.grant': '上报订阅授权结果，只影响自己的额度；未绑定时授权也可以先攒着',
 };
 
 /**
  * 只有部分路径需要绑定的 action：鉴权按入参分支，不能整条塞进上面两张表。
- * 每个都要写清「哪条路径不绑、为什么安全」。
+ * 值可以是字符串（原因，默认用 { who: 'partner' } / {} 两条路径探测），
+ * 也可以是 { reason, bound, free }：分支不看 who 的接口显式给出两边的入参。
  */
 const CONDITIONAL_BOUND = {
   'ledger.list': '自己的账本按 openid 归属，未绑定也能看（文档 5.3.9）；只有 who=partner 的伴侣视角要 requireBound',
+  'reminder.set': {
+    reason: '关闭提醒不需要绑定（解绑后必须能关掉）；只有 enabled=true 时才 requireBound，因为提醒内容是「给 TA 报平安」（文档 7.15）',
+    bound: { enabled: true },
+    free: { enabled: false },
+  },
 };
 
 /** 必须调用 ctx.requireBound() 的双人 action（与 UNBOUND_SAFE 互补） */
@@ -132,7 +140,7 @@ function requireBoundIndex(src) {
 
 test('双人 handler 必须调用 ctx.requireBound()（文档 11.9）', () => {
   const registered = Object.keys(handlers).sort();
-  assert.strictEqual(registered.length, 31, '登记的 action 数量变了，请同步分类');
+  assert.strictEqual(registered.length, 34, '登记的 action 数量变了，请同步分类');
   const classified = registered.filter((action) => (
     !Object.prototype.hasOwnProperty.call(UNBOUND_SAFE, action)
     && !Object.prototype.hasOwnProperty.call(CONDITIONAL_BOUND, action)
@@ -169,22 +177,24 @@ test('未绑定时调用双人 action 一律 NOT_BOUND（鉴权先于入参校�
 
 test('按路径鉴权的 action：伴侣视角未绑定必须 NOT_BOUND，自己的数据不需要绑定', async (t) => {
   captureConsoleError(t);
-  for (const [action, reason] of Object.entries(CONDITIONAL_BOUND)) {
+  for (const [action, spec] of Object.entries(CONDITIONAL_BOUND)) {
     assert.strictEqual(typeof handlers[action], 'function', action + ' 已不在 registry，请从 CONDITIONAL_BOUND 删除');
+    const normalized = typeof spec === 'string' ? { reason: spec } : spec;
+    const reason = normalized.reason;
     assert.ok(typeof reason === 'string' && reason.length > 0, action + ' 缺少「哪条路径不绑」的说明');
     assert.notStrictEqual(requireBoundIndex(sourceOf(action)), -1,
       action + ' 在 CONDITIONAL_BOUND 里却没调用 ctx.requireBound()');
 
-    // 伴侣视角：未绑定一定被拦住
+    // 需要绑定的那条路径：未绑定一定被拦住
     h.reset({}, 'oA');
-    const partner = await h.callAs('oA', action, { who: 'partner' });
-    assert.strictEqual(partner.code, 'NOT_BOUND', action + ' 的伴侣视角未绑定时应返回 NOT_BOUND');
+    const boundCase = await h.callAs('oA', action, normalized.bound || { who: 'partner' });
+    assert.strictEqual(boundCase.code, 'NOT_BOUND', action + ' 需要绑定的路径未绑定时应返回 NOT_BOUND');
 
-    // 自己的数据：未绑定不能因为「没对象」就报 NOT_BOUND
+    // 不需要绑定的那条路径：未绑定不能因为「没对象」就报 NOT_BOUND
     h.reset({}, 'oA');
-    const mine = await h.callAs('oA', action, {});
-    assert.notStrictEqual(mine.code, 'NOT_BOUND',
-      action + ' 的自己视角在未绑定时不该被绑定校验拦住（个人数据按 openid 归属）');
+    const freeCase = await h.callAs('oA', action, normalized.free || {});
+    assert.notStrictEqual(freeCase.code, 'NOT_BOUND',
+      action + ' 的免绑定路径在未绑定时不该被绑定校验拦住（个人数据按 openid 归属）');
   }
 });
 

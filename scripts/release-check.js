@@ -481,7 +481,22 @@ function checkDeployConfig(root, lines) {
       lines.push({ level: 'FAIL', msg: 'cloudfunctions/api/config.json 的 triggers 必须是数组' });
     }
     if (Array.isArray(openapi) && Array.isArray(cfg.triggers)) {
-      lines.push({ level: 'PASS', msg: '云函数 config.json 权限/触发器格式正确（openapi ' + openapi.length + ' 项）' });
+      // 只校验「是数组」不够：openapi 写成 [] 时代码会静默 fail-open（内容安全等于没接），
+      // 触发器丢了则订阅提醒永远不发，两者都不会在运行时报错，只能在这里拦
+      const REQUIRED_OPENAPI = ['security.msgSecCheck', 'subscribeMessage.send'];
+      const missingApi = REQUIRED_OPENAPI.filter((name) => openapi.indexOf(name) === -1);
+      if (missingApi.length) {
+        lines.push({ level: 'FAIL', msg: 'cloudfunctions/api/config.json 缺少云调用权限：' + missingApi.join('、') });
+      }
+      const trigger = cfg.triggers.find((t) => t && t.name === 'reminder-tick');
+      if (!trigger) {
+        lines.push({ level: 'FAIL', msg: 'cloudfunctions/api/config.json 缺少 reminder-tick 定时触发器' });
+      } else if (trigger.type !== 'timer' || !trigger.config) {
+        lines.push({ level: 'FAIL', msg: 'reminder-tick 触发器必须是 timer 类型并带 cron 配置' });
+      }
+      if (!missingApi.length && trigger && trigger.type === 'timer' && trigger.config) {
+        lines.push({ level: 'PASS', msg: '云函数 config.json 权限/触发器正确（openapi ' + openapi.length + ' 项，reminder-tick ' + trigger.config + '）' });
+      }
     }
   }
 
@@ -1055,7 +1070,9 @@ function runChecks(root) {
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 已重新上传部署（最近一次改动之后）' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 超时 10s、内存 256MB（文档 16.6；默认超时可能只有 3s，冷启动会偶发失败）' });
   lines.push({ level: 'TODO', msg: '微信公众平台确认：用户隐私保护指引（头像/昵称）已声明' });
-  lines.push({ level: 'TODO', msg: '双人真机按 docs/M6-真机验收与发布.md 跑 F1–F8，并导出一次数据库备份' });
+  lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 的定时触发器 reminder-tick 已生效（config.json 的 triggers 随部署上传）' });
+  lines.push({ level: 'TODO', msg: '云函数环境变量确认：YIYI_REMINDER_TEMPLATE_ID 已配订阅消息模板 ID（未配时「我的」页提醒开关是禁用态）' });
+  lines.push({ level: 'TODO', msg: '双人真机按 docs/M6-真机验收与发布.md 跑 F1–F12，并导出一次数据库备份' });
 
   const failed = lines.filter((l) => l.level === 'FAIL');
   return { ok: failed.length === 0, lines, warnings };

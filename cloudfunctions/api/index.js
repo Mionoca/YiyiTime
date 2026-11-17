@@ -6,10 +6,51 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const handlers = require('./handlers');
+const { runTimer } = require('./handlers/reminder');
 const { AppError, toErrorResponse } = require('./lib/errors');
 const { buildContext } = require('./lib/ctx');
 
+/**
+ * 定时触发器（config.json 的 triggers）走这里，不是 action：
+ * 客户端传 action: 'reminder.tick' 会被 action 白名单挡成 UNKNOWN_ACTION。
+ *
+ * 但 `event` 就是客户端 wx.cloud.callFunction({ data }) 的任意对象，光看 `Type === 'Timer'`
+ * 挡不住伪造——真实的定时触发器**没有用户身份**，所以必须再要求 getWXContext().OPENID 为空。
+ * 同时不信任 `event.Time`：伪造一个未来日期就能让 `todayKey` 错位，「一天最多一条」直接失效；
+ * 一律用服务端当前时间。
+ */
+function isTimerEvent(event) {
+  return !!(event && event.Type === 'Timer');
+}
+
 exports.main = async (event) => {
+  if (isTimerEvent(event)) {
+    const wx = cloud.getWXContext() || {};
+    if (wx.OPENID) {
+      console.error('[timer]', JSON.stringify({
+        reason: 'forged-timer-event',
+        openidTail: String(wx.OPENID).slice(-6),
+      }));
+      return { ok: false, code: 'FORBIDDEN', message: '这个操作还不存在' };
+    }
+
+    // 触发器失败会被云端重试，所以这里自己兜住异常，只留日志
+    const started = Date.now();
+    try {
+      const result = await runTimer({ trigger: event.TriggerName });
+      console.log('[timer]', JSON.stringify(Object.assign({ ms: Date.now() - started }, result)));
+      return { ok: true, data: result };
+    } catch (err) {
+      console.error('[timer]', JSON.stringify({
+        reason: 'crashed',
+        trigger: String(event.TriggerName || ''),
+        code: String((err && (err.code || err.errCode)) || 'INTERNAL_ERROR'),
+        message: err && err.message,
+      }));
+      return { ok: false, code: 'INTERNAL_ERROR' };
+    }
+  }
+
   const action = event && event.action;
   let openid = '';
   let coupleId = '';

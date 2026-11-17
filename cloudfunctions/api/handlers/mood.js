@@ -2,6 +2,7 @@
 
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
+const security = require('../lib/security');
 const time = require('../lib/time');
 const relation = require('../lib/relation');
 const { isDocumentMissing } = require('../lib/db-util');
@@ -23,6 +24,7 @@ async function set(payload, ctx) {
 
   const mood = validate.oneOf(p.mood, MOODS, '心情');
   const note = validate.string(p.note, { field: '备注', max: NOTE_MAX });
+  await security.assertText(ctx, note, 'social');
   const coupleId = ctx.couple._id || ctx.user.coupleId;
   const date = time.dateKeyOf(ctx.now);
   const id = `${ctx.openid}_${date}`;

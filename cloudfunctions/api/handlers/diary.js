@@ -2,6 +2,7 @@
 
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
+const security = require('../lib/security');
 const time = require('../lib/time');
 const relation = require('../lib/relation');
 const { isDocumentMissing } = require('../lib/db-util');
@@ -31,6 +32,7 @@ async function save(payload, ctx) {
   const content = validate.string(p.content, {
     field: '内容', min: 1, max: CONTENT_MAX, required: true, emptyCode: 'DIARY_EMPTY',
   });
+  await security.assertText(ctx, content, 'social');
   const coupleId = relation.coupleIdOf(ctx);
   const date = time.dateKeyOf(ctx.now);
   const unlockAt = time.nextUnlockAt(date);
