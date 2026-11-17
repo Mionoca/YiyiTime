@@ -1,17 +1,25 @@
 @import "./styles/tokens.wxss";
 
+/*
+ * 全局：手绘涂鸦风（文档 8.7）
+ * 四条硬规则：虚线边框 / 彩色实心硬阴影 / 极小圆角 / 不用渐变与等宽字体。
+ * 页面只写布局，视觉一律复用下面的 dk-* 公共类，避免各页各写一套。
+ */
+
 page {
   background-color: var(--bg);
   color: var(--ink);
   font-size: 28rpx;
   line-height: 1.6;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  /* 规范里的 Baloo 2 / Nunito 是网络字体，小程序要域名白名单且拖慢首屏，故降级到系统字体（8.7） */
+  font-family: "Baloo 2", "Comic Sans MS", "Trebuchet MS", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 view,
 text,
 button,
 input,
+textarea,
 image {
   box-sizing: border-box;
 }
@@ -20,36 +28,206 @@ button::after {
   border: none;
 }
 
-/* 通用：主按钮 / 次按钮 */
+/*
+ * dk-page：页面内容容器。
+ * tab 页要留出 tabBar + 安全区，否则最后一张卡被压住（文档 8.2 / 9.9）。
+ */
+.dk-page {
+  padding: 24rpx 24rpx 48rpx;
+}
+
+.dk-page--tab {
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
+}
+
+/* ── 便签卡 ───────────────────────────────────────────────────── */
+.dk-card {
+  position: relative;
+  padding: 32rpx;
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+/* 同屏最多两张卡带旋转，其余保持水平（否则整页歪斜伤可读性） */
+.dk-card--tilt-l {
+  transform: rotate(-1deg);
+}
+
+.dk-card--tilt-r {
+  transform: rotate(1deg);
+}
+
+/* 装饰胶带：只贴日子卡左上角，纯装饰不接点击（文档 9.8） */
+.dk-tape {
+  position: absolute;
+  top: -14rpx;
+  left: 28rpx;
+  width: 104rpx;
+  height: 26rpx;
+  background-color: rgba(255, 217, 61, 0.82);
+  transform: rotate(-4deg);
+  pointer-events: none;
+}
+
+/* ── 文字层级 ─────────────────────────────────────────────────── */
+.dk-label {
+  display: inline-block;
+  font-size: 22rpx;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.dk-title {
+  font-size: 36rpx;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.dk-sub {
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.dk-num {
+  font-size: 56rpx;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  /* 标题允许 -2° 斜切（规范 -3°，中文略收一点更好读） */
+  transform: rotate(-2deg);
+}
+
+/* 链接式文字：青色 + 虚线下划线，不用渐变与实线 */
+.dk-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 88rpx;
+  padding: 0 4rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--accent-ink);
+  border-bottom: 2rpx dashed var(--accent-ink);
+}
+
+.dk-divider {
+  height: 0;
+  margin: 24rpx 0;
+  border-top: 2rpx dashed var(--ink-faint);
+}
+
+/* ── 按钮 ─────────────────────────────────────────────────────── */
+/* 通用主按钮：奶白底 + 虚线墨边 + 墨黑字 + 马克笔红硬阴影 */
 .btn-primary {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 96rpx;
-  padding: 0 48rpx;
-  border-radius: 48rpx;
-  /* 白字要压在 --accent-strong 上才够对比度（文档 8.9） */
-  background-color: var(--accent-strong, #A85C42);
-  color: #FFFFFF;
+  min-height: 96rpx;
+  padding: 0 40rpx;
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-btn);
+  color: var(--ink);
   font-size: 30rpx;
-  font-weight: 500;
+  font-weight: 800;
+  line-height: 1.4;
   letter-spacing: 2rpx;
+  transition: transform 150ms linear;
+}
+
+/* 按下：整体位移 + 去阴影，做出「按进纸里」的手感（只动 transform，8.9） */
+.btn-primary:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: none;
+}
+
+/* 强 CTA：墨黑底 + 奶白字，阴影仍是马克笔红 */
+.btn-primary.btn-solid {
+  background-color: var(--accent-strong);
+  color: var(--card);
+  border-color: var(--line);
 }
 
 .btn-primary.btn-ghost {
   background-color: transparent;
-  border: 2rpx solid var(--accent-strong, #A85C42);
-  /* --accent 本身在浅底上对比度不足，描边按钮文字用 --accent-ink（文档 8.9） */
   color: var(--accent-ink);
+  box-shadow: none;
+  border-color: var(--accent-ink);
 }
 
 .btn-primary[disabled] {
   opacity: 0.5;
-  color: #FFFFFF;
+  box-shadow: none;
+  color: var(--ink);
 }
 
+.btn-primary.btn-solid[disabled] {
+  color: var(--card);
+}
+
+/* ── 骨架：虚线圈出的空卡，首屏不白屏（文档 9.12）─────────────── */
+.dk-skeleton {
+  position: relative;
+  padding: 32rpx;
+  background-color: var(--card);
+  border: 3rpx dashed var(--ink-faint);
+  border-radius: var(--radius-md);
+}
+
+.dk-skeleton__bar {
+  height: 28rpx;
+  margin-bottom: 20rpx;
+  background-color: var(--ink-faint);
+  opacity: 0.35;
+  animation: dk-pulse 1200ms linear infinite;
+}
+
+.dk-skeleton__bar:last-child {
+  width: 40%;
+  margin-bottom: 0;
+}
+
+.dk-skeleton__bar--lg {
+  height: 56rpx;
+  width: 55%;
+}
+
+@keyframes dk-pulse {
+  0% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+
+/* ── 兼容旧类名：card 也按涂鸦风渲染（原为大圆角 + 灰阴影）─────── */
 .card {
   background-color: var(--card);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8rpx 32rpx rgba(63, 58, 54, 0.08);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+/* 减少动态效果：系统开启后只保留必要的透明度变化（8.9 / 12.9） */
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary,
+  .dk-card--tilt-l,
+  .dk-card--tilt-r {
+    transition: none;
+  }
+
+  .dk-skeleton__bar {
+    animation: none;
+  }
 }

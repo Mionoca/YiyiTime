@@ -10,7 +10,8 @@ const path = require('node:path');
  * - 子页（非自定义导航）必须在页面 json 打开 enablePullDownRefresh，否则手势不触发；
  * - 打开后页面 js 的 onPullDownRefresh 里必须调用 wx.stopPullDownRefresh()，
  *   否则用户会一直看到转圈（失败分支也要收起）。
- * home 是 navigationStyle: custom + disableScroll 的自定义导航页，不在「子页」范围。
+ * M8 起首页也回归默认导航 + 可滚动卡片流，所以要一起纳入检查；
+ * 任何页面改回 navigationStyle: custom 都会被这里的名单变化拦住。
  */
 const ROOT = path.join(__dirname, '..');
 const MINI = path.join(ROOT, 'miniprogram');
@@ -47,6 +48,7 @@ test('pull-down: 非自定义导航的子页都开启了 enablePullDownRefresh�
   assert.deepStrictEqual(subPages().slice().sort(), [
     'pages/bind/index',
     'pages/diary/index',
+    'pages/home/index',
     'pages/mood/index',
     'pages/profile/index',
     'pages/safety/index',
@@ -57,7 +59,7 @@ test('pull-down: 非自定义导航的子页都开启了 enablePullDownRefresh�
   }
 });
 
-test('pull-down: onPullDownRefresh 处理器内必须调用 wx.stopPullDownRefresh，home 不开启系统下拉', () => {
+test('pull-down: onPullDownRefresh 处理器内必须调用 wx.stopPullDownRefresh', () => {
   for (const page of subPages()) {
     const js = stripComments(fs.readFileSync(path.join(MINI, page + '.js'), 'utf8'));
     const body = methodBody(js, 'onPullDownRefresh');
@@ -66,7 +68,9 @@ test('pull-down: onPullDownRefresh 处理器内必须调用 wx.stopPullDownRefre
     }
     assert.match(body, /wx\.stopPullDownRefresh\s*\(/, page + ' 的 onPullDownRefresh 没有收起转圈');
   }
-  // home 是自定义导航 + disableScroll，不靠系统下拉刷新（文档 9.2）
-  assert.strictEqual(pageJson('pages/home/index').navigationStyle, 'custom');
-  assert.notStrictEqual(pageJson('pages/home/index').enablePullDownRefresh, true);
+  // M8：首页不再是「一屏场景」，卡片流可滚动，靠系统下拉刷新（文档 9.9）
+  const home = pageJson('pages/home/index');
+  assert.strictEqual(home.enablePullDownRefresh, true);
+  assert.notStrictEqual(home.navigationStyle, 'custom', '首页已回归默认导航栏');
+  assert.notStrictEqual(home.disableScroll, true, '首页卡片流要能滚动');
 });

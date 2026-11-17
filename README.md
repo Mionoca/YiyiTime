@@ -22,17 +22,18 @@ YiyiTime/
 │  └─ lib/                          # ctx / errors / time / validate / db / db-util / relation / home-blocks
 ├─ miniprogram/
 │  ├─ pages/
-│  │  ├─ home/                      # 小屋首页（场景、门口信封、两个入口页脚）
+│  │  ├─ home/                      # 今天（天数卡 / 抱抱卡 / 心情卡 / 四宫格入口）
 │  │  ├─ bind/                      # 双人绑定与邀请码
 │  │  ├─ profile/                   # 我的（昵称头像、开始日期、隐私保护指引 / 数据与隐私说明）
 │  │  ├─ safety/                    # 报平安（我到家了 + 时间线）
 │  │  ├─ diary/                     # 台灯下的日记（当天上锁，次日解锁）
 │  │  ├─ wish/                      # 下次见面想做的事
 │  │  └─ mood/                      # 心情记录（两人按天倒序，只读时间线）
+│  ├─ custom-tab-bar/               # 自定义 tabBar（今天 / 日记 / 愿望 / 心情 / 我的）
 │  ├─ components/                   # avatar-bubble / mood-picker / hug-banner / bottom-sheet /
 │  │                                # timeline-item / diary-card / wish-item / empty-state / privacy-guard
-│  ├─ utils/                        # api（唯一云函数入口）、constants、time、format、me、upload、haptics、privacy
-│  ├─ styles/tokens.wxss            # 颜色/间距/字号设计变量
+│  ├─ utils/                        # api（唯一云函数入口）、constants、tabbar、time、format、me、upload、haptics、privacy
+│  ├─ styles/tokens.wxss            # 手绘涂鸦风设计变量（颜色 / 描边 / 硬阴影 / 间距 / 字号）
 │  ├─ config/env.example.js         # 环境 ID 模板（env.js 不入库）
 │  └─ images/avatars/               # 默认头像
 ├─ tests/                           # 云函数 / 页面 / 组件级单测 + WXML 绑定自检（helpers: fake-db / cloud-entry / client-page）
@@ -70,7 +71,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 535 个用例）
+node --test                       # 自动发现 tests/*.test.js（Node 22 实测 540 个用例）
 # 或只跑一个文件：node tests/hug.test.js
 ```
 
@@ -100,7 +101,9 @@ node scripts/release-check.js   # 页面/组件路径与注册（`usingComponent
 - 不信任客户端传来的 `openid` / `coupleId`，一律从上下文取。
 - handler 只返回纯数据，不返回 `bindFailCount` / `lastActiveAt` 等内部字段。
 - 日志不打日记正文、愿望备注、完整邀请码；客户端 `console` 不打 openid/coupleId/邀请码。
-- 文字对比度按 8.9：正文 `--ink`/`--muted`，白字按钮底色用 `--accent-strong`，`--ink-faint` 只做装饰。
+- 文字对比度按 8.9：正文 `--ink`、次要文字 `--muted`（两者在 `--paper` / `--card` 上都 ≥4.5:1）；`--marker-red` / `--marker-teal` / `--marker-yellow` 只做底块与描边，不当正文色；`--ink-faint` 只做装饰。
+- 视觉按 8.7「手绘涂鸦风（hand-drawn-doodle）」：3rpx 虚线描边 + 4/6rpx 小圆角 + 彩色硬阴影（`8rpx 8rpx 0`）、150ms linear、`:active` 位移 3rpx 且阴影归零；禁渐变、禁 999rpx 胶囊、不引网络字体（字体栈本地降级）。
+- 导航：`pages/home` / `diary` / `wish` / `mood` / `profile` 是 tab 页，一律 `wx.switchTab` 并按 `utils/constants.js` 的 `TAB_ROUTES` 判断；`bind` / `safety` 不是 tab，用 `wx.navigateTo`；每个 tab 页 `onShow` 首行 `tabbar.sync(this, ROUTES.x)` 维持自定义 tabBar 选中态。
 
 ## 进度
 

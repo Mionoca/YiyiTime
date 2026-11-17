@@ -1,42 +1,67 @@
 page {
-  /* 颜色 */
-  --bg: #FBF6EE;
-  --wall: #F3E8D8;
-  --floor: #E7D3B8;
-  --ink: #3F3A36;
-  /* 文档 8.9：正文/提示文字需 ≥4.5:1（#6F685F 在 --bg / --card 上分别为 5.11 / 5.41） */
-  --muted: #6F685F;
-  --ink-faint: #C4B9AC;
-  --accent: #D98E73;
-  /* 按钮底色：白字在 #D98E73 上只有 2.6:1，改用加深一档的 #A85C42（4.91:1，文档 8.9） */
-  --accent-strong: #A85C42;
-  /* 强调文字：在 --accent-soft 上 5.47:1、在 --card 上 8.15:1（文档 8.9；#8A5A45 只有 3.83:1） */
-  --accent-ink: #6E4433;
-  --accent-soft: #F4C9B8;
-  --card: #FFFDF9;
-  --danger: #C25B4E;
-  --success: #7A9B76;
-  --sunny: #F2CC8F;
-  --cloudy: #B8C0CC;
-  --rainy: #7A9CC6;
+  /* ── 纸与墨（手绘涂鸦风，文档 8.7）──────────────────────────── */
+  /* 奶白纸底；卡片与纸同色，靠虚线边 + 彩色硬阴影区分层次 */
+  --bg: #FFFEF5;
+  --card: #FFFEF5;
+  /* 牛皮纸/便签条底色，用于需要「贴上去」的区块 */
+  --wall: #F6EFD8;
+  --floor: #EFE4C6;
+  /* 签字笔：正文、标题、虚线描边 */
+  --ink: #2C2C2C;
+  /* 说明文字：在纸底上 7.0:1（文档 8.9 要求 ≥4.5） */
+  --muted: #5F574C;
+  /* 占位线、禁用态、骨架 */
+  --ink-faint: #B9B0A0;
+  --line: #2C2C2C;
+
+  /* ── 三支马克笔：只做装饰与阴影，不做正文色 ─────────────────── */
+  --marker-red: #FF6B6B;
+  --marker-teal: #4ECDC4;
+  --marker-yellow: #FFD93D;
+  /* 压在黄色上的文字（4.9:1） */
+  --olive: #A98D16;
+
+  /* ── 语义色（沿用旧变量名，值换成涂鸦色板）──────────────────── */
+  --accent: #FF6B6B;
+  /* 实心按钮底：奶白字压墨黑 12.0:1 */
+  --accent-strong: #2C2C2C;
+  /* 浅色底上的强调文字：在 --accent-soft 上 7.7:1 */
+  --accent-ink: #7A2E22;
+  --accent-soft: #FFE3D9;
+  --danger: #B23A2E;
+  --success: #2F7A5B;
+
+  /* ── 心情四色：只用于气泡与圆点，始终配文字 + emoji ─────────── */
+  --sunny: #FFD93D;
+  --cloudy: #B9C0CA;
+  --rainy: #4ECDC4;
   --thunder: #6C6A8A;
 
-  /* 圆角 */
-  --radius-sm: 12rpx;
-  --radius-md: 20rpx;
-  --radius-lg: 32rpx;
+  /* ── 形状：涂鸦风只用极小圆角，边界靠虚线 ──────────────────── */
+  --radius-sm: 4rpx;
+  --radius-md: 4rpx;
+  --radius-lg: 6rpx;
+  --border-dash: 3rpx dashed var(--line);
+  --border-dash-thin: 2rpx dashed var(--line);
+  /* 硬阴影：彩色实心偏移，不用灰色模糊 */
+  --shadow-card: 8rpx 8rpx 0 var(--marker-yellow);
+  --shadow-btn: 6rpx 6rpx 0 var(--marker-red);
 
-  /* 间距 */
+  /* ── 间距 ────────────────────────────────────────────────── */
   --space-xs: 8rpx;
   --space-sm: 16rpx;
   --space-md: 24rpx;
   --space-lg: 32rpx;
   --space-xl: 48rpx;
 
-  /* 字号 */
+  /* ── 字号 ────────────────────────────────────────────────── */
   --font-xs: 22rpx;
   --font-sm: 24rpx;
   --font-md: 28rpx;
   --font-lg: 40rpx;
   --font-xl: 56rpx;
+
+  /* ── tabBar 与安全区（文档 8.2 / 9.9）─────────────────────── */
+  --tabbar-h: 100rpx;
+  --tabbar-safe: calc(140rpx + env(safe-area-inset-bottom));
 }

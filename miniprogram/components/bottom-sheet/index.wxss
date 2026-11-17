@@ -1,10 +1,11 @@
+/* 底部弹层：涂鸦风（文档 8.7） */
 .bs {
   position: fixed;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  /* 文档 9.8：页面级浮层在第 6 层 */
+  /* 文档 9.8：页面级浮层在第 60 层 */
   z-index: 60;
 }
 
@@ -14,7 +15,7 @@
   right: 0;
   top: 0;
   bottom: 0;
-  background: rgba(63, 58, 54, 0.32);
+  background-color: rgba(44, 44, 44, 0.35);
 }
 
 .bs__sheet {
@@ -23,30 +24,38 @@
   right: 0;
   bottom: 0;
   padding: 24rpx 48rpx calc(48rpx + env(safe-area-inset-bottom));
-  border-radius: 32rpx 32rpx 0 0;
-  background: var(--card, #FFFDF9);
-  animation: bs-up 240ms ease-out;
+  background-color: var(--card);
+  /* 便签从下面抽出来：边框走虚线，顶部两角略收 */
+  border-top: 3rpx dashed var(--line);
+  border-left: 3rpx dashed var(--line);
+  border-right: 3rpx dashed var(--line);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  animation: bs-up 240ms linear;
 }
 
 @keyframes bs-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  0% {
+    transform: translateY(100%);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
 
 .bs__handle {
   width: 64rpx;
   height: 8rpx;
   margin: 0 auto 16rpx;
-  border-radius: 999rpx;
-  background: var(--ink-faint, #C4B9AC);
+  background-color: var(--ink-faint);
+  border-radius: 4rpx;
 }
 
 .bs__title {
   padding: 8rpx 0 16rpx;
   text-align: center;
-  font-size: var(--font-lg, 40rpx);
-  font-weight: 600;
-  color: var(--ink, #3F3A36);
+  font-size: var(--font-lg);
+  font-weight: 800;
+  color: var(--ink);
 }
 
 .bs__body {

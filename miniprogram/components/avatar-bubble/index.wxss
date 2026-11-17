@@ -1,3 +1,4 @@
+/* 头像 + 心情气泡：涂鸦风（文档 8.7 / 9.5） */
 .avatar-bubble {
   display: inline-flex;
   flex-direction: column;
@@ -7,8 +8,8 @@
 
 /* ---------- 心情气泡 ---------- */
 .bubble {
-  --bubble-bg: var(--card, #FFFDF9);
-  --bubble-color: var(--ink, #3F3A36);
+  --bubble-bg: var(--card);
+  --bubble-color: var(--ink);
   position: relative;
   display: flex;
   align-items: center;
@@ -16,10 +17,12 @@
   min-width: 64rpx;
   margin-bottom: 10rpx;
   padding: 6rpx 14rpx;
-  border-radius: 24rpx;
+  border-radius: var(--radius-sm);
   background: var(--bubble-bg);
+  border: 2rpx dashed var(--line);
   color: var(--bubble-color);
-  box-shadow: 0 4rpx 12rpx rgba(63, 58, 54, 0.12);
+  /* 彩色硬阴影，不用灰色模糊（8.7） */
+  box-shadow: 4rpx 4rpx 0 var(--marker-yellow);
   /* 气泡在头像右上方（文档 9.5），三角指向头像 */
   align-self: flex-end;
   margin-right: -10rpx;
@@ -27,7 +30,7 @@
 
 /* 只在心情真的变化时由页面/组件加 class 触发一次淡入（文档 10.4） */
 .bubble.is-pop {
-  animation: bubble-in 200ms ease-out;
+  animation: bubble-in 200ms linear;
 }
 
 .bubble__icon {
@@ -38,7 +41,7 @@
 
 .bubble__char {
   font-size: 26rpx;
-  font-weight: 600;
+  font-weight: 800;
   line-height: 1.1;
 }
 
@@ -53,40 +56,47 @@
   border-top: 8rpx solid var(--bubble-bg);
 }
 
+/* 四色只做淡底，文字用深色保证对比度（不只靠颜色，8.9） */
 .bubble--sunny {
-  --bubble-bg: #FDF2DC;
-  --bubble-color: #8A6420;
+  --bubble-bg: #FFF3C4;
+  --bubble-color: #4A3A00;
 }
 
 .bubble--cloudy {
-  --bubble-bg: #EEF1F5;
-  --bubble-color: #4F5866;
+  --bubble-bg: #EDF0F4;
+  --bubble-color: #3C424C;
 }
 
 .bubble--rainy {
-  --bubble-bg: #E6EEF8;
-  --bubble-color: #3D5B7C;
+  --bubble-bg: #D9F5F2;
+  --bubble-color: #1F4B48;
 }
 
 .bubble--thunder {
-  --bubble-bg: #E8E6F0;
-  --bubble-color: #45425E;
+  --bubble-bg: #E6E4F0;
+  --bubble-color: #33304A;
 }
 
 .bubble--empty {
-  border: 2rpx dashed var(--ink-faint, #C4B9AC);
-  background: rgba(255, 253, 249, 0.72);
-  color: var(--muted, #8C837A);
+  border: 2rpx dashed var(--ink-faint);
+  background: var(--card);
+  color: var(--muted);
   box-shadow: none;
 }
 
 .bubble--empty .bubble__tail {
-  border-top-color: rgba(255, 253, 249, 0.72);
+  border-top-color: var(--card);
 }
 
 @keyframes bubble-in {
-  from { opacity: 0; transform: translateY(6rpx) scale(0.94); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  0% {
+    opacity: 0;
+    transform: translateY(6rpx) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ---------- 头像 ---------- */
@@ -95,27 +105,30 @@
   display: flex;
 }
 
+/* 圆形保留（人像惯例），描边改虚线 + 硬阴影，像贴上去的照片 */
 .avatar {
   width: 96rpx;
   height: 96rpx;
   border-radius: 50%;
-  border: 6rpx solid #FFFDF9;
-  background: var(--wall, #F3E8D8);
-  box-shadow: 0 6rpx 14rpx rgba(63, 58, 54, 0.14);
+  border: 3rpx dashed var(--line);
+  background: var(--wall);
+  box-shadow: 4rpx 4rpx 0 var(--marker-yellow);
 }
 
 .avatar-bubble--sm .avatar {
-  width: 64rpx;
-  height: 64rpx;
-  border-width: 4rpx;
+  width: 72rpx;
+  height: 72rpx;
+  border-width: 2rpx;
+  box-shadow: 3rpx 3rpx 0 var(--marker-yellow);
 }
 
 .avatar-bubble--lg .avatar {
   width: 132rpx;
   height: 132rpx;
-  border-width: 8rpx;
+  border-width: 4rpx;
 }
 
+/* 对方有 pending 抱抱：心形角标 */
 .hug-badge {
   position: absolute;
   right: -8rpx;
@@ -125,14 +138,21 @@
   line-height: 34rpx;
   text-align: center;
   border-radius: 50%;
-  background: var(--accent-strong, #A85C42);
-  color: #FFFFFF;
+  background: var(--accent-strong);
+  color: var(--card);
   font-size: 20rpx;
-  box-shadow: 0 2rpx 8rpx rgba(63, 58, 54, 0.2);
-  animation: badge-beat 1.4s ease-in-out infinite;
+  box-shadow: 2rpx 2rpx 0 var(--marker-red);
+  animation: badge-beat 1400ms linear infinite;
 }
 
 @keyframes badge-beat {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.14); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
 }

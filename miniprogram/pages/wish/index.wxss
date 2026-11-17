@@ -1,15 +1,17 @@
+/* 下次见面想做的事：涂鸦风（文档 8.7） */
 .page {
   min-height: 100vh;
-  padding: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
-  background: var(--bg, #FBF6EE);
+  padding: 24rpx 24rpx calc(140rpx + env(safe-area-inset-bottom));
+  background-color: var(--bg);
 }
 
 /* ---------- 进度 ---------- */
 .stats {
   padding: 28rpx 32rpx;
-  border-radius: var(--radius-lg, 32rpx);
-  background: var(--card, #FFFDF9);
-  box-shadow: 0 8rpx 32rpx rgba(63, 58, 54, 0.08);
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
 }
 
 .stats__top {
@@ -19,36 +21,39 @@
 }
 
 .stats__title {
-  font-size: var(--font-md, 28rpx);
-  color: var(--ink, #3F3A36);
-  font-weight: 600;
+  font-size: var(--font-md);
+  font-weight: 800;
+  color: var(--ink);
 }
 
 .stats__num {
-  font-size: var(--font-lg, 40rpx);
-  color: var(--accent, #D98E73);
-  font-weight: 600;
+  font-size: var(--font-lg);
+  font-weight: 800;
+  color: var(--accent-ink);
+  transform: rotate(-2deg);
 }
 
+/* 进度条：实心马克笔色 + 虚线边，不用渐变（8.7） */
 .stats__bar {
-  height: 12rpx;
+  height: 20rpx;
   margin: 20rpx 0 12rpx;
-  border-radius: 999rpx;
-  background: var(--wall, #F3E8D8);
+  background-color: var(--wall);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
 .stats__bar-in {
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #F2CC8F 0%, #D98E73 100%);
+  background-color: var(--marker-teal);
   transform-origin: left center;
-  transition: transform 300ms ease;
+  transition: transform 300ms linear;
 }
 
 .stats__hint {
-  font-size: var(--font-xs, 22rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-xs);
+  color: var(--muted);
 }
 
 /* ---------- 新增按钮 ---------- */
@@ -56,18 +61,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 96rpx;
   margin: 24rpx 0 8rpx;
-  padding: 26rpx 0;
-  border-radius: var(--radius-lg, 32rpx);
-  border: 2rpx dashed var(--accent, #D98E73);
-  color: var(--accent-ink, #6E4433);
-  font-size: var(--font-md, 28rpx);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  background-color: var(--card);
+  box-shadow: var(--shadow-btn);
+  color: var(--ink);
+  font-size: var(--font-md);
+  font-weight: 800;
+  transition: transform 150ms linear;
+}
+
+.add:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: none;
 }
 
 .add--disabled {
   opacity: 0.45;
-  border-color: var(--muted, #6F685F);
-  color: var(--muted, #8C837A);
+  box-shadow: none;
+  border-color: var(--ink-faint);
+  color: var(--muted);
 }
 
 .add__plus {
@@ -77,8 +92,8 @@
 
 .limit-hint {
   padding: 8rpx 8rpx 16rpx;
-  font-size: var(--font-xs, 22rpx);
-  color: var(--danger, #C25B4E);
+  font-size: var(--font-xs);
+  color: var(--danger);
   text-align: center;
 }
 
@@ -86,8 +101,8 @@
 .hint {
   padding: 32rpx 0;
   text-align: center;
-  font-size: var(--font-sm, 24rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-sm);
+  color: var(--muted);
 }
 
 .state {
@@ -97,13 +112,13 @@
 
 .state__text {
   margin-bottom: 40rpx;
-  font-size: var(--font-md, 28rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-md);
+  color: var(--muted);
 }
 
 .state__btn {
   display: inline-flex;
-  height: 80rpx;
+  min-height: 88rpx;
   padding: 0 56rpx;
 }
 
@@ -118,41 +133,43 @@
 
 .empty__text {
   margin-top: 16rpx;
-  font-size: var(--font-md, 28rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-md);
+  color: var(--muted);
 }
 
-/* ---------- 弹层表单 ---------- */
+/* ---------- 弹层表单：便签输入（8.7 Scribble Input）---------- */
 .form__input {
   height: 96rpx;
-  padding: 0 28rpx;
-  border-radius: var(--radius-md, 20rpx);
-  background: var(--bg, #FBF6EE);
-  font-size: var(--font-md, 28rpx);
-  color: var(--ink, #3F3A36);
+  padding: 0 24rpx;
+  background-color: var(--wall);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-md);
+  color: var(--ink);
 }
 
 .form__placeholder {
-  color: var(--muted, #6F685F);
+  color: var(--muted);
 }
 
 .form__textarea {
   width: 100%;
   min-height: 160rpx;
   margin-top: 24rpx;
-  padding: 20rpx 28rpx;
-  border-radius: var(--radius-md, 20rpx);
-  background: var(--bg, #FBF6EE);
-  font-size: var(--font-md, 28rpx);
+  padding: 20rpx 24rpx;
+  background-color: var(--wall);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-md);
   line-height: 1.6;
-  color: var(--ink, #3F3A36);
+  color: var(--ink);
 }
 
 .form__count {
   padding: 8rpx 8rpx 0;
   text-align: right;
-  font-size: var(--font-xs, 22rpx);
-  color: var(--muted, #6F685F);
+  font-size: var(--font-xs);
+  color: var(--muted);
 }
 
 .form__actions {
@@ -167,11 +184,12 @@
   align-items: center;
   justify-content: center;
   width: 176rpx;
-  height: 96rpx;
+  min-height: 96rpx;
   margin-right: 20rpx;
-  border-radius: 48rpx;
-  background: var(--bg, #FBF6EE);
-  color: var(--muted, #8C837A);
+  background-color: transparent;
+  border: 3rpx dashed var(--ink-faint);
+  border-radius: var(--radius-md);
+  color: var(--muted);
   font-size: 28rpx;
 }
 
@@ -180,15 +198,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 96rpx;
-  border-radius: 48rpx;
-  background: var(--accent-strong, #A85C42);
-  color: #FFFFFF;
+  min-height: 96rpx;
+  background-color: var(--accent-strong);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-btn);
+  color: var(--card);
   font-size: 30rpx;
-  font-weight: 500;
+  font-weight: 800;
   letter-spacing: 2rpx;
+  transition: transform 150ms linear;
+}
+
+.form__save:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: none;
 }
 
 .form__save--disabled {
   opacity: 0.5;
+  box-shadow: none;
 }

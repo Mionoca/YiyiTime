@@ -52,7 +52,8 @@ function setup(handlers, wxExtra) {
     Object.assign(
       {
         showToast: (opts) => toasts.push(opts),
-        navigateTo: (opts) => navs.push(opts),
+        navigateTo: (opts) => navs.push({ kind: 'navigateTo', url: opts.url }),
+        switchTab: (opts) => navs.push({ kind: 'switchTab', url: opts.url }),
         showModal: (opts) => {
           const next = setup.modal && setup.modal(opts);
           if (next) opts.success && opts.success(next);
@@ -201,25 +202,23 @@ test('home: 再试一次仍失败保留浮层提示，不整页报错也不丢�
   }
 });
 
-test('home: 底部浮层在模板里接上 onRetryRefresh，位于场景之后、底部动作之前', () => {
+test('home: 静默刷新失败的横幅接上 onRetryRefresh，并在卡片之前吸顶', () => {
   const path = require('node:path');
   const wxml = fs.readFileSync(path.join(__dirname, '..', 'miniprogram/pages/home/index.wxml'), 'utf8');
   const wxss = fs.readFileSync(path.join(__dirname, '..', 'miniprogram/pages/home/index.wxss'), 'utf8');
-  assert.ok(wxml.includes('wx:if="{{home && refreshError}}"'), '浮层要按 home && refreshError 条件渲染');
-  assert.ok(wxml.includes('bindtap="onRetryRefresh"'), '浮层按钮必须接上重试方法');
-  assert.ok(wxml.includes('aria-role="button"'), '浮层按钮要声明无障碍角色');
-  assert.ok(wxml.includes('aria-label="重试加载首页"'), '浮层按钮要有区分于可见文字的 aria-label');
+  assert.ok(wxml.includes('wx:if="{{home && refreshError}}"'), '横幅要按 home && refreshError 条件渲染');
+  assert.ok(wxml.includes('bindtap="onRetryRefresh"'), '横幅按钮必须接上重试方法');
+  assert.ok(wxml.includes('aria-role="button"'), '横幅按钮要声明无障碍角色');
+  assert.ok(wxml.includes('aria-label="重试加载首页"'), '横幅按钮要有区分于可见文字的 aria-label');
   assert.ok(!wxml.includes('小屋的门卡住了'), '文案只放在 data.refreshError，模板不再硬编码一份');
-  const sceneAt = wxml.indexOf('class="scene {{sceneEnter');
   const barAt = wxml.indexOf('refresh-bar');
-  const actionAt = wxml.indexOf('<!-- 底部动作 -->');
+  const daysAt = wxml.indexOf('class="dk-card days-card');
   assert.ok(barAt > 0, '模板里应有 refresh-bar');
-  assert.ok(sceneAt > 0, '真实场景（class="scene {{sceneEnter…"）应存在');
-  assert.ok(sceneAt < barAt, '浮层要排在真实场景之后，不能只排在骨架屏之后');
-  assert.ok(actionAt > 0 && barAt < actionAt, '浮层要插在场景之后、底部动作之前，避免遮挡热区');
-  const btnRule = wxss.slice(wxss.indexOf('.refresh-bar-btn {'), wxss.indexOf('}', wxss.indexOf('.refresh-bar-btn {')));
+  assert.ok(daysAt > 0 && barAt < daysAt, '横幅要排在卡片之前，吸顶后不遮挡内容');
+  const btnRule = wxss.slice(wxss.indexOf('.refresh-bar__btn {'), wxss.indexOf('}', wxss.indexOf('.refresh-bar__btn {')));
   assert.ok(btnRule.includes('min-height: 88rpx'), '失败态唯一恢复入口要满足 88rpx 热区（文档 8.9）');
-  assert.ok(wxss.includes('.phase-night .refresh-bar'), '夜间浮层要跟着整体降亮（文档 9.6）');
+  const barRule = wxss.slice(wxss.indexOf('.refresh-bar {'), wxss.indexOf('}', wxss.indexOf('.refresh-bar {')));
+  assert.ok(barRule.includes('position: sticky'), '横幅要吸顶，滚到下面也能重试（文档 9.12）');
 });
 
 test('home: 心情打卡成功后先更新气泡、关弹层、提示并静默刷新', async () => {
@@ -289,7 +288,7 @@ test('home: 点对方头像打开只读心情详情，备注只在那里出现',
   }
 });
 
-test('home: 未绑定时点对方头像与房间入口只提示，不跳转', async () => {
+test('home: 未绑定时点对方头像与四个入口只提示，不跳转', async () => {
   const { page, toasts, navs } = setup({
     'home.get': () =>
       baseHome({
@@ -304,29 +303,32 @@ test('home: 未绑定时点对方头像与房间入口只提示，不跳转', as
     await page.load();
     page.onTapPartnerAvatar();
     assert.ok(toasts.some((t) => t.title === '等 TA 住进来吧'));
-    page.onTapLamp();
-    page.onTapFridge();
-    page.onTapDoor();
+    page.onTapDiary();
+    page.onTapWish();
+    page.onTapSafety();
+    page.onTapMoodHistory();
     assert.ok(toasts.some((t) => t.title === '等 TA 住进来，这里就开门啦'));
-    assert.strictEqual(navs.length, 0);
+    assert.strictEqual(navs.length, 0, '未绑定不该跳进空页面');
   } finally {
     teardown(page);
     restoreWx();
   }
 });
 
-test('home: 已绑定时房间入口分别打开日记/愿望/报平安', async () => {
+test('home: 四个入口按 tab / 非 tab 分别用 switchTab 与 navigateTo（文档 8.2）', async () => {
   const { page, navs } = setup({ 'home.get': () => baseHome() });
   try {
     await page.load();
-    page.onTapLamp();
-    page.onTapFridge();
-    page.onTapTableNote();
-    page.onTapDoor();
-    assert.deepStrictEqual(
-      navs.map((n) => n.url),
-      [constants.ROUTES.diary, constants.ROUTES.wish, constants.ROUTES.wish, constants.ROUTES.safety]
-    );
+    page.onTapDiary();
+    page.onTapWish();
+    page.onTapMoodHistory();
+    page.onTapSafety();
+    assert.deepStrictEqual(navs, [
+      { kind: 'switchTab', url: constants.ROUTES.diary },
+      { kind: 'switchTab', url: constants.ROUTES.wish },
+      { kind: 'switchTab', url: constants.ROUTES.mood },
+      { kind: 'navigateTo', url: constants.ROUTES.safety },
+    ]);
   } finally {
     teardown(page);
     restoreWx();

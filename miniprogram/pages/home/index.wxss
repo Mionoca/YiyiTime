@@ -1,1140 +1,348 @@
-.home-page {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+/*
+ * 首页：卡片式仪表盘（文档 9.2 / 8.7）。
+ * 视觉全部来自 app.wxss 的 dk-* 公共类，这里只写布局与少数局部尺寸。
+ */
+
+.home {
+  min-height: 100vh;
+  /* tab 页底部留出 tabBar + 安全区（文档 9.9），改写自 app.wxss 的 dk-page 默认值 */
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
   background-color: var(--bg);
-  overflow: hidden;
-  position: relative;
 }
 
-/* ---------- 导航 ---------- */
-.nav {
-  flex-shrink: 0;
-  padding-left: 40rpx;
-  padding-right: 40rpx;
+/* 卡片间距：24rpx（文档 9.2） */
+.card-gap {
+  margin-bottom: 24rpx;
 }
 
-.nav-title {
-  height: 88rpx;
-  line-height: 88rpx;
-  font-size: 34rpx;
-  font-weight: 600;
-  color: var(--ink);
-  letter-spacing: 2rpx;
-}
-
-/* ---------- 场景 ---------- */
-.scene {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  background: linear-gradient(180deg, #FCF4E7 0%, #F4E6D2 58%, #E7D3B8 100%);
-}
-
-.phase-morning .scene {
-  background: linear-gradient(180deg, #FCF0E0 0%, #F6E2CC 58%, #E8D3B8 100%);
-}
-
-.phase-dusk .scene {
-  background: linear-gradient(180deg, #F6DCC4 0%, #E8CBB8 50%, #D8BFA8 100%);
-}
-
-.phase-night .scene {
-  background: linear-gradient(180deg, #3E4360 0%, #333852 60%, #2C3048 100%);
-}
-
-/* 文档 9.6：夜间整体降亮，导航与底部动作区一起变暗；暖白文字保证对比度 */
-.phase-night {
-  background-color: #2C3048;
-}
-
-.phase-night .nav-title {
-  color: #F3E9DA;
-}
-
-.phase-night .action-bar {
-  background: linear-gradient(180deg, rgba(44, 48, 72, 0) 0%, #2C3048 32%);
-}
-
-.phase-night .action-hint {
-  color: #D5C7B2;
-}
-
-.phase-night .state-text {
-  color: #EDE2D1;
-}
-
-.phase-night .state-sub {
-  color: #B9AB96;
-}
-
-/* ---------- 首屏入场（文档 9.7）：500ms，背景淡入 + 家具上移 8rpx ---------- */
-.scene.is-enter {
-  animation: scene-fade 500ms ease-out;
-}
-
-.scene.is-enter .window,
-.scene.is-enter .calendar,
-.scene.is-enter .lamp,
-.scene.is-enter .rug,
-.scene.is-enter .sofa,
-.scene.is-enter .table,
-.scene.is-enter .fridge,
-.scene.is-enter .door {
-  animation: scene-lift 500ms ease-out;
-}
-
-@keyframes scene-fade {
-  from { opacity: 0.55; }
-  to { opacity: 1; }
-}
-
-@keyframes scene-lift {
-  from { transform: translateY(8rpx); }
-  to { transform: translateY(0); }
-}
-
-/* 通用木质感 */
-/* ---------- 窗 ---------- */
-.window {
-  position: absolute;
-  /* 文档 9.2：窗在左上，文档 9.8：窗户在第 2 层 */
-  top: 4.5%;
-  left: 6%;
-  width: 38%;
-  height: 21%;
-  z-index: 10;
-}
-
-.window-glass {
-  width: 100%;
-  height: calc(100% - 12rpx);
-  border-radius: 12rpx 12rpx 4rpx 4rpx;
-  background: linear-gradient(180deg, #CFE6F2 0%, #E8F2F7 100%);
-  border: 8rpx solid #E4CDB2;
-  box-sizing: border-box;
-  position: relative;
-  overflow: hidden;
-}
-
-.phase-morning .window-glass {
-  background: linear-gradient(180deg, #FFE7C9 0%, #FFF4E4 100%);
-}
-
-.phase-dusk .window-glass {
-  background: linear-gradient(180deg, #F7C9A8 0%, #F6DEC6 100%);
-}
-
-.phase-night .window-glass {
-  background: linear-gradient(180deg, #232948 0%, #2F3559 100%);
-}
-
-.sun {
-  position: absolute;
-  right: 18%;
-  top: 22%;
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 50%;
-  background: #F7D48A;
-  box-shadow: 0 0 24rpx rgba(247, 212, 138, 0.8);
-}
-
-.sun--dusk {
-  top: 46%;
-  background: #F0A56E;
-  box-shadow: 0 0 32rpx rgba(240, 165, 110, 0.85);
-}
-
-.phase-morning .sun {
-  top: 32%;
-  background: #FBE3B0;
-}
-
-.phase-night .window-sill {
-  background: #8C7760;
-}
-
-.moon {
-  position: absolute;
-  right: 18%;
-  top: 20%;
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  background: #F3EEDC;
-  box-shadow: 0 0 24rpx rgba(243, 238, 220, 0.6);
-}
-
-.star {
-  position: absolute;
-  width: 6rpx;
-  height: 6rpx;
-  border-radius: 50%;
-  background: #FFFFFF;
-  opacity: 0.85;
-}
-
-.star-1 {
-  left: 22%;
-  top: 24%;
-}
-
-.star-2 {
-  left: 42%;
-  top: 48%;
-}
-
-.window-sill {
-  height: 12rpx;
-  border-radius: 0 0 8rpx 8rpx;
-  background: #E4CDB2;
-}
-
-/* ---------- 墙历 ---------- */
-.calendar {
-  position: absolute;
-  /* 文档 9.2：墙历右上；9.8：第 2 层 */
-  top: 7%;
-  right: 7%;
-  width: 24%;
-  padding: 16rpx 8rpx 20rpx;
-  z-index: 10;
-  border-radius: 8rpx;
-  background: var(--card);
-  box-shadow: 0 6rpx 16rpx rgba(63, 58, 54, 0.08);
-  text-align: center;
-}
-
-.calendar::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: -10rpx;
-  width: 4rpx;
-  height: 12rpx;
-  background: #C9A787;
-  transform: translateX(-50%);
-}
-
-.calendar-top {
-  font-size: 20rpx;
-  color: var(--muted);
-  letter-spacing: 1rpx;
-}
-
-.calendar-days {
-  margin-top: 8rpx;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--accent-ink);
-}
-
-.calendar-days-empty {
-  font-size: 22rpx;
-  /* 文档 8.9：提示文字也要可读，不用过淡的 --ink-faint */
-  color: var(--muted);
-  font-weight: 400;
-}
-
-/* 文档 9.3 / 9.10：纪念日临近时墙历高亮并提示还有几天 */
-.calendar-soon {
-  box-shadow: 0 6rpx 16rpx rgba(168, 92, 66, 0.28);
-}
-
-.calendar-soon .calendar-days {
-  color: var(--accent-strong);
-}
-
-.calendar-sub {
-  margin-top: 4rpx;
-  font-size: 18rpx;
-  color: var(--accent-ink);
-}
-
-/* ---------- 相框 ---------- */
-.frame {
-  position: absolute;
-  /* 文档 9.2 示意图：相框在右侧墙面（墙历下方）；9.8：第 2 层 */
-  top: 32%;
-  right: 6%;
-  width: 16%;
-  height: 13%;
-  padding: 8rpx;
-  z-index: 10;
-  border-radius: 8rpx;
-  background: #E8D3B8;
-  box-shadow: 0 6rpx 16rpx rgba(63, 58, 54, 0.12);
-  transform: rotate(3deg);
-}
-
-.frame-avatar {
-  width: 100%;
-  height: 100%;
-  border-radius: 4rpx;
-  background: var(--wall);
-}
-
-/* 文档 9.3：资料没填完时相框显示「+ 我的」占位 */
-.frame--todo .frame-avatar {
-  opacity: 0.35;
-}
-
-.frame-tip {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 4rpx 0;
-  font-size: 18rpx;
-  text-align: center;
-  /* 白字压在深色蒙层上 ≈6.9:1（文档 8.9） */
-  color: #FFFDF9;
-  background: rgba(75, 58, 46, 0.88);
-  border-radius: 0 0 4rpx 4rpx;
-}
-
-/* ---------- 落地灯（文档 9.2：台灯在左） ---------- */
-.lamp {
-  position: absolute;
-  left: 3.5%;
-  bottom: 4%;
-  width: 12%;
-  height: 31%;
-  z-index: 20;
-}
-
-.lamp-glow {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  width: 320rpx;
-  height: 320rpx;
-  margin-left: -160rpx;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(247, 212, 138, 0.55) 0%, rgba(247, 212, 138, 0) 68%);
-  opacity: 0;
-  transition: opacity 400ms ease;
-  /* 文档 9.2 / 9.8：光晕是装饰，320rpx 的隐形区域不能拦截沙发/地毯的点击 */
-  pointer-events: none;
-}
-
-.lamp.dim .lamp-glow {
-  opacity: 0;
-  animation: none;
-}
-
-/* 文档 9.6：黄昏台灯开始亮；文档 9.7：夜间暖光常驻 4s 呼吸 */
-.phase-dusk .lamp:not(.dim) .lamp-glow,
-.phase-night .lamp:not(.dim) .lamp-glow {
-  opacity: 1;
-}
-
-.phase-night .lamp:not(.dim) .lamp-glow {
-  background: radial-gradient(circle, rgba(255, 214, 148, 0.62) 0%, rgba(255, 214, 148, 0) 70%);
-  animation: lamp-breathe 4s ease-in-out infinite;
-}
-
-@keyframes lamp-breathe {
-  0%, 100% { opacity: 0.82; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.04); }
-}
-
-.lamp-shade {
-  position: absolute;
-  left: 0;
-  top: 4%;
-  width: 100%;
-  height: 26%;
-  border-radius: 8rpx 8rpx 4rpx 4rpx;
-  background: #F2CC8F;
-  opacity: 0.95;
-}
-
-.lamp.dim .lamp-shade {
-  background: #D9CBB8;
-}
-
-.lamp-pole {
-  position: absolute;
-  left: 50%;
-  top: 30%;
-  width: 6rpx;
-  height: 56%;
-  margin-left: -3rpx;
-  background: #B99677;
-}
-
-.lamp-base {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 60%;
-  height: 10rpx;
-  margin-left: -30%;
-  border-radius: 999rpx;
-  background: #B99677;
-}
-
-/* TA 写了今天还没解锁：灯罩旁边的小光点（文档 9.10） */
-.lamp-dot {
-  position: absolute;
-  right: -8rpx;
-  top: 0;
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  background: #F7D48A;
-  box-shadow: 0 0 14rpx rgba(247, 212, 138, 0.9);
-}
-
-/* ---------- 地毯 ---------- */
-.rug {
-  position: absolute;
-  left: 50%;
-  bottom: 9%;
-  width: 62%;
-  height: 5.5%;
-  transform: translateX(-50%);
-  border-radius: 999rpx;
-  background: rgba(217, 142, 115, 0.22);
-  /* 纯装饰层不参与点击，否则会挡住台灯热区（文档 9.2） */
-  pointer-events: none;
-}
-
-/* ---------- 沙发 ---------- */
-.sofa {
-  position: absolute;
-  /* 文档 9.2：两个人+沙发居中、贴住底部家具上方；不设 z-index/transform，
-     让子节点 .people 能按文档 9.8 提到头像层（30） */
-  left: 19%;
-  bottom: 28%;
-  width: 62%;
-  height: 19%;
-  /* 沙发本体不接点击，避免遮住台灯热区；两个座位上的可点区域单独放行（文档 9.2） */
-  pointer-events: none;
-}
-
-.sofa-back {
-  position: absolute;
-  left: 0;
-  top: -28%;
-  width: 100%;
-  height: 62%;
-  border-radius: 24rpx 24rpx 8rpx 8rpx;
-  background: #D8A98C;
-}
-
-.phase-night .sofa-back {
-  background: #A8836C;
-}
-
-.sofa-seat {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 62%;
-  border-radius: 12rpx;
-  background: #E2B89A;
-}
-
-.phase-night .sofa-seat {
-  background: #B08E77;
-}
-
-.sofa-arm {
-  position: absolute;
-  bottom: 0;
-  width: 8%;
-  height: 74%;
-  border-radius: 12rpx;
-  background: #CE9E81;
-}
-
-.phase-night .sofa-arm {
-  background: #9C7A66;
-}
-
-.sofa-arm-left {
-  left: -2%;
-}
-
-.sofa-arm-right {
-  right: -2%;
-}
-
-.people {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 52%;
-  /* 文档 9.8：头像/心情气泡在第 4 层，压在沙发、家具之上 */
-  z-index: 30;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.person {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0 12rpx;
-  pointer-events: auto;
-}
-
-.person-name {
-  margin-top: 8rpx;
-  max-width: 160rpx;
-  padding: 2rpx 12rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  /* 文档 8.9：沙发上的名字要 ≥4.5:1，加浅色名牌底（#4A3A2E on #FFF6EC = 10.2:1） */
-  color: #4A3A2E;
-  background: #FFF6EC;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.phase-night .person-name {
-  /* 夜间深底浅字（#F6ECDF on #4B3A2E = 9.3:1） */
-  color: #F6ECDF;
-  background: #4B3A2E;
-}
-
-.empty-seat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0 12rpx;
-  pointer-events: auto;
-}
-
-.empty-cushion {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 50%;
-  border: 4rpx dashed #C9B49C;
-  background: rgba(255, 253, 249, 0.35);
-}
-
-.empty-text {
-  margin-top: 8rpx;
-  padding: 2rpx 12rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  /* 文档 8.9 / 9.6：未绑定的唯一提示不能靠淡色压沙发（#5A4A3D on #FFF6EC = 7.9:1） */
-  color: #5A4A3D;
-  background: #FFF6EC;
-  white-space: nowrap;
-}
-
-.phase-night .empty-text {
-  /* 夜间深底浅字（#EFE6D8 on #4B3A2E = 10.3:1） */
-  color: #EFE6D8;
-  background: #4B3A2E;
-}
-
-/* ---------- 桌子（愿望便签） ---------- */
-.table {
-  position: absolute;
-  /* 文档 9.2：底排 台灯-桌子-冰箱 */
-  left: 37.5%;
-  bottom: 3.5%;
-  width: 25%;
-  height: 15%;
-  z-index: 20;
-}
-
-.table-top {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 42%;
-  height: 14%;
-  border-radius: 6rpx;
-  background: #C99C7C;
-  box-shadow: 0 6rpx 14rpx rgba(63, 58, 54, 0.14);
-}
-
-.table-leg {
-  position: absolute;
-  top: 56%;
-  width: 6rpx;
-  height: 44%;
-  background: #B98A6A;
-}
-
-.table-leg--left {
-  left: 12%;
-}
-
-.table-leg--right {
-  right: 12%;
-}
-
-.table-note {
-  position: absolute;
-  left: 16%;
-  right: 16%;
-  top: 0;
-  max-height: 44%;
-  padding: 12rpx;
-  border-radius: 6rpx;
-  background: #FFF5D6;
-  box-shadow: 0 4rpx 10rpx rgba(63, 58, 54, 0.12);
-  transform: rotate(-2deg);
-  overflow: hidden;
-}
-
-.table-note-text {
-  /* 文档 9.9：愿望标题最多 30 字，便签只有两行高度，超出必须省略而不是硬裁 */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  font-size: 20rpx;
-  line-height: 1.4;
-  /* 文档 8.9：#6E4433 on #FFF5D6 = 7.6:1（原来的 #8A6A45 只有 4.56:1，压线） */
-  color: var(--accent-ink);
-  word-break: break-all;
-}
-
-/* ---------- 冰箱 ---------- */
-.fridge {
-  position: absolute;
-  /* 文档 9.2：冰箱在底排右侧（不压住门的右下热区） */
-  right: 19.5%;
-  bottom: 3.5%;
-  width: 16%;
-  height: 24%;
-  z-index: 20;
-  border-radius: 10rpx;
-  background: #EBE4D8;
-  box-shadow: inset 0 0 0 4rpx #DCD0BE;
-  overflow: hidden;
-}
-
-.fridge-door {
-  position: relative;
-  height: 68%;
-  border-bottom: 4rpx solid #DCD0BE;
-}
-
-.fridge-handle {
-  position: absolute;
-  right: 10rpx;
-  top: 18%;
-  width: 6rpx;
-  height: 30%;
-  border-radius: 999rpx;
-  background: #B8AB98;
-}
-
-.fridge-note {
-  position: absolute;
-  left: 12%;
-  top: 16%;
-  width: 42%;
-  height: 34%;
-  border-radius: 4rpx;
-  background: #F2CC8F;
-  transform: rotate(-4deg);
-}
-
-.fridge-bottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 28%;
-}
-
-/* 冰箱贴纸：愿望进度 done/total（文档 9.10） */
-.fridge-progress {
-  position: absolute;
-  right: 14%;
-  bottom: 14%;
-  padding: 2rpx 10rpx;
-  border-radius: 999rpx;
-  /* 白字压在 --accent 上只有 2.6:1，改用 --accent-ink（5.8:1，文档 8.9） */
-  background: var(--accent-ink, #6E4433);
-  color: #FFFFFF;
-  font-size: 18rpx;
-  line-height: 1.6;
-}
-
-/* ---------- 门 ---------- */
-.door {
-  position: absolute;
-  /* 文档 9.2：门在右下；9.8：家具层 20 */
-  right: 2.5%;
-  bottom: 6%;
-  width: 15%;
-  height: 25%;
-  z-index: 20;
-  border-radius: 10rpx 10rpx 0 0;
-  background: #C99C7C;
-  box-shadow: inset 0 0 0 4rpx #B98A6A;
-}
-
-/* 未绑定：门还没「启用」，只做装饰，避免和门垫邀请信封抢热区（文档 9.12） */
-.door--off {
-  pointer-events: none;
-}
-
-.door-panel {
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  top: 10%;
-  bottom: 10%;
-  border-radius: 6rpx;
-  border: 4rpx solid #B98A6A;
-}
-
-.door-knob {
-  position: absolute;
-  right: 10%;
-  top: 50%;
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  background: #F2CC8F;
-}
-
-/* 对方今天报过平安：门灯暖（文档 9.10） */
-.door--lit {
-  box-shadow: inset 0 0 0 4rpx #B98A6A, 0 0 40rpx rgba(247, 212, 138, 0.65);
-}
-
-/* 门牌：伴侣最近报平安状态（文档 9.10，partnerLastAt 为空显示「还没报平安」） */
-.door-label {
-  position: absolute;
-  left: 7%;
-  right: 7%;
-  bottom: 8%;
-  padding: 2rpx 6rpx;
-  border-radius: 4rpx;
-  background: rgba(255, 253, 249, 0.92);
-  text-align: center;
-  /* 文档 9.9：门牌是三档机型都要读的文案，字号不低于 --font-xs 附近的 20rpx */
-  font-size: 20rpx;
-  line-height: 1.4;
-  color: #8A5A45;
-  /* 文档 9.9：窄标签不写死高度，允许换行（「TA 11月14日」这类文案） */
-  white-space: normal;
-  word-break: break-all;
-}
-
-/* ---------- 信封 ---------- */
-.envelope {
-  position: absolute;
-  /* 文档 9.12：门垫上的邀请信封；热区按文档 8.9 保证 ≥88rpx 高 */
-  right: 2.5%;
-  bottom: 1%;
-  width: 15%;
-  height: 88rpx;
-  z-index: 30;
-  transform: rotate(-4deg);
-}
-
-.envelope-body {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 78%;
-  border-radius: 4rpx;
-  background: #FFFDF9;
-  box-shadow: 0 4rpx 12rpx rgba(63, 58, 54, 0.16);
-}
-
-.envelope-flap {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-  border-left: 56rpx solid transparent;
-  border-right: 56rpx solid transparent;
-  border-top: 32rpx solid #F4E6D2;
-}
-
-.envelope.applied_by_partner {
-  animation: envelope-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes envelope-pulse {
-  0%, 100% { transform: rotate(-4deg) scale(1); }
-  50% { transform: rotate(-4deg) scale(1.04); }
-}
-
-.envelope-avatar {
-  position: absolute;
-  right: -12rpx;
-  top: -44rpx;
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: 50%;
-  border: 4rpx solid #FFFDF9;
-  background-color: var(--card);
-  box-shadow: 0 4rpx 10rpx rgba(63, 58, 54, 0.18);
-}
-
-.envelope-reddot {
-  position: absolute;
-  right: -6rpx;
-  top: -6rpx;
-  width: 18rpx;
-  height: 18rpx;
-  border-radius: 50%;
-  background: var(--danger);
-  border: 3rpx solid #FFFDF9;
-}
-
-/* ---------- 加载骨架 ---------- */
-.skeleton-scene .sk-block {
-  position: absolute;
-  background: rgba(255, 253, 249, 0.5);
-  border-radius: 12rpx;
-  animation: sk-breathe 1.6s ease-in-out infinite;
-}
-
-@keyframes sk-breathe {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.9; }
-}
-
-.sk-window {
-  top: 4.5%;
-  left: 6%;
-  width: 38%;
-  height: 21%;
-}
-
-.sk-calendar {
-  top: 7%;
-  right: 7%;
-  width: 24%;
-  height: 15%;
-}
-
-.sk-frame {
-  top: 32%;
-  right: 6%;
-  width: 16%;
-  height: 13%;
-}
-
-.sk-sofa {
-  left: 19%;
-  bottom: 28%;
-  width: 62%;
-  height: 19%;
-}
-
-.sk-table {
-  left: 37.5%;
-  bottom: 3.5%;
-  width: 25%;
-  height: 15%;
-}
-
-.sk-fridge {
-  right: 19.5%;
-  bottom: 3.5%;
-  width: 16%;
-  height: 24%;
-}
-
-.sk-lamp {
-  left: 3.5%;
-  bottom: 4%;
-  width: 12%;
-  height: 31%;
-}
-
-.sk-door {
-  right: 2.5%;
-  bottom: 6%;
-  width: 15%;
-  height: 25%;
-}
-
-.state-overlay {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 40%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.state-text {
-  color: var(--muted);
-  font-size: var(--font-md);
-}
-
-.state-sub {
-  margin-top: 8rpx;
-  text-align: center;
-  font-size: var(--font-sm);
-  /* 文档 8.9：日间错误提示副文案也要 ≥4.5:1（--ink-faint 只有 1.8） */
-  color: var(--muted);
-}
-
-.retry-btn {
-  margin-top: 32rpx;
-  width: 320rpx;
-}
-
-/* ---------- 静默刷新失败：底部浮层（文档 9.12 / 10.3） ---------- */
-/* 放在场景与底部动作之间的 flow 行，天然避开安全区与底部按钮，不遮挡热区 */
+/* ── 静默刷新失败的吸顶横幅（文档 9.12 / 12.9）──────────────── */
 .refresh-bar {
-  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
-  margin: 0 32rpx 12rpx;
-  /* 按钮本身要 88rpx 热区，外层只留 8rpx 上下内边距，避免场景被压太多 */
-  padding: 8rpx 16rpx 8rpx 24rpx;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+  padding: 12rpx 12rpx 12rpx 24rpx;
   background-color: var(--card);
+  border: 3rpx dashed var(--danger);
   border-radius: var(--radius-md);
-  box-shadow: 0 8rpx 24rpx rgba(63, 58, 54, 0.12);
+  box-shadow: 8rpx 8rpx 0 var(--accent-soft);
 }
 
-.refresh-bar-text {
+.refresh-bar__text {
   flex: 1;
-  font-size: var(--font-sm);
-  /* 文档 8.9：提示文字 ≥4.5:1（--ink #3F3A36 在 --card #FFFDF9 上按 WCAG 约 11.05:1） */
-  color: var(--ink);
+  min-width: 0;
+  font-size: 24rpx;
+  color: var(--danger);
 }
 
-.refresh-bar-btn {
-  flex-shrink: 0;
+/* 失败态唯一恢复入口：热区不能小于 88rpx（文档 8.9） */
+.refresh-bar__btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  /* 文档 8.9：可点热区 ≥88rpx；这是失败态唯一的恢复入口 */
+  justify-content: flex-end;
+  min-width: 160rpx;
   min-height: 88rpx;
-  margin-left: 16rpx;
-  padding: 0 32rpx;
-  border: 2rpx solid var(--accent-strong);
-  border-radius: 999rpx;
-  font-size: var(--font-sm);
-  font-weight: 500;
-  /* 描边按钮文字用 --accent-ink（--accent 在浅底对比度不足，文档 8.9） */
+  padding: 0 16rpx;
+  font-size: 24rpx;
+  font-weight: 700;
   color: var(--accent-ink);
+  border-bottom: 2rpx dashed var(--accent-ink);
 }
 
-/* 文档 9.6：夜间整体降亮，导航与底部动作区一起变暗；浮层跟着降亮，暖白文字保证对比度 */
-.phase-night .refresh-bar {
-  background-color: #2C3048;
-}
-
-.phase-night .refresh-bar-text {
-  color: #EDE2D1;
-}
-
-.phase-night .refresh-bar-btn {
-  border-color: #D5C7B2;
-  color: #F3E9DA;
-}
-
-/* ---------- 底部动作 ---------- */
-.action-bar {
-  flex-shrink: 0;
-  padding: 16rpx 48rpx calc(24rpx + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(251, 246, 238, 0) 0%, #FBF6EE 30%);
-}
-
-.action-hint {
+/* ── 首屏失败 ───────────────────────────────────────────────── */
+.error-card {
+  margin-top: 48rpx;
+  padding: 48rpx 32rpx;
   text-align: center;
-  font-size: var(--font-sm);
+}
+
+.error-sub {
+  display: block;
+  margin-top: 12rpx;
+}
+
+.error-btn {
+  margin-top: 32rpx;
+}
+
+/* ── 邀请卡（未绑定 / 邀请中）──────────────────────────────── */
+.invite-card {
+  padding-top: 40rpx;
+}
+
+.invite-title {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 40rpx;
+}
+
+.invite-btn {
+  margin-top: 28rpx;
+}
+
+.invite-tip {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 22rpx;
   color: var(--muted);
-  margin-bottom: 16rpx;
 }
 
-.action-btn {
-  width: 100%;
+/* ── 日子卡 ─────────────────────────────────────────────────── */
+.days-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-/* ---------- 抱抱横幅与心形动画 ---------- */
-.hug-slot {
-  position: relative;
-  flex-shrink: 0;
-  padding: 8rpx 40rpx 12rpx;
-  /* 文档 9.8：抱抱横幅在第 5 层 */
-  z-index: 50;
-  animation: hug-slot-in 240ms ease-out;
+.days-link {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--accent-ink);
+  border-bottom: 2rpx dashed var(--accent-ink);
 }
 
-@keyframes hug-slot-in {
-  from {
-    opacity: 0;
-    transform: translateY(-12rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.days-num {
+  display: block;
+  margin-top: 16rpx;
+}
+
+.days-meta {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.days-anniv {
+  display: inline-block;
+  margin-top: 16rpx;
+  padding: 6rpx 16rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background-color: var(--accent-soft);
+  border: 2rpx dashed var(--accent-ink);
+  border-radius: var(--radius-sm);
+}
+
+/* ── 抱抱卡 ─────────────────────────────────────────────────── */
+.hug-head {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 24rpx;
+}
+
+.hug-hint {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .hug-btn-wrap {
   position: relative;
 }
 
+.hug-btn {
+  width: 100%;
+}
+
+/* 心形上浮 1400ms：只动 transform / opacity（文档 9.7），JS 1440ms 后摘 class */
 .hug-heart-float {
   position: absolute;
+  top: -52rpx;
   left: 50%;
-  bottom: 60rpx;
-  margin-left: -20rpx;
-  width: 40rpx;
-  text-align: center;
-  font-size: 40rpx;
-  color: var(--accent);
+  margin-left: -24rpx;
+  font-size: 44rpx;
+  line-height: 1;
+  color: var(--marker-red);
   pointer-events: none;
-  animation: hug-float 1400ms ease-out forwards;
+  animation: hug-float 1400ms ease-out;
 }
 
 @keyframes hug-float {
-  0% { opacity: 0; transform: translateY(12rpx) scale(0.6); }
-  25% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-90rpx) scale(1.2); }
+  0% {
+    opacity: 0;
+    transform: translateY(24rpx) scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-8rpx) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-96rpx) scale(1);
+  }
 }
 
-/* ---------- 对方心情详情 ---------- */
-.pm-head {
+/* ── 心情卡 ─────────────────────────────────────────────────── */
+.card-head {
   display: flex;
   align-items: center;
-  margin: 24rpx 0 8rpx;
+  justify-content: space-between;
 }
 
-.pm-info {
-  margin-left: 32rpx;
+.mood-link {
+  min-height: 88rpx;
 }
 
-.pm-chip {
-  display: inline-block;
-  padding: 8rpx 24rpx;
-  border-radius: 999rpx;
-  background: var(--wall);
-  font-size: var(--font-md);
+.mood-row {
+  display: flex;
+  align-items: center;
+  margin-top: 20rpx;
+}
+
+.mood-info {
+  flex: 1;
+  min-width: 0;
+  margin-left: 20rpx;
+}
+
+.mood-name {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 700;
   color: var(--ink);
 }
 
-.pm-chip--sunny {
-  background: #FDF2DC;
-  color: #8A6420;
-}
-
-.pm-chip--cloudy {
-  background: #EEF1F5;
-  color: #4F5866;
-}
-
-.pm-chip--rainy {
-  background: #E6EEF8;
-  color: #3D5B7C;
-}
-
-.pm-chip--thunder {
-  background: #E8E6F0;
-  color: #45425E;
-}
-
-.pm-time {
-  margin-top: 8rpx;
-  font-size: var(--font-xs);
+.mood-desc {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.pm-empty {
-  font-size: var(--font-md);
+/* 没打卡：浅色会被当成可忽略，用 muted + 斜体，靠虚线圈表达「还没说」（文档 9.5 / 8.9） */
+.mood-desc--empty {
   color: var(--muted);
+  font-style: italic;
 }
 
-.pm-note {
-  margin-top: 24rpx;
+.mood-cta {
+  flex-shrink: 0;
+  margin-left: 16rpx;
+  padding: 8rpx 18rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--accent-ink);
+  border: 2rpx dashed var(--accent-ink);
+  border-radius: var(--radius-sm);
+}
+
+/* ── 四个入口 ───────────────────────────────────────────────── */
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.grid__item {
+  display: flex;
+  flex-direction: column;
+  width: calc(50% - 12rpx);
+  min-height: 152rpx;
+  margin-bottom: 24rpx;
   padding: 24rpx;
-  border-radius: var(--radius-md);
-  background: var(--bg);
-  font-size: var(--font-md);
+}
+
+.grid__icon {
+  font-size: 34rpx;
+  line-height: 1.2;
   color: var(--ink);
-  line-height: 1.6;
-  word-break: break-all;
 }
 
-.pm-note-empty {
+.grid__title {
+  margin-top: 8rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.grid__sub {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  line-height: 1.45;
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* ---------- 浮层 ---------- */
+/* ── 浮层（我们的日子 / TA 的心情）───────────────────────────── */
 .sheet-mask {
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  /* 文档 9.8：页面级浮层在第 6 层，必须盖住抱抱横幅（50） */
   z-index: 60;
-  background: rgba(63, 58, 54, 0.32);
   display: flex;
   align-items: flex-end;
+  padding: 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  background-color: rgba(44, 44, 44, 0.35);
 }
 
 .sheet {
   width: 100%;
-  padding: 24rpx 48rpx calc(48rpx + env(safe-area-inset-bottom));
-  border-radius: 32rpx 32rpx 0 0;
-  background: var(--card);
-  animation: sheet-up 240ms ease-out;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 32rpx;
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 10rpx 10rpx 0 var(--marker-yellow);
+  animation: sheet-up 200ms linear;
 }
 
 @keyframes sheet-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-
-.sheet-handle {
-  width: 64rpx;
-  height: 8rpx;
-  margin: 0 auto 24rpx;
-  border-radius: 999rpx;
-  background: var(--wall);
+  0% {
+    opacity: 0;
+    transform: translateY(40rpx);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .sheet-title {
-  font-size: var(--font-md);
-  color: var(--muted);
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--ink);
 }
 
 .sheet-days {
-  margin: 12rpx 0 32rpx;
-  font-size: 64rpx;
-  font-weight: 600;
+  margin-top: 12rpx;
+  font-size: 56rpx;
+  font-weight: 800;
   color: var(--ink);
+  transform: rotate(-2deg);
 }
 
 .sheet-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20rpx 0;
-  border-top: 2rpx solid var(--wall);
+  min-height: 88rpx;
+  border-bottom: 2rpx dashed var(--ink-faint);
 }
 
 .sheet-label {
-  font-size: var(--font-md);
+  font-size: 24rpx;
   color: var(--muted);
 }
 
 .sheet-value {
-  font-size: var(--font-md);
+  font-size: 26rpx;
+  font-weight: 700;
   color: var(--ink);
 }
 
@@ -1145,50 +353,146 @@
 
 .sheet-edit {
   margin-left: 12rpx;
-  padding: 4rpx 16rpx;
-  border-radius: 999rpx;
-  background-color: var(--accent-soft);
+  font-size: 22rpx;
   color: var(--accent-ink);
-  font-size: var(--font-xs);
+  border-bottom: 2rpx dashed var(--accent-ink);
 }
 
 .sheet-tip {
-  margin-top: 8rpx;
-  font-size: var(--font-xs);
+  margin-top: 20rpx;
+  font-size: 22rpx;
   color: var(--muted);
-  text-align: right;
 }
 
 .sheet-close {
-  margin-top: 32rpx;
-  height: 88rpx;
-  line-height: 88rpx;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+  margin-top: 24rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--card);
+  background-color: var(--accent-strong);
   border-radius: var(--radius-md);
-  background: var(--accent-strong);
-  color: #FFFFFF;
-  font-size: 30rpx;
 }
 
-/* ---------- 小屏适配（文档 9.9：320×568 / 375×667 一屏放得下、按钮不被遮挡） ---------- */
+.pm-head {
+  display: flex;
+  align-items: center;
+  margin-top: 24rpx;
+}
+
+.pm-info {
+  flex: 1;
+  min-width: 0;
+  margin-left: 24rpx;
+}
+
+.pm-chip {
+  display: inline-block;
+  padding: 6rpx 16rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--ink);
+  background-color: var(--wall);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.pm-time {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+.pm-empty {
+  font-size: 26rpx;
+  color: var(--muted);
+}
+
+.pm-note {
+  margin-top: 24rpx;
+  padding: 24rpx;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: var(--ink);
+  background-color: var(--wall);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.pm-note-empty {
+  color: var(--ink-faint);
+}
+
+/* ── 卡片入场：一次性 class（文档 9.7）───────────────────────── */
+.home.is-enter .dk-card {
+  animation: card-in 300ms linear;
+}
+
+@keyframes card-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16rpx);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 旋转的卡片入场回到自己的角度，避免动画把 -1° 抹平后跳一下 */
+.home.is-enter .dk-card--tilt-l {
+  animation-name: card-in-left;
+}
+
+.home.is-enter .dk-card--tilt-r {
+  animation-name: card-in-right;
+}
+
+@keyframes card-in-left {
+  0% {
+    opacity: 0;
+    transform: translateY(16rpx) rotate(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(-1deg);
+  }
+}
+
+@keyframes card-in-right {
+  0% {
+    opacity: 0;
+    transform: translateY(16rpx) rotate(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(1deg);
+  }
+}
+
+/* ── 小屏（320×568）：收内边距与天数，四宫格仍两列（文档 9.9）── */
 @media (max-height: 640px) {
-  .nav-title {
-    height: 72rpx;
-    line-height: 72rpx;
-    font-size: 30rpx;
+  .days-num {
+    font-size: 48rpx;
   }
 
-  .action-bar {
-    padding-top: 8rpx;
-    padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  .dk-card {
+    padding: 24rpx;
   }
 
-  .action-hint {
-    margin-bottom: 8rpx;
-    font-size: 22rpx;
+  .grid__item {
+    min-height: 136rpx;
+    padding: 20rpx;
   }
+}
 
-  .action-btn {
-    height: 88rpx;
+@media (prefers-reduced-motion: reduce) {
+  .hug-heart-float,
+  .sheet,
+  .home.is-enter .dk-card {
+    animation: none;
   }
 }

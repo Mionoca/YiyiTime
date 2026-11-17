@@ -1,205 +1,144 @@
-<view class="home-page phase-{{phase}}">
+<view class="home dk-page dk-page--tab {{cardEnter ? 'is-enter' : ''}}">
 
-  <!-- 自定义导航 -->
-  <view class="nav" style="padding-top: {{statusBarHeight}}px;">
-    <view class="nav-title">小怡怡安</view>
-  </view>
-
-  <!-- 抱抱横幅（文档 10.5「顶部横幅」）：只在 TA 的待处理抱抱时出现；
-       我发出/已回应/已过期由底部按钮矩阵 + 心形动画表达（文档 9.4）。
-       放在导航与场景之间占位，避免压住墙历等热区（文档 9.2）。 -->
-  <view class="hug-slot" wx:if="{{home && home.couple && hugIncoming}}">
-    <hug-banner incoming="{{hugIncoming}}" bind:respond="onHugRespond" />
-  </view>
-
-  <!-- 加载中 / 加载失败的房间轮廓 -->
-  <view class="scene skeleton-scene" wx:if="{{!home && (loading || error)}}">
-    <view class="sk-block sk-window"></view>
-    <view class="sk-block sk-calendar"></view>
-    <view class="sk-block sk-frame"></view>
-    <view class="sk-block sk-sofa"></view>
-    <view class="sk-block sk-table"></view>
-    <view class="sk-block sk-fridge"></view>
-    <view class="sk-block sk-lamp"></view>
-    <view class="sk-block sk-door"></view>
-    <view class="state-overlay">
-      <view class="state-text" wx:if="{{loading}}">正在开门…</view>
-      <block wx:else>
-        <view class="state-text">{{error}}</view>
-        <view class="state-sub">检查一下网络，再敲敲门</view>
-        <button class="btn-primary retry-btn" bindtap="onRetry">再试一次</button>
-      </block>
-    </view>
-  </view>
-
-  <!-- 小屋：首屏入场动画（文档 9.7），一次性 class 由页面在 520ms 后移除 -->
-  <view class="scene {{sceneEnter ? 'is-enter' : ''}}" wx:if="{{home}}">
-    <!-- 窗 -->
-    <view class="window">
-      <view class="window-glass">
-        <view class="moon" wx:if="{{phase === 'night'}}"></view>
-        <view class="sun" wx:if="{{phase === 'day' || phase === 'morning'}}"></view>
-        <view class="sun sun--dusk" wx:if="{{phase === 'dusk'}}"></view>
-        <view class="star star-1" wx:if="{{phase === 'night'}}"></view>
-        <view class="star star-2" wx:if="{{phase === 'night'}}"></view>
-      </view>
-      <view class="window-sill"></view>
-    </view>
-
-    <!-- 墙历 -->
-    <view class="calendar {{calendarSoon ? 'calendar-soon' : ''}}" bindtap="onTapCalendar" aria-label="我们的日子" aria-role="button">
-      <view class="calendar-top">我们的日子</view>
-      <view class="calendar-days" wx:if="{{home.couple}}">{{daysText}}</view>
-      <view class="calendar-days calendar-days-empty" wx:else>从今天开始</view>
-      <view class="calendar-sub" wx:if="{{calendarSub}}">{{calendarSub}}</view>
-    </view>
-
-    <!-- 相框 -->
-    <view class="frame {{profileIncomplete ? 'frame--todo' : ''}}" bindtap="onTapProfile" aria-label="我的" aria-role="button">
-      <image class="frame-avatar" src="{{myAvatar}}" mode="aspectFill" />
-      <view class="frame-tip" wx:if="{{profileIncomplete}}">+ 我的</view>
-    </view>
-
-    <!-- 落地灯（日记，文档 9.10：我写了今天灯亮，TA 写了未解锁旁边小光点） -->
-    <view
-      class="lamp {{lampDim ? 'dim' : ''}}"
-      bindtap="onTapLamp"
-      aria-label="日记"
-      aria-role="button"
-    >
-      <view class="lamp-glow"></view>
-      <view class="lamp-shade"></view>
-      <view class="lamp-pole"></view>
-      <view class="lamp-base"></view>
-      <view class="lamp-dot" wx:if="{{lampDot}}"></view>
-    </view>
-
-    <!-- 地毯 -->
-    <view class="rug"></view>
-
-    <!-- 沙发 + 两个人 -->
-    <view class="sofa">
-      <view class="sofa-back"></view>
-      <view class="sofa-arm sofa-arm-left"></view>
-      <view class="sofa-arm sofa-arm-right"></view>
-      <view class="sofa-seat"></view>
-      <view class="people">
-        <view class="person" aria-label="我的心情">
-          <avatar-bubble
-            user="{{myUser}}"
-            mood="{{moodMine}}"
-            size="md"
-            bind:tap="onTapMyAvatar"
-          />
-          <view class="person-name">{{myName}}</view>
-        </view>
-        <view class="person" wx:if="{{home.couple}}" aria-label="TA 的心情">
-          <avatar-bubble
-            user="{{partnerUser}}"
-            mood="{{moodPartner}}"
-            size="md"
-            hug-badge="{{hugIncoming ? true : false}}"
-            bind:tap="onTapPartnerAvatar"
-          />
-          <view class="person-name">{{partnerName}}</view>
-        </view>
-        <view class="empty-seat" wx:else bindtap="onTapBind" aria-label="邀请 TA 住进来" aria-role="button">
-          <view class="empty-cushion"></view>
-          <view class="empty-text">屋里还缺一个人</view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 冰箱（愿望进度，文档 9.10 / 10.8） -->
-    <view class="fridge" bindtap="onTapFridge" aria-label="愿望清单" aria-role="button">
-      <view class="fridge-door">
-        <view class="fridge-handle"></view>
-        <view class="fridge-note"></view>
-        <view class="fridge-progress" wx:if="{{wishTotal > 0}}">{{wishDone}}/{{wishTotal}}</view>
-      </view>
-      <view class="fridge-bottom"></view>
-    </view>
-
-    <!-- 桌子便签（愿望预览，文档 9.10） -->
-    <view class="table" bindtap="onTapTableNote" aria-label="愿望" aria-role="button">
-      <view class="table-note">
-        <text class="table-note-text">{{wishPreviewTitle || '下次见面想做的事'}}</text>
-      </view>
-      <view class="table-top"></view>
-      <view class="table-leg table-leg--left"></view>
-      <view class="table-leg table-leg--right"></view>
-    </view>
-
-    <!-- 门（报平安，文档 9.10：对方今天报平安门灯暖） -->
-    <view
-      class="door {{doorLit ? 'door--lit' : ''}} {{home.couple ? '' : 'door--off'}}"
-      bindtap="onTapDoor"
-      aria-label="报平安"
-      aria-role="button"
-    >
-      <view class="door-panel">
-        <view class="door-knob"></view>
-      </view>
-      <view class="door-label" wx:if="{{home.couple}}">{{safetyLabel}}</view>
-    </view>
-
-    <!-- 门垫信封：邀请状态 -->
-    <view
-      class="envelope {{home.bind.state}}"
-      wx:if="{{!home.couple && home.bind.state !== 'unbound'}}"
-      bindtap="onTapBind"
-      aria-label="{{home.bind.state === 'applied_by_partner' ? '有人在等你' : '邀请码'}}"
-      aria-role="button"
-    >
-      <view class="envelope-body"></view>
-      <view class="envelope-flap"></view>
-      <image
-        class="envelope-avatar"
-        wx:if="{{home.bind.pending && home.bind.pending.other && home.bind.pending.other.avatarFileID}}"
-        src="{{home.bind.pending.other.avatarFileID}}"
-        mode="aspectFill"
-        aria-label="等你确认的 TA"
-      ></image>
-      <view class="envelope-reddot" wx:if="{{home.bind.state === 'applied_by_partner'}}"></view>
-    </view>
-
-  </view>
-
-  <!-- 静默刷新失败：保留上次场景，底部浮层提示 + 再试一次（文档 9.12 / 10.3） -->
+  <!-- 静默刷新失败：吸顶横幅，保留已加载卡片（文档 9.12 / 12.9） -->
   <view class="refresh-bar" wx:if="{{home && refreshError}}" aria-role="alert" aria-label="{{refreshError}}">
-    <text class="refresh-bar-text">{{refreshError}}</text>
-    <view class="refresh-bar-btn" bindtap="onRetryRefresh" aria-role="button" aria-label="重试加载首页">再试一次</view>
+    <text class="refresh-bar__text">{{refreshError}}</text>
+    <view class="refresh-bar__btn" bindtap="onRetryRefresh" aria-role="button" aria-label="重试加载首页">再试一次</view>
   </view>
 
-  <!-- 底部动作 -->
-  <view class="action-bar" wx:if="{{home}}">
-    <block wx:if="{{home.bind.state === 'unbound'}}">
-      <view class="action-hint">小屋还空着一半</view>
-      <button class="btn-primary action-btn" bindtap="onTapBind">邀请 TA 住进来</button>
-    </block>
-    <block wx:elif="{{home.bind.state !== 'bound'}}">
-      <view class="action-hint">{{bindHint}}</view>
-      <button class="btn-primary action-btn" bindtap="onTapBind">去看看</button>
-    </block>
-    <block wx:else>
-      <view class="action-hint">{{hugHint}}</view>
+  <!-- 首屏：三张虚线骨架卡，不白屏（文档 9.12） -->
+  <block wx:if="{{!home && loading}}">
+    <view class="dk-skeleton card-gap">
+      <view class="dk-skeleton__bar dk-skeleton__bar--lg"></view>
+      <view class="dk-skeleton__bar"></view>
+      <view class="dk-skeleton__bar"></view>
+    </view>
+    <view class="dk-skeleton card-gap">
+      <view class="dk-skeleton__bar"></view>
+      <view class="dk-skeleton__bar"></view>
+    </view>
+    <view class="dk-skeleton">
+      <view class="dk-skeleton__bar"></view>
+    </view>
+  </block>
+
+  <!-- 首屏失败：整页错误 + 重试（文档 9.12） -->
+  <view class="dk-card error-card" wx:if="{{!home && !loading}}">
+    <text class="dk-title">{{error}}</text>
+    <text class="dk-sub error-sub">检查一下网络，再敲敲门</text>
+    <button class="btn-primary error-btn" bindtap="onRetry">再试一次</button>
+  </view>
+
+  <block wx:if="{{home}}">
+
+    <!-- 未绑定 / 邀请中：只留一张邀请卡，其他卡片进去也是空态（文档 9.12） -->
+    <view class="dk-card invite-card dk-card--tilt-l" wx:if="{{!home.couple}}">
+      <view class="dk-tape"></view>
+      <text class="dk-label">还差一个人</text>
+      <text class="dk-title invite-title">{{bindTitle}}</text>
+      <text class="dk-sub">{{bindSub}}</text>
+      <button class="btn-primary btn-solid invite-btn" bindtap="onTapBind">{{bindActionText}}</button>
+      <text class="invite-tip">绑好之后，这里会出现你们的日子、抱抱和心情</text>
+    </view>
+
+    <!-- 1 日子卡（文档 9.2） -->
+    <view
+      class="dk-card days-card dk-card--tilt-l card-gap"
+      wx:if="{{home.couple}}"
+      bindtap="onTapCalendar"
+      aria-role="button"
+      aria-label="我们的日子，点开可以修改开始日期"
+    >
+      <view class="dk-tape"></view>
+      <view class="days-head">
+        <text class="dk-label">我们的日子</text>
+        <text class="days-link">改日子 ›</text>
+      </view>
+      <text class="dk-num days-num">{{daysText}}</text>
+      <text class="days-meta">{{startDateText || '还没选开始的日子'}}</text>
+      <text class="days-anniv" wx:if="{{anniversaryText}}">纪念日 · {{anniversaryText}}</text>
+    </view>
+
+    <!-- 2 抱抱卡（文档 9.4） -->
+    <view class="dk-card hug-card dk-card--tilt-r card-gap" wx:if="{{home.couple}}">
+      <view class="hug-head">
+        <text class="dk-label">抱抱</text>
+        <text class="hug-hint">{{hugHint}}</text>
+      </view>
       <view class="hug-btn-wrap">
         <view class="hug-heart-float" wx:if="{{hugCelebrate}}">♥</view>
         <button
-          class="btn-primary action-btn"
+          class="btn-primary btn-solid hug-btn"
           bindtap="onTapHug"
           disabled="{{hugButtonDisabled || hugSending}}"
         >
           {{hugSending ? '抱抱中…' : hugButtonText}}
         </button>
       </view>
-    </block>
-  </view>
+    </view>
+
+    <!-- 3 心情卡（文档 9.5）：自己那行可点开打卡，TA 那行只读 -->
+    <view class="dk-card mood-card card-gap" wx:if="{{home.couple}}">
+      <view class="card-head">
+        <text class="dk-label">今天的心情</text>
+        <view class="dk-link mood-link" bindtap="onTapMoodHistory" aria-role="button" aria-label="看心情记录">记录 ›</view>
+      </view>
+
+      <view class="mood-row">
+        <avatar-bubble user="{{myUser}}" mood="{{moodMine}}" size="sm" bind:tap="onTapMyAvatar" />
+        <view class="mood-info">
+          <text class="mood-name">我</text>
+          <text class="mood-desc {{moodMine ? '' : 'mood-desc--empty'}}">{{moodMineText}}</text>
+        </view>
+        <text class="mood-cta">{{moodMine ? '改' : '记一笔'}}</text>
+      </view>
+
+      <view class="dk-divider"></view>
+
+      <view class="mood-row">
+        <avatar-bubble
+          user="{{partnerUser}}"
+          mood="{{moodPartner}}"
+          size="sm"
+          hug-badge="{{hugIncoming ? true : false}}"
+          bind:tap="onTapPartnerAvatar"
+        />
+        <view class="mood-info">
+          <text class="mood-name">{{partnerName}}</text>
+          <text class="mood-desc {{moodPartner ? '' : 'mood-desc--empty'}}">{{moodPartnerText}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 4 四个入口（文档 9.2）：动词短语 + 一行状态，不做物件隐喻 -->
+    <view class="grid" wx:if="{{home.couple}}">
+      <view class="dk-card grid__item" bindtap="onTapDiary" aria-role="button" aria-label="写今天的日记">
+        <text class="grid__icon">✎</text>
+        <text class="grid__title">写日记</text>
+        <text class="grid__sub">{{diarySub}}</text>
+      </view>
+      <view class="dk-card grid__item" bindtap="onTapWish" aria-role="button" aria-label="愿望清单">
+        <text class="grid__icon">★</text>
+        <text class="grid__title">愿望清单</text>
+        <text class="grid__sub">{{wishSub}}</text>
+      </view>
+      <view class="dk-card grid__item" bindtap="onTapSafety" aria-role="button" aria-label="报平安">
+        <text class="grid__icon">✓</text>
+        <text class="grid__title">报平安</text>
+        <text class="grid__sub">{{safetySub}}</text>
+      </view>
+      <view class="dk-card grid__item" bindtap="onTapMoodHistory" aria-role="button" aria-label="心情记录">
+        <text class="grid__icon">☀</text>
+        <text class="grid__title">心情记录</text>
+        <text class="grid__sub">按天翻看两人的心情</text>
+      </view>
+    </view>
+
+  </block>
 
   <!-- 我们的日子浮层 -->
   <view class="sheet-mask" wx:if="{{showDaysSheet}}" bindtap="onCloseDaysSheet">
     <view class="sheet" catchtap="noop">
-      <view class="sheet-handle"></view>
       <view class="sheet-title">我们的日子</view>
       <view class="sheet-days">{{daysText}}</view>
       <view class="sheet-row">
@@ -213,24 +152,23 @@
           bindchange="onStartDateChange"
         >
           <view class="sheet-value sheet-editable">
-            {{startDateText}}
+            {{startDateText || '选一天'}}
             <text class="sheet-edit">{{startDateSaving ? '保存中…' : '改'}}</text>
           </view>
         </picker>
       </view>
       <view class="sheet-row">
         <text class="sheet-label">下一个纪念日</text>
-        <text class="sheet-value">{{anniversaryText}}</text>
+        <text class="sheet-value">{{anniversaryText || '还没有'}}</text>
       </view>
       <view class="sheet-tip">点「开始于」右边的「改」可以重新选日子</view>
-      <view class="sheet-close" bindtap="onCloseDaysSheet">知道啦</view>
+      <view class="sheet-close" bindtap="onCloseDaysSheet" aria-role="button" aria-label="关闭">知道啦</view>
     </view>
   </view>
 
   <!-- 对方心情详情：只读，备注只在这里出现（文档 9.5） -->
   <view class="sheet-mask" wx:if="{{partnerMoodSheet}}" bindtap="onClosePartnerMood">
     <view class="sheet" catchtap="noop">
-      <view class="sheet-handle"></view>
       <view class="sheet-title">{{partnerName}} 今天</view>
       <view class="pm-head">
         <avatar-bubble user="{{partnerUser}}" show-mood="{{false}}" size="lg" />
@@ -246,7 +184,7 @@
         <text wx:if="{{partnerMood.note}}">{{partnerMood.note}}</text>
         <text wx:else class="pm-note-empty">TA 今天没写备注</text>
       </view>
-      <view class="sheet-close" bindtap="onClosePartnerMood">知道啦</view>
+      <view class="sheet-close" bindtap="onClosePartnerMood" aria-role="button" aria-label="关闭">知道啦</view>
     </view>
   </view>
 

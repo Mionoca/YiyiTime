@@ -176,7 +176,8 @@ test('8.8 所有 image 用 aspectFill，且 wxml / wxss 不用网络图片', () 
       if (src) assert.ok(!/https?:\/\//.test(src[1]), rel(f) + ' 使用了网络图片（8.8 要求不使用网络图片）：' + tag.replace(/\s+/g, ' '));
     }
   }
-  assert.ok(count >= 9, '应扫描到至少 9 个 image 标签，实际 ' + count + '（夹具或目录结构可能变了）');
+  // 首页 M8 去掉相框/信封图后，全站剩 7 张（默认头像、绑定头像、时间线头像等）
+  assert.ok(count >= 7, '应扫描到至少 7 个 image 标签，实际 ' + count + '（夹具或目录结构可能变了）');
   for (const f of wxssFiles) {
     const text = stripComments(read(f));
     const urls = text.match(/url\(\s*['"]?https?:\/\/[^)]*\)/g) || [];
@@ -194,18 +195,14 @@ test('8.8 列表头像（timeline-item）开启 lazy-load', () => {
   }
 });
 
-test('8.9 首页 disableScroll 一屏，其余页面可下拉刷新且不禁滚动', () => {
+test('8.9 页面集合与滚动配置：全部可滚动、可下拉刷新', () => {
   const app = JSON.parse(read(path.join(ROOT, 'app.json')));
   const pages = app.pages.map((p) => p.replace(/^pages\//, '').replace(/\/index$/, ''));
   assert.deepStrictEqual(pages.slice().sort(), ['bind', 'diary', 'home', 'mood', 'profile', 'safety', 'wish'], '页面集合变了，请同步本测试与发布文档');
-  const home = JSON.parse(read(path.join(ROOT, 'pages', 'home', 'index.json')));
-  assert.strictEqual(home.disableScroll, true, '首页必须 disableScroll（8.9 / 13.8）');
-  assert.strictEqual(home.navigationStyle, 'custom');
   for (const page of pages) {
-    if (page === 'home') continue;
     const json = JSON.parse(read(path.join(ROOT, 'pages', page, 'index.json')));
     assert.strictEqual(json.enablePullDownRefresh, true, page + ' 页应支持下拉刷新');
-    assert.notStrictEqual(json.disableScroll, true, page + ' 子页不应禁用滚动');
+    assert.notStrictEqual(json.disableScroll, true, page + ' 页不应禁用滚动（M8 起首页也是卡片流）');
   }
 });
 
@@ -287,7 +284,9 @@ test('8.9 animation 引用的 keyframes 都已定义（含多值 / 无分号 / a
       if (decl) checkAnimation(decl[1], rel(f) + ' 的行内 style');
     }
   }
-  assert.ok(count >= 15, '应扫描到至少 15 条 animation 声明，实际 ' + count);
+  // M8 去掉场景化首页后少了 7 条场景动画；这里守的是「引用的 keyframes 必须存在」，
+  // 数量只防止扫描器被改坏（例如正则失效后恒为 0）
+  assert.ok(count >= 12, '应扫描到至少 12 条 animation 声明，实际 ' + count);
 });
 
 test('8.9 子页列表分页 10–20 条，onPageScroll 里不得 setData', () => {

@@ -1,3 +1,4 @@
+/* 空态：涂鸦风（文档 8.7 / 8.9） */
 .es {
   padding: 96rpx 48rpx;
   text-align: center;
@@ -10,29 +11,38 @@
 
 .es__title {
   margin-top: 16rpx;
-  font-size: var(--font-md, 28rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-md);
+  color: var(--muted);
   line-height: 1.6;
 }
 
 .es__desc {
   margin-top: 12rpx;
-  font-size: var(--font-sm, 24rpx);
-  color: var(--muted, #6F685F);
+  font-size: var(--font-sm);
+  color: var(--muted);
   line-height: 1.6;
 }
 
+/* 重试/行动按钮：奶白底 + 虚线墨边 + 硬阴影，热区 ≥88rpx */
 .es__action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* 8.9：可点区域 ≥88rpx */
   height: 88rpx;
   margin-top: 40rpx;
-  padding: 0 56rpx;
-  border-radius: 999rpx;
-  background: var(--accent-strong, #A85C42);
-  color: #FFFFFF;
-  font-size: var(--font-sm, 24rpx);
+  padding: 0 48rpx;
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-btn);
+  color: var(--ink);
+  font-size: var(--font-sm);
+  font-weight: 800;
   letter-spacing: 2rpx;
+  transition: transform 150ms linear;
+}
+
+.es__action:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: none;
 }

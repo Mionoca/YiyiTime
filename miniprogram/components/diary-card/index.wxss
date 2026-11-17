@@ -1,26 +1,29 @@
+/* 日记卡：涂鸦便签（文档 8.7） */
 .dc {
   margin-bottom: 24rpx;
   padding: 28rpx 28rpx 24rpx;
-  border-radius: var(--radius-lg, 32rpx);
-  background: var(--card, #FFFDF9);
-  box-shadow: 0 8rpx 32rpx rgba(63, 58, 54, 0.06);
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
 }
 
+/* 今天的日记：换成马克笔红硬阴影，一眼能认出 */
 .dc--today {
-  box-shadow: 0 8rpx 32rpx rgba(217, 142, 115, 0.16);
+  box-shadow: 8rpx 8rpx 0 var(--marker-red);
 }
 
 /* 日记解锁微光：opacity + 轻微上移，400ms 一次（文档 9.7） */
 .dc--glow {
-  animation: dc-unlock 400ms ease-out;
+  animation: dc-unlock 400ms linear;
 }
 
 @keyframes dc-unlock {
-  from {
+  0% {
     opacity: 0.35;
     transform: translateY(10rpx);
   }
-  to {
+  100% {
     opacity: 1;
     transform: translateY(0);
   }
@@ -31,21 +34,23 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20rpx;
+  padding-bottom: 12rpx;
+  border-bottom: 2rpx dashed var(--ink-faint);
 }
 
 .dc__date {
-  font-size: var(--font-sm, 24rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-sm);
+  color: var(--muted);
   letter-spacing: 1rpx;
 }
 
 .dc--today .dc__date {
-  color: var(--accent-ink, #6E4433);
-  font-weight: 600;
+  color: var(--accent-ink);
+  font-weight: 800;
 }
 
 .dc__lock {
-  font-size: var(--font-sm, 24rpx);
+  font-size: var(--font-sm);
 }
 
 .dc__block {
@@ -53,7 +58,7 @@
 }
 
 .dc__block--partner {
-  border-top: 2rpx dashed rgba(140, 131, 122, 0.18);
+  border-top: 2rpx dashed var(--ink-faint);
 }
 
 .dc__who {
@@ -62,40 +67,44 @@
   margin-bottom: 10rpx;
 }
 
+/* 名字标签：小方角 + 虚线边，不用胶囊（8.7） */
 .dc__tag {
   padding: 2rpx 14rpx;
-  border-radius: 999rpx;
-  background: var(--accent-soft, #F4C9B8);
-  color: var(--accent-ink, #6E4433);
-  font-size: var(--font-xs, 22rpx);
+  background-color: var(--accent-soft);
+  border: 2rpx dashed var(--accent-ink);
+  border-radius: var(--radius-sm);
+  color: var(--accent-ink);
+  font-size: var(--font-xs);
+  font-weight: 700;
 }
 
 .dc__tag--partner {
-  background: var(--wall, #F3E8D8);
-  color: var(--muted, #8C837A);
+  background-color: var(--wall);
+  border-color: var(--line);
+  color: var(--muted);
 }
 
 .dc__time {
   margin-left: 12rpx;
-  font-size: var(--font-xs, 22rpx);
-  color: var(--muted, #6F685F);
+  font-size: var(--font-xs);
+  color: var(--muted);
 }
 
 .dc__text {
-  font-size: var(--font-md, 28rpx);
-  color: var(--ink, #3F3A36);
+  font-size: var(--font-md);
+  color: var(--ink);
   line-height: 1.7;
   word-break: break-all;
   white-space: pre-wrap;
 }
 
 .dc__empty {
-  font-size: var(--font-md, 28rpx);
-  color: var(--muted, #6F685F);
+  font-size: var(--font-md);
+  color: var(--muted);
 }
 
 .dc__locktext {
-  font-size: var(--font-md, 28rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-md);
+  color: var(--muted);
   line-height: 1.6;
 }

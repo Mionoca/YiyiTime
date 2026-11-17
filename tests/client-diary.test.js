@@ -416,5 +416,5 @@ test('diary: 模板里的底部重试入口真实绑定且排在翻页提示之�
   assert.ok(loadingMoreAt >= 0, '翻页提示视图还在');
   assert.ok(listErrorAt > loadingMoreAt, '重试入口排在翻页提示之后');
   const wxss = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/diary/index.wxss'), 'utf8');
-  assert.ok(/\.hint--error\s*\{[^}]*var\(--accent-strong/.test(wxss), '重试文案用 --accent-strong token 保证对比度');
+  assert.ok(/\.hint--error\s*\{[^}]*var\(--accent-(ink|strong)/.test(wxss), '重试文案用深色 token 保证对比度');
 });

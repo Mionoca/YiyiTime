@@ -1,5 +1,6 @@
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
+const tabbar = require('../../utils/tabbar');
 const timeUtil = require('../../utils/time');
 const upload = require('../../utils/upload');
 const haptics = require('../../utils/haptics');
@@ -37,6 +38,8 @@ Page({
   },
 
   onShow() {
+    // 自定义 tabBar 的选中态要页面自己报（文档 8.2）
+    tabbar.sync(this, constants.ROUTES.profile);
     this.load();
   },
 
@@ -241,13 +244,13 @@ Page({
     wx.navigateTo({ url: constants.ROUTES.bind });
   },
 
-  /** 心情记录（文档 8.3.7）：只读时间线，未绑定时入口不可用 */
+  /** 心情记录（文档 8.3.7）：只读时间线；现在是 tab 页，只能 switchTab（文档 8.2） */
   onOpenMood() {
     if (!this.data.bound) {
       this.toast('先邀请 TA 住进来吧');
       return;
     }
-    wx.navigateTo({ url: constants.ROUTES.mood });
+    wx.switchTab({ url: constants.ROUTES.mood });
   },
 
   /** 隐私保护指引（文档 13.8：隐私弹窗与授权口径要能被用户随时查到） */

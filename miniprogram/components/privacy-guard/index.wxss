@@ -1,10 +1,11 @@
+/* 隐私授权弹窗：涂鸦风（文档 8.7 / 13.8） */
 .privacy {
   position: fixed;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  /* 文档 9.8：页面级浮层第 6 层之上（隐私弹窗必须盖住所有浮层） */
+  /* 文档 9.8：必须盖住所有页面浮层 */
   z-index: 200;
 }
 
@@ -14,59 +15,73 @@
   right: 0;
   top: 0;
   bottom: 0;
-  background: rgba(63, 58, 54, 0.42);
+  background-color: rgba(44, 44, 44, 0.42);
 }
 
 .privacy__card {
   position: absolute;
-  left: 48rpx;
-  right: 48rpx;
+  left: 40rpx;
+  right: 40rpx;
   bottom: calc(48rpx + env(safe-area-inset-bottom));
   padding: 40rpx 40rpx 32rpx;
-  border-radius: var(--radius-lg, 32rpx);
-  background: var(--card, #FFFDF9);
-  box-shadow: 0 16rpx 48rpx rgba(63, 58, 54, 0.24);
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 10rpx 10rpx 0 var(--marker-yellow);
 }
 
 .privacy__title {
   font-size: 36rpx;
-  font-weight: 600;
-  color: var(--ink, #3F3A36);
+  font-weight: 800;
+  color: var(--ink);
+  transform: rotate(-2deg);
 }
 
 .privacy__text {
   margin-top: 16rpx;
-  font-size: var(--font-sm, 24rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-sm);
+  color: var(--muted);
   line-height: 1.6;
 }
 
 .privacy__item {
   margin-top: 10rpx;
-  font-size: var(--font-sm, 24rpx);
-  color: var(--ink, #3F3A36);
+  font-size: var(--font-sm);
+  color: var(--ink);
   line-height: 1.6;
 }
 
 .privacy__link {
-  margin-top: 24rpx;
-  font-size: var(--font-sm, 24rpx);
-  color: var(--accent-ink, #6E4433);
-  text-decoration: underline;
+  display: inline-block;
+  min-height: 88rpx;
+  line-height: 88rpx;
+  margin-top: 8rpx;
+  font-size: var(--font-sm);
+  color: var(--accent-ink);
+  border-bottom: 2rpx dashed var(--accent-ink);
 }
 
+/* 同意：墨黑实心 + 虚线边 + 马克笔红硬阴影 */
 .privacy__agree {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 96rpx;
-  margin-top: 32rpx;
+  min-height: 96rpx;
+  margin-top: 24rpx;
   padding: 0 48rpx;
-  border-radius: 48rpx;
-  background-color: var(--accent-strong, #A85C42);
-  color: #FFFFFF;
+  background-color: var(--accent-strong);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-btn);
+  color: var(--card);
   font-size: 30rpx;
-  font-weight: 500;
+  font-weight: 800;
+  transition: transform 150ms linear;
+}
+
+.privacy__agree:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: none;
 }
 
 .privacy__agree::after {
@@ -74,13 +89,11 @@
 }
 
 .privacy__skip {
-  margin-top: 20rpx;
-  text-align: center;
-  font-size: var(--font-sm, 24rpx);
-  color: var(--muted, #8C837A);
-  /* 文档 8.9：可点文字热区 ≥88rpx */
-  min-height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 88rpx;
+  margin-top: 8rpx;
+  font-size: var(--font-sm);
+  color: var(--muted);
 }

@@ -1,7 +1,9 @@
+/* 台灯下的日记：涂鸦风（文档 8.7） */
 .page {
   min-height: 100vh;
-  padding: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
-  background: var(--bg, #FBF6EE);
+  /* tab 页底部留出 tabBar + 安全区（文档 8.2 / 9.9） */
+  padding: 24rpx 24rpx calc(140rpx + env(safe-area-inset-bottom));
+  background-color: var(--bg);
 }
 
 /* ---------- 顶部编辑器 ---------- */
@@ -11,24 +13,26 @@
   z-index: 10;
   margin-bottom: 24rpx;
   padding: 24rpx;
-  border-radius: var(--radius-lg, 32rpx);
-  background: var(--card, #FFFDF9);
-  box-shadow: 0 8rpx 32rpx rgba(63, 58, 54, 0.08);
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
 }
 
 .editor__input {
   width: 100%;
   min-height: 168rpx;
   padding: 20rpx;
-  border-radius: var(--radius-md, 20rpx);
-  background: var(--bg, #FBF6EE);
-  font-size: var(--font-md, 28rpx);
+  background-color: var(--wall);
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-md);
   line-height: 1.7;
-  color: var(--ink, #3F3A36);
+  color: var(--ink);
 }
 
 .editor__placeholder {
-  color: var(--muted, #6F685F);
+  color: var(--muted);
 }
 
 .editor__bar {
@@ -39,38 +43,57 @@
 }
 
 .editor__count {
-  font-size: var(--font-xs, 22rpx);
-  color: var(--muted, #6F685F);
+  font-size: var(--font-xs);
+  color: var(--muted);
 }
 
+/* 保存：墨黑实心 + 虚线边 + 马克笔红硬阴影 */
 .editor__save {
-  padding: 14rpx 40rpx;
-  border-radius: 999rpx;
-  background: var(--accent-strong, #A85C42);
-  color: #FFFFFF;
-  font-size: var(--font-sm, 24rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+  padding: 0 40rpx;
+  background-color: var(--accent-strong);
+  color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-btn);
+  font-size: var(--font-sm);
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  transition: transform 150ms linear;
+}
+
+.editor__save:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: none;
 }
 
 .editor__save--disabled {
   opacity: 0.45;
+  box-shadow: none;
 }
 
 /* ---------- 状态 ---------- */
 .hint {
   padding: 32rpx 0;
   text-align: center;
-  font-size: var(--font-sm, 24rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-sm);
+  color: var(--muted);
 }
 
 .hint--faint {
-  color: var(--muted, #6F685F);
+  color: var(--muted);
 }
 
 /* 文档 12.9：列表失败保留内容 + 底部可点重试 */
 .hint--error {
-  color: var(--accent-strong, #A85C42);
-  text-decoration: underline;
+  display: inline-block;
+  min-height: 88rpx;
+  line-height: 88rpx;
+  color: var(--accent-ink);
+  border-bottom: 2rpx dashed var(--accent-ink);
 }
 
 .state {
@@ -80,13 +103,13 @@
 
 .state__text {
   margin-bottom: 40rpx;
-  font-size: var(--font-md, 28rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-md);
+  color: var(--muted);
 }
 
 .state__btn {
   display: inline-flex;
-  height: 80rpx;
+  min-height: 88rpx;
   padding: 0 56rpx;
 }
 
@@ -101,6 +124,6 @@
 
 .empty__text {
   margin-top: 16rpx;
-  font-size: var(--font-md, 28rpx);
-  color: var(--muted, #8C837A);
+  font-size: var(--font-md);
+  color: var(--muted);
 }

@@ -9,12 +9,41 @@
     "pages/mood/index"
   ],
   "window": {
-    "backgroundColor": "#FBF6EE",
+    "backgroundColor": "#FFFEF5",
     "backgroundTextStyle": "dark",
-    "navigationBarBackgroundColor": "#FBF6EE",
+    "navigationBarBackgroundColor": "#FFFEF5",
     "navigationBarTitleText": "小怡怡安",
     "navigationBarTextStyle": "black",
     "pageOrientation": "portrait"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#5F574C",
+    "selectedColor": "#2C2C2C",
+    "backgroundColor": "#FFFEF5",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "今天"
+      },
+      {
+        "pagePath": "pages/diary/index",
+        "text": "日记"
+      },
+      {
+        "pagePath": "pages/wish/index",
+        "text": "愿望"
+      },
+      {
+        "pagePath": "pages/mood/index",
+        "text": "心情"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
   },
   "sitemapLocation": "sitemap.json",
   "style": "v2",

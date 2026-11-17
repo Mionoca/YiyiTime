@@ -222,12 +222,9 @@ test('首页 ↔ 云函数：绑定后展示服务端聚合的天数、纪念日
     + ' · 还有 ' + server.couple.anniversary.daysLeft + ' 天';
   assert.strictEqual(page.data.anniversaryText, expectedAnniversary);
   // 其它区块：还没人打卡/进房间
-  assert.strictEqual(page.data.doorLit, false);
-  assert.strictEqual(page.data.safetyLabel, '还没报平安');
-  assert.strictEqual(page.data.lampDim, true);
-  assert.strictEqual(page.data.lampDot, false);
-  assert.strictEqual(page.data.wishTotal, 0);
-  assert.strictEqual(page.data.wishDone, 0);
+  assert.strictEqual(page.data.safetySub, '还没报平安');
+  assert.strictEqual(page.data.diarySub, '今天还没写');
+  assert.strictEqual(page.data.wishSub, '还没有愿望');
   assert.strictEqual(page.data.moodMine, null);
   assert.strictEqual(page.data.moodPartner, null);
   assert.strictEqual(page.data.hugButtonText, '我需要抱抱');
@@ -369,8 +366,7 @@ test('报平安：A 报平安后 B 的首页门灯亮、门牌显示 TA 到家�
   assert.ok(safety.data.items[0].checkinId);
 
   const pageB = await openHome(B);
-  assert.strictEqual(pageB.data.doorLit, true);
-  assert.strictEqual(pageB.data.safetyLabel, 'TA 到家了');
+  assert.strictEqual(pageB.data.safetySub, 'TA 到家了');
 
   // B 的报平安页能看到 A 的记录（时间线走真实 safety.list）
   currentOpenid = B;
@@ -413,8 +409,7 @@ test('日记：A 写完当天日记后，B 的首页只看到「写了」，正�
   assert.strictEqual(listA.todayKey, diaryA.data.todayKey);
 
   const pageB = await openHome(B);
-  assert.strictEqual(pageB.data.lampDim, true, 'B 今天还没写，台灯应暗');
-  assert.strictEqual(pageB.data.lampDot, true, 'A 写了未解锁，应亮小光点');
+  assert.strictEqual(pageB.data.diarySub, 'TA 写了，明天就能看', 'B 没写、A 写了未解锁，摘要要说清');
   const homeB = await ok(B, 'home.get');
   assert.strictEqual(homeB.diary.mineWritten, false);
   assert.strictEqual(homeB.diary.partnerWritten, true);
@@ -485,9 +480,7 @@ test('愿望：A 新增愿望后，B 的首页统计与愿望页都能看到，�
   assert.ok(wishId, '愿望应带 wishId');
 
   const pageB = await openHome(B);
-  assert.strictEqual(pageB.data.wishTotal, 1);
-  assert.strictEqual(pageB.data.wishDone, 0);
-  assert.strictEqual(pageB.data.wishPreviewTitle, '去看海');
+  assert.strictEqual(pageB.data.wishSub, '0/1 完成');
 
   currentOpenid = B;
   const wishB = openPage(WISH);
@@ -503,9 +496,8 @@ test('愿望：A 新增愿望后，B 的首页统计与愿望页都能看到，�
   // A 回首页：统计同步，全部完成后便签预览为空
   currentOpenid = A;
   pageA.onShow();
-  await waitFor(() => pageA.data.wishDone === 1, 'A 首页统计同步');
-  assert.strictEqual(pageA.data.wishTotal, 1);
-  assert.strictEqual(pageA.data.wishPreviewTitle, '');
+  await waitFor(() => pageA.data.wishSub === '1/1 完成', 'A 首页统计同步');
+  assert.strictEqual(pageA.data.wishSub, '1/1 完成');
 
   pageA.onUnload();
   pageB.onUnload();

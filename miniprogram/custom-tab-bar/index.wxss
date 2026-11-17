@@ -1,0 +1,52 @@
+/*
+ * tabBar 的颜色直接写死而不吃 CSS 变量：自定义 tabBar 是独立组件实例，
+ * 样式隔离下变量取不到时会把文字变成默认黑/透明，宁可在这里多写四个色值。
+ * 纸底 #FFFEF5 / 墨 #2C2C2C / 次要 #5F574C / 马克笔黄 #FFD93D（文档 8.7）。
+ */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  height: calc(100rpx + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background-color: #FFFEF5;
+  /* 虚线顶边：涂鸦风的边界语言，不用实线 */
+  border-top: 2rpx dashed #2C2C2C;
+}
+
+.tabbar__item {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+}
+
+.tabbar__label {
+  font-size: 26rpx;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #5F574C;
+}
+
+.tabbar__item.is-active .tabbar__label {
+  color: #2C2C2C;
+  font-weight: 800;
+  /* 选中项轻微斜切，像手写标出来的一笔 */
+  transform: rotate(-2deg);
+}
+
+/* 马克笔高亮条：压在文字下方，只做装饰 */
+.tabbar__mark {
+  position: absolute;
+  bottom: 16rpx;
+  width: 48rpx;
+  height: 6rpx;
+  background-color: #FFD93D;
+  transform: rotate(-2deg);
+}

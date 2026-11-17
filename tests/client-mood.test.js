@@ -320,11 +320,13 @@ test('mood 页: 客户端日期工具跨月/跨年正确（「昨天」不会算
   assert.strictEqual(timeUtil.formatHM('not-a-date'), '');
 });
 
-test('profile: 已绑定点「心情记录」进入页面，未绑定只提示不跳转', async () => {
+test('profile: 已绑定点「心情记录」走 switchTab，未绑定只提示不跳转', async () => {
   const nav = [];
   const toasts = [];
   installWx({
-    navigateTo: (opts) => { nav.push(opts.url); },
+    // 心情记录已是 tab 页，只能 switchTab（文档 8.2）；navigateTo 到 tab 页会失败
+    switchTab: (opts) => { nav.push(opts.url); },
+    navigateTo: (opts) => { nav.push('navigateTo:' + opts.url); },
     showToast: (opts) => { toasts.push(opts); },
   });
   try {

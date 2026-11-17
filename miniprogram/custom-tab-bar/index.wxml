@@ -1,0 +1,17 @@
+<!-- 涂鸦风 tabBar：虚线顶边 + 文字标签 + 马克笔高亮条（文档 8.2 / 8.7） -->
+<view class="tabbar" aria-role="tablist">
+  <view
+    wx:for="{{list}}"
+    wx:key="path"
+    class="tabbar__item {{selected === index ? 'is-active' : ''}}"
+    data-index="{{index}}"
+    data-path="{{item.path}}"
+    bindtap="onTap"
+    aria-role="button"
+    aria-label="{{item.text}}"
+    aria-selected="{{selected === index}}"
+  >
+    <text class="tabbar__label">{{item.text}}</text>
+    <view class="tabbar__mark" wx:if="{{selected === index}}"></view>
+  </view>
+</view>
