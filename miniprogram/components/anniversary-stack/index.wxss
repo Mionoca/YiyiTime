@@ -4,9 +4,14 @@
  * 组件样式是隔离的，app.wxss 的 dk-* 与页面变量都进不来：
  * 这里用 var(--x, 默认值) 兜底，取不到变量时仍是涂鸦风的纸卡。
  *
- * 层级只用 transform / opacity（文档 8.9 静态检查）：
- * 卡片在 grid 的同一格里叠放，不用绝对定位挪位置，容器高度才不会塌。
+ * 两条硬约束：
+ * 1. 层级只用 transform / opacity（文档 8.9 静态检查）：卡片在 grid 的同一格里
+ *    叠放，不用绝对定位挪位置，容器高度才不会塌；
+ * 2. 卡面高度固定（文档 9.4「统一高度」）：内容长短不一时靠裁剪正文 + 操作行贴底
+ *    吸收，卡片下沿与下方控件永远不动 —— 否则切一张没有脚注的卡，下面的心情卡
+ *    会跟着上下跳。
  */
+
 .stack {
   position: relative;
   /* 为后置层留出上移空间（9.2：上下各 48rpx） */
@@ -18,20 +23,31 @@
   /* 同格叠放：所有卡都落在 1/1，天然等高对齐，不需要 position: absolute */
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+  /* 固定高度（文档 9.4）：按最长内容算（≈380rpx）再留 20rpx 余量。
+     只渲染 3 层的模型下，容器高度本来会取「当前这 3 张」的最大值，
+     换一张卡集合就变，下方控件会跳 40rpx 左右 */
+  height: 400rpx;
   /* 后置层比当前卡窄，靠自身 scale 缩，容器不裁剪 */
   overflow: visible;
 }
 
 .stack__card {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
   grid-area: 1 / 1;
   position: relative;
+  height: 100%;
   padding: 32rpx;
   /* 以顶边为缩放原点：后层上移量才是干净的 24 / 48rpx（居中缩放会把位移吃掉一半） */
   transform-origin: 50% 0;
   background-color: var(--card, #FFFEF5);
   border: 3rpx dashed var(--line, #2C2C2C);
   border-radius: var(--radius-md, 4rpx);
-  transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* 缓动带轻微回弹（y1 = 1.56）：卡片会越过目标位置一点再落回，
+     后置层因此先「展开」再「收回」，比匀速滑过去更像纸牌 */
+  transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 320ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform, opacity;
 }
 
@@ -58,12 +74,23 @@
   pointer-events: none;
 }
 
+/* 正文区：吃满剩余高度，超了裁掉，不顶开卡片（9.4 统一高度） */
+.stack__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .stack__label {
   display: block;
   font-size: 22rpx;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--muted, #5F574C);
+  /* 标题上限 12 字，正常一行放得下；真超了用省略号，比换行更能守住卡高 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stack__main {
@@ -95,11 +122,13 @@
   border-radius: var(--radius-sm, 4rpx);
 }
 
+/* 操作行（改日子 / 管理）贴底：正文区 flex: 1 撑开后，这一行永远落在同一高度（9.4） */
 .stack__foot {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  margin-top: 16rpx;
+  margin-top: auto;
+  padding-top: 8rpx;
 }
 
 .stack__link {
@@ -132,6 +161,12 @@
   color: var(--muted, #5F574C);
   border: 2rpx dashed rgba(44, 44, 44, 0.35);
   border-radius: var(--radius-sm, 4rpx);
+  transition: transform 120ms ease-out;
+}
+
+/* 按下时像被手指压了一下：只挪 2rpx，不缩放整块（9.7） */
+.stack__arrow.is-press {
+  transform: translate(2rpx, 2rpx);
 }
 
 .stack__dots {
@@ -150,7 +185,8 @@
   border: 2rpx dashed rgba(44, 44, 44, 0.3);
   border-radius: 2rpx;
   transform: scaleX(0.333);
-  transition: transform 300ms ease-out;
+  /* 和卡片同一套回弹：选中态「弹」一下再稳住，切卡时眼神有落点 */
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .stack__dot.is-on {
@@ -161,7 +197,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .stack__card,
+  .stack__arrow,
   .stack__dot {
     transition: none;
+  }
+
+  .stack__arrow.is-press {
+    transform: none;
   }
 }

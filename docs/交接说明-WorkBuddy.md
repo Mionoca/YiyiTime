@@ -2,7 +2,7 @@
 
 > 更新时间：2026-11-18 19:40（Asia/Shanghai）
 > 仓库：`D:/大学/YiyiTime`　分支：`hjj`　M12 功能提交：`7afdd02`，文档同步提交：`f545c5f`（**均已推送**，远端 `hjj` = `f545c5f`）
-> 单测基线：654 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
+> 单测基线：662 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
 
 ## 一、当前状态
 
@@ -18,7 +18,7 @@
   2. **内容安全（F12）**：新增 `lib/security.js` 的 `assertText`，七个自由文本字段在写库前送 `security.msgSecCheck` v2 —— 昵称（scene 1）、心情备注 / 日记 / 愿望备注 / 报平安备注 / 记账备注（4）、愿望标题（3）。`risky` 与 `review` 都抛 `CONTENT_RISKY`（这里没有人工复审环节，放过等于没人管）；**接口不可用时放行**（没有 `cloud.openapi`、`errCode` 非 0、1.5s 超时）并记 `[security]` 日志 —— 内容只在两个人之间可见、不是公开传播，审核服务抖动不能把写日记的路堵死。日志只记 `scene` / 长度 / `suggest` / `label`，不记原文。
   3. **页面**：「我的」页把「每日提醒（即将上线）」换成真实设置（`switch` + `time` picker + 剩余额度文案）。开启顺序严格是「先 `wx.requestSubscribeMessage` 拿授权 → `reminder.grant` 攒额度 → `reminder.set` 打开」，反了会出现「开关开着但永远发不出去」；拒绝授权开关回滚。`profile.load` 里 `reminder.get` 单独 `catch`，提醒设置挂了不影响整页。`couple.confirmUnbind` 事务内顺手关掉双方提醒开关。
 - 改动范围（M12）：**云函数**（删 `handlers/hug.js`、新增 `handlers/anniversary.js`、`handlers/index.js` 36 个 action、`lib/time.js` 加 `yearlyOccurrence`、`lib/home-blocks.js` 换 `loadAnniversary`、`handlers/home.js` 字段换 `anniversary`、`scripts/release-check.js` 集合白名单）；**小程序端**（`app.json` 三 tab + 新页面、`custom-tab-bar`、`constants` / `tabbar`、`pages/home`、`pages/ledger`、`pages/profile`、`pages/anniversary`、`components/anniversary-stack` 新增、`components/hug-banner` 删除、`components/avatar-bubble` 去角标）；**文档**（技术设计文档 1.3 / 2.3–2.5 / 3.3–3.5 / 4.1 / 4.5 / 4.8 / 5.1–5.7 / 6.1 / 6.4–6.7 / 6.10 / 7.1 / 7.2 / 7.7 / 7.8 / 8.2–8.5 / 第 9 章 / 10.3 / 10.5 / 11.2 / 11.4 / 11.7 / 11.9 / 12.3 / 12.5 / 12.6 / 13.2 / 13.6 / 14.3 / 14.4 / 14.9 / 15.1–15.5 / 16.1–16.4 / 16.8，版本 v0.1.4）。
-- 验证记录：`node --test tests/*.test.js` **654 pass / 0 fail**（删 `hug.test.js`、新增 `anniversary.test.js` 13 个 + `client-anniversary.test.js` 9 个；`components` / `home-derive` / `client-home` 里 15 个抱抱用例改写为堆叠与纪念日用例；15 个测试文件随动）；`release-check` 21 PASS + 7 TODO + 0 FAIL；`check-secrets` exit 0。
+- 验证记录：`node --test tests/*.test.js` **662 pass / 0 fail**（删 `hug.test.js`、新增 `anniversary.test.js` 13 个 + `client-anniversary.test.js` 9 个；`components` / `home-derive` / `client-home` 里 15 个抱抱用例改写为堆叠与纪念日用例；15 个测试文件随动）；`release-check` 21 PASS + 7 TODO + 0 FAIL；`check-secrets` exit 0。
 - 已知边界（不阻断）：订阅消息「攒授权」是微信能力的硬限制，用户只点一次授权就只够发一条，所以额度为 0 时不会发；`runTimer` 单批最多 100 人（云函数单次 `get` 上限），用户量大起来要补 `skip` 分页；模板关键词（默认 `thing1` / `time2`）必须和公众平台上选的模板一致，否则 47003，失败只记日志不扣额度；内容安全是 fail-open，微信接口整体挂掉时等于没审（靠日志发现）。M12 新增：纪念日 8 条上限是「先 count 再写」的软上限，两台设备同时提交可能多出 1 条；`hugs` 历史数据不再展示，需要的话自己导出。
 
 ## 二、接手第一步

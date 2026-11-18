@@ -178,12 +178,12 @@ test('对比度：马克笔色只做装饰，不做正文色（文档 8.7）', (
   assert.deepStrictEqual(offenders, [], '首页正文色不能直接用马克笔色：' + offenders.join('、'));
 });
 
-test('动画：纪念日堆叠切换 400ms 缓出，只过渡 transform / opacity（文档 9.4 / 9.7）', () => {
+test('动画：纪念日堆叠切换 460ms 回弹缓出，只过渡 transform / opacity（文档 9.4 / 9.7）', () => {
   const card = findRule(stackRules, '.stack__card');
   const transition = String(card.transition || '');
-  assert.match(transition, /transform 400ms/, '切换必须过渡 transform');
-  assert.match(transition, /opacity 400ms/, '切换必须过渡 opacity');
-  assert.match(transition, /cubic-bezier\(0\.22, 1, 0\.36, 1\)/, '用 9.4 指定的缓出曲线');
+  assert.match(transition, /transform 460ms/, '切换必须过渡 transform');
+  assert.match(transition, /opacity 320ms/, 'opacity 单独给 320ms（层级淡出不跟着回弹）');
+  assert.match(transition, /cubic-bezier\(0\.34, 1\.56, 0\.64, 1\)/, '用 9.4 指定的回弹曲线');
   // 超过 500ms 会觉得卡，低于 300ms 看不出前后关系
   for (const ms of transition.match(/(\d+)ms/g) || []) {
     const n = Number(ms.replace('ms', ''));
@@ -195,7 +195,7 @@ test('动画：纪念日堆叠切换 400ms 缓出，只过渡 transform / opacit
   // 指示器拉长用 scaleX，不改 width（改宽度会重排）
   const dot = findRule(stackRules, '.stack__dot');
   assert.match(String(dot.transform), /scaleX/, '指示器用 scaleX 拉长');
-  assert.match(String(dot.transition), /300ms/, '指示器过渡 300ms');
+  assert.match(String(dot.transition), /320ms/, '指示器与卡片同一套回弹（320ms）');
 });
 
 test('对比度：心情气泡四态在淡底上 ≥4.5:1（文档 9.5）', () => {
