@@ -75,6 +75,10 @@ const BOUND_REQUIRED = [
   'wish.setDone',
   'wish.remove',
   'wish.list',
+  'pause.start',
+  'pause.status',
+  'pause.end',
+  'pause.choose',
 ];
 
 const BACKSLASH = String.fromCharCode(92);
@@ -142,7 +146,7 @@ function requireBoundIndex(src) {
 
 test('双人 handler 必须调用 ctx.requireBound()（文档 11.9）', () => {
   const registered = Object.keys(handlers).sort();
-  assert.strictEqual(registered.length, 36, '登记的 action 数量变了，请同步分类');
+  assert.strictEqual(registered.length, 40, '登记的 action 数量变了，请同步分类');
   const classified = registered.filter((action) => (
     !Object.prototype.hasOwnProperty.call(UNBOUND_SAFE, action)
     && !Object.prototype.hasOwnProperty.call(CONDITIONAL_BOUND, action)

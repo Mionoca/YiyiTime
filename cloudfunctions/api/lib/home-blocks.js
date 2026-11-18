@@ -3,10 +3,21 @@
 const time = require('./time');
 const relation = require('./relation');
 const anniversaryHandler = require('../handlers/anniversary');
+const pauseHandler = require('../handlers/pause');
 
 const iso = relation.iso;
 /** 自定义纪念日上限（文档 5.3.5）：与 handlers/anniversary.js 同源，避免两处常量漂移 */
 const ANNIVERSARY_MAX = anniversaryHandler.MAX_COUNT;
+
+/**
+ * 暂停区块（文档 7.8 / 7.17）：当前未 closed 的一条（含到点惰性 ended）。
+ * 没有暂停时返回 null——「pause 不存在」本身就是合法状态，不是错误；
+ * 读库故障由外层 optionalBlock 降级为 null，两种 null 客户端都按「没有便签」渲染。
+ */
+async function loadPause(ctx, coupleId) {
+  const doc = await pauseHandler.currentPause(ctx.db, coupleId, ctx.now);
+  return pauseHandler.viewOf(doc, ctx);
+}
 
 /** 今日两个人的心情（一次查询；coupleId + date 索引） */
 async function loadMood(ctx, coupleId, todayKey, partnerOpenid) {
@@ -139,5 +150,5 @@ async function optionalBlock(ctx, name, task) {
 }
 
 module.exports = {
-  loadMood, loadAnniversary, loadSafety, loadDiary, loadWish, optionalBlock, iso,
+  loadMood, loadAnniversary, loadSafety, loadDiary, loadWish, loadPause, optionalBlock, iso,
 };

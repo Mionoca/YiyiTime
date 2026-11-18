@@ -28,6 +28,7 @@ const EXPECTED_ACTIONS = [
   'ledger.add', 'ledger.update', 'ledger.remove', 'ledger.list',
   'home.get',
   'reminder.get', 'reminder.set', 'reminder.grant',
+  'pause.start', 'pause.status', 'pause.end', 'pause.choose',
 ];
 
 const REQUEST_ID = /^\d+-[a-z0-9]{6}$/;

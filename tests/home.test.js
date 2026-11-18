@@ -580,3 +580,86 @@ test('home.get: couple.startDate 缺失或非法时降级为 null，不整页失
     }
   }
 });
+
+test('home.get: pause 区块聚合 active 视图（M11，文档 7.8 / 7.17）', async () => {
+  const { ctx } = makeCtx({
+    users: [{ _id: 'oA', coupleId: 'c_1' }],
+    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
+    pauses: [{
+      _id: 'p_home1', coupleId: 'c_1', byOpenid: 'oB', durationMin: 30, status: 'active',
+      startedAt: new Date(NOW.getTime() - 5 * 60 * 1000),
+      endsAt: new Date(NOW.getTime() + 25 * 60 * 1000),
+      endedAt: null, endChoice: null, endChoiceBy: null,
+      createdAt: NOW, updatedAt: NOW,
+    }],
+  });
+  ctx.user = { _id: 'oA', coupleId: 'c_1', nickname: '小怡' };
+  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
+  ctx.partner = { _id: 'oB', nickname: '小安' };
+
+  const res = await homeHandler.get({}, ctx);
+  assert.strictEqual(res.pause.byMe, false, '是对方按的暂停');
+  assert.strictEqual(res.pause.byName, '小安');
+  assert.strictEqual(res.pause.status, 'active');
+  assert.strictEqual(res.pause.durationMin, 30);
+  assert.ok(JSON.stringify(res.pause).indexOf('oB') === -1, '不泄漏 openid');
+});
+
+test('home.get: pause 到点惰性 ended 在首页生效；closed 后区块为 null', async () => {
+  const { ctx, fake } = makeCtx({
+    users: [{ _id: 'oA', coupleId: 'c_1' }],
+    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
+    pauses: [{
+      _id: 'p_home2', coupleId: 'c_1', byOpenid: 'oA', durationMin: 30, status: 'active',
+      startedAt: new Date(NOW.getTime() - 31 * 60 * 1000),
+      endsAt: new Date(NOW.getTime() - 60 * 1000),
+      endedAt: null, endChoice: null, endChoiceBy: null,
+      createdAt: NOW, updatedAt: NOW,
+    }],
+  });
+  ctx.user = { _id: 'oA', coupleId: 'c_1', nickname: '小怡' };
+  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
+  ctx.partner = { _id: 'oB', nickname: '小安' };
+
+  const res = await homeHandler.get({}, ctx);
+  assert.strictEqual(res.pause.status, 'ended', '到点即翻面成和好卡');
+  assert.strictEqual(fake.get('pauses', 'p_home2').status, 'ended', '惰性写回已落库');
+
+  // closed 之后：区块回到 null（便签消失，首页恢复卡片流）
+  fake.get('pauses', 'p_home2').status = 'closed';
+  fake.get('pauses', 'p_home2').endChoice = 'later';
+  fake.get('pauses', 'p_home2').endChoiceBy = 'oB';
+  const after = await homeHandler.get({}, ctx);
+  assert.strictEqual(after.pause, null);
+});
+
+test('home.get: pause 区块读库失败只降级自己，其余区块照常（文档 10.3）', async () => {
+  const { ctx, fake } = makeCtx({
+    users: [{ _id: 'oA', coupleId: 'c_1' }],
+    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
+    moods: [
+      { _id: 'oA_' + TODAY, coupleId: 'c_1', openid: 'oA', date: TODAY, mood: 'sunny', note: '', updatedAt: NOW },
+    ],
+  });
+  const realDb = fake.db;
+  ctx.db = {
+    collection(name) {
+      if (name === 'pauses') throw new Error('mock pauses down');
+      return realDb.collection(name);
+    },
+  };
+  ctx.user = { _id: 'oA', coupleId: 'c_1' };
+  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
+  ctx.partner = { _id: 'oB' };
+
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const res = await homeHandler.get({}, ctx);
+    assert.strictEqual(res.pause, null, 'pause 块失败降级 null');
+    assert.strictEqual(res.mood.mine.mood, 'sunny', '心情块不受影响');
+    assert.strictEqual(res.couple.coupleId, 'c_1');
+  } finally {
+    console.error = originalError;
+  }
+});

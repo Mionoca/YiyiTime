@@ -113,7 +113,7 @@ function assertNoN1(q, maxPerCollection) {
   });
 }
 
-test('查询预算：已绑定首页一次 home.get 约 9 次库操作（文档 7.8 的 9 次读）', async () => {
+test('查询预算：已绑定首页一次 home.get 约 10 次库操作（文档 7.8：9 次读 + M11 的 pause 1 次）', async () => {
   const h = createHarness();
   const today = todayKey();
   h.reset(seedBound(today), A);
@@ -136,8 +136,9 @@ test('查询预算：已绑定首页一次 home.get 约 9 次库操作（文档 
     safety_checkins: 2,   // 我今日 + 伴侣最近
     diaries: 1,           // 今日两人一次查
     wishes: 1,            // 一次读全量本地统计
+    pauses: 1,            // M11：当前未 closed 的一条（coupleId+status+startedAt 索引）
   });
-  assert.strictEqual(q.total(), 9, '一次首页聚合应约 9 次库操作');
+  assert.strictEqual(q.total(), 10, '一次首页聚合应约 10 次库操作');
   assertNoN1(q, 2);
 });
 
@@ -153,7 +154,7 @@ test('查询预算：lastActiveAt 超过 5 分钟才多一次写，其余不变'
   assert.strictEqual(res.ok, true);
   assert.strictEqual(q.counts.users, 3, '本人 + 伴侣 + 更新 lastActiveAt 一次');
   assert.deepStrictEqual(q.ops['users:doc.update'], 1, '只有一次回写');
-  assert.strictEqual(q.total(), 10);
+  assert.strictEqual(q.total(), 11);
   assertNoN1(q, 3);
 });
 
@@ -202,7 +203,7 @@ test('查询预算：纪念日多也不多查（8 条仍是一次 where.get，�
   // 1 次读，无写；排序 / 剩余天数都在内存里算
   assert.strictEqual(q.counts.anniversaries, 1);
   assert.strictEqual(q.ops['anniversaries:doc.update'], undefined);
-  assert.strictEqual(q.total(), 9);
+  assert.strictEqual(q.total(), 10);
 });
 
 test('查询预算：列表接口每页只多一次数据读（分页不 N+1）', async () => {
@@ -259,9 +260,9 @@ test('查询预算：关系里没有伴侣时少读伴侣相关项（users/safet
   assert.strictEqual(res.data.partner, null);
   assert.deepStrictEqual(q.counts, {
     users: 1, couples: 1, moods: 1, anniversaries: 1,
-    safety_checkins: 1, diaries: 1, wishes: 1,
+    safety_checkins: 1, diaries: 1, wishes: 1, pauses: 1,
   });
-  assert.strictEqual(q.total(), 7);
+  assert.strictEqual(q.total(), 8);
 });
 
 test('查询预算：couple 文档丢失自愈只多两次用户读写，不继续查双人集合', async () => {
@@ -310,10 +311,10 @@ test('查询预算：可选区块降级不重试、不额外扫库（mood 失败
   assert.strictEqual(res.ok, true, '单区块失败不影响整页');
   assert.strictEqual(res.data.mood, null, '降级区块按 null 返回');
   assert.strictEqual(res.data.safety.mineToday, true, '其它区块正常');
-  // 降级路径少一次 moods 读、且不因失败重试：8 次操作
+  // 降级路径少一次 moods 读、且不因失败重试：9 次操作（含 M11 的 pause 1 次）
   assert.deepStrictEqual(q.counts, {
-    users: 2, couples: 1, anniversaries: 1, safety_checkins: 2, diaries: 1, wishes: 1,
+    users: 2, couples: 1, anniversaries: 1, safety_checkins: 2, diaries: 1, wishes: 1, pauses: 1,
   });
   assert.strictEqual(q.counts.moods, undefined);
-  assert.strictEqual(q.total(), 8);
+  assert.strictEqual(q.total(), 9);
 });

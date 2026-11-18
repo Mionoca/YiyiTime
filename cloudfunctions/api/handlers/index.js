@@ -46,4 +46,8 @@ module.exports = {
   'reminder.get': require('./reminder').get,
   'reminder.set': require('./reminder').set,
   'reminder.grant': require('./reminder').grant,
+  'pause.start': require('./pause').start,
+  'pause.status': require('./pause').status,
+  'pause.end': require('./pause').end,
+  'pause.choose': require('./pause').choose,
 };

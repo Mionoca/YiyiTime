@@ -46,6 +46,7 @@ async function get(payload, ctx) {
     safety: null,
     diary: null,
     wish: null,
+    pause: null,
     unbind: NO_UNBIND,
   };
 
@@ -91,13 +92,14 @@ async function get(payload, ctx) {
       : { openid: partnerOpenid, nickname: '', avatarFileID: '' };
   }
 
-  // 五个区块互不依赖，并行读取；单个区块失败只降级自己（文档 10.3）
-  const [mood, anniversary, safety, diary, wish] = await Promise.all([
+  // 六个区块互不依赖，并行读取；单个区块失败只降级自己（文档 10.3）
+  const [mood, anniversary, safety, diary, wish, pause] = await Promise.all([
     blocks.optionalBlock(ctx, 'mood', () => blocks.loadMood(ctx, coupleId, todayKey, partnerOpenid)),
     blocks.optionalBlock(ctx, 'anniversary', () => blocks.loadAnniversary(ctx, coupleId, todayKey)),
     blocks.optionalBlock(ctx, 'safety', () => blocks.loadSafety(ctx, coupleId, todayKey, partnerOpenid)),
     blocks.optionalBlock(ctx, 'diary', () => blocks.loadDiary(ctx, coupleId, todayKey, partnerOpenid)),
     blocks.optionalBlock(ctx, 'wish', () => blocks.loadWish(ctx, coupleId)),
+    blocks.optionalBlock(ctx, 'pause', () => blocks.loadPause(ctx, coupleId)),
   ]);
 
   return Object.assign({}, base, {
@@ -114,6 +116,7 @@ async function get(payload, ctx) {
     safety,
     diary,
     wish,
+    pause,
     unbind: relation.unbindView(couple, ctx.openid),
   });
 }

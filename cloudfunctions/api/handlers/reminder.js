@@ -21,6 +21,7 @@
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
 const time = require('../lib/time');
+const pause = require('./pause');
 
 /** 模板 ID 从环境变量读（控制台改环境变量比改代码安全），没配就是空串 */
 const TEMPLATE_PAGE = 'pages/safety/index';
@@ -235,6 +236,9 @@ async function runTimer(options) {
       .where({ coupleId: user.coupleId, openid: user.openid, date: todayKey })
       .count();
     if (cnt && cnt.total > 0) { result.skipped += 1; continue; }
+
+    // 暂停进行中：刹车优先，本轮不发也不占位（7.17 静音规则）
+    if (await pause.isOngoing(db, user.coupleId, now)) { result.skipped += 1; continue; }
 
     const claim = await claimToday(db, user._id, todayKey, now);
     if (!claim.claimed) { result.skipped += 1; continue; }
