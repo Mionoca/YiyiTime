@@ -1,8 +1,7 @@
 # 交接说明（WorkBuddy 接手用）
 
-> 更新时间：2026-11-18 19:30（Asia/Shanghai）
-> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　M12 功能提交：`7afdd02`（本地已提交，**尚未推送**；其后只有一次「交接说明 / 开发进度同步」的 docs 提交）
-> 推送状态：本机到 GitHub 的请求被代理拦下（`CONNECT tunnel failed, response 502`），需在能连 GitHub 的环境执行 `git push origin hjj`；接手前先 `git ls-remote origin hjj` 确认远端是否已包含 `7afdd02`
+> 更新时间：2026-11-18 19:40（Asia/Shanghai）
+> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　M12 功能提交：`7afdd02`，文档同步提交：`f545c5f`（**均已推送**，远端 `hjj` = `f545c5f`）
 > 单测基线：654 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
 
 ## 一、当前状态
