@@ -228,8 +228,10 @@ test('首页 ↔ 云函数：绑定后展示服务端聚合的天数、纪念日
   assert.strictEqual(page.data.wishSub, '还没有愿望');
   assert.strictEqual(page.data.moodMine, null);
   assert.strictEqual(page.data.moodPartner, null);
-  assert.strictEqual(page.data.hugButtonText, '我需要抱抱');
-  assert.strictEqual(page.data.hugButtonDisabled, false);
+  // 还没加自定义纪念日时只剩「在一起」一张卡
+  assert.strictEqual(page.data.cards.length, 1);
+  assert.strictEqual(page.data.cards[0].kind, 'together');
+  assert.strictEqual(page.data.cards[0].mainText, '第 ' + server.couple.daysTogether + ' 天');
   assert.strictEqual(page.data.shareCode, '');
 
   page.onUnload();
@@ -298,50 +300,53 @@ test('心情记录：A/B 各自打卡后，心情页按天合并双方（页面 
   assert.strictEqual(page.data.hasMore, false);
 });
 
-test('抱抱：A 发抱抱、B 首页回应、A 再回首页看到已抱', async () => {
+test('纪念日：A 在管理页添加后，双方首页堆叠多一张卡', async () => {
   setup();
   await seedBound();
 
-  const pageA = await openHome(A);
+  // A 在管理页添加
   currentOpenid = A;
-  // 冻结静默刷新：确认按钮与 hugOutgoing 来自 hug.send 的出参
-  const realLoadHug = pageA.load;
-  pageA.load = () => Promise.resolve();
-  try {
-    pageA.onTapHug();
-    await waitFor(() => pageA.data.hugButtonText === '等 TA 抱抱', 'A 进入等待回应');
-  } finally {
-    pageA.load = realLoadHug;
-  }
-  assert.strictEqual(pageA.data.hugSending, false);
-  assert.strictEqual(pageA.data.hugButtonDisabled, true);
-  assert.strictEqual(pageA.data.hugOutgoing.status, 'pending');
-  assert.ok(pageA.data.hugHint.indexOf('抱抱已经送出去') >= 0, '实际提示：' + pageA.data.hugHint);
-  assert.strictEqual(vibrated, 1, '发抱抱应轻振动一次');
+  const managePage = openPage('miniprogram/pages/anniversary/index.js');
+  managePage.onLoad();
+  await waitFor(() => !managePage.data.loading, '管理页加载');
+  assert.deepStrictEqual(managePage.data.items, []);
+
+  managePage.onAdd();
+  assert.strictEqual(managePage.data.formOpen, true);
+  assert.strictEqual(managePage.data.form.date, cloudTime.dateKeyOf(new Date()), '日期默认服务端今天');
+  managePage.onTitleInput({ detail: { value: '第一次见面' } });
+  managePage.onDateChange({ detail: { value: '2023-06-01' } });
+  await managePage.onSave();
+  assert.strictEqual(managePage.data.formOpen, false);
+  assert.strictEqual(managePage.data.saving, false);
+  assert.strictEqual(managePage.data.items.length, 1);
+  assert.strictEqual(managePage.data.items[0].title, '第一次见面');
+  assert.ok(managePage.data.items[0].daysText.indexOf('还有') === 0 || managePage.data.items[0].daysText === '就是今天',
+    '列表要给出剩余天数：' + managePage.data.items[0].daysText);
+  managePage.onUnload();
+
+  // 双方首页都能看到这张卡（同一条数据，剩余天数由服务端算）
+  const pageA = await openHome(A);
+  assert.strictEqual(pageA.data.cards.length, 2);
+  assert.strictEqual(pageA.data.cards[1].label, '第一次见面');
+  assert.strictEqual(pageA.data.cards[1].kind, 'custom');
+  pageA.onCardChange({ detail: { index: 1 } });
+  assert.strictEqual(pageA.data.cardIndex, 1);
 
   const pageB = await openHome(B);
-  assert.ok(pageB.data.hugIncoming, 'B 应收到抱抱横幅数据');
-  assert.ok(pageB.data.hugIncoming.hugId);
-  assert.strictEqual(pageB.data.hugButtonText, '抱抱 TA');
-  assert.strictEqual(pageB.data.hugButtonDisabled, false);
-  assert.ok(pageB.data.hugHint.indexOf('需要抱抱') >= 0, '实际提示：' + pageB.data.hugHint);
+  assert.strictEqual(pageB.data.cards.length, 2);
+  assert.strictEqual(pageB.data.cards[1].label, '第一次见面');
 
+  // B 的管理页也能看到（纪念日是两个人都能改的）
   currentOpenid = B;
-  pageB.onTapHug();
-  await waitFor(() => pageB.data.hugIncoming === null, 'B 回应后横幅消失');
-  assert.strictEqual(toasts[toasts.length - 1], '抱到啦', '实际 toasts：' + JSON.stringify(toasts));
-  assert.strictEqual(vibrated, 2, '回应抱抱也应轻振动一次');
-
-  // A 再打开首页：outgoing 变成 hugged，按钮变成「再抱一次」
-  const pageA2 = await openHome(A);
-  assert.strictEqual(pageA2.data.hugIncoming, null);
-  assert.strictEqual(pageA2.data.hugOutgoing.status, 'hugged');
-  assert.strictEqual(pageA2.data.hugButtonText, '再抱一次');
-  assert.ok(pageA2.data.hugHint.indexOf('TA 抱了你') >= 0, '实际提示：' + pageA2.data.hugHint);
+  const manageB = openPage('miniprogram/pages/anniversary/index.js');
+  manageB.onLoad();
+  await waitFor(() => !manageB.data.loading, 'B 管理页加载');
+  assert.strictEqual(manageB.data.items.length, 1);
 
   pageA.onUnload();
-  pageA2.onUnload();
   pageB.onUnload();
+  manageB.onUnload();
 });
 
 test('报平安：A 报平安后 B 的首页门灯亮、门牌显示 TA 到家了', async () => {
@@ -530,38 +535,31 @@ test('报平安：10 分钟内重复点击走 deduped 分支，不新增记录�
   assert.strictEqual(list.items[0].note, '第一次', '重复点击不能覆盖原备注');
 });
 
-test('抱抱：过期 pending 在首页被惰性置为 expired，双方都不出现可回应的横幅', async () => {
+test('纪念日：B 删掉 A 正在看的那张后，A 刷新时堆叠回到第一张', async () => {
   setup();
   await seedBound();
-  const userA = h.fake().get('users', A);
-  const oldStart = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
-  // 从 B 发给 A 的过期 pending：A 打开首页会走 incoming 的惰性写回
-  await h.fake().db.collection('hugs').doc('h_expired_e2e_01').set({
-    data: {
-      coupleId: userA.coupleId,
-      fromOpenid: B,
-      toOpenid: A,
-      status: 'pending',
-      createdAt: oldStart,
-      respondedAt: null,
-      expiresAt: new Date(oldStart.getTime() + 7 * 24 * 60 * 60 * 1000),
-    },
-  });
+
+  const first = await ok(A, 'anniversary.add', { title: '第一次见面', date: '2023-06-01' });
+  const second = await ok(A, 'anniversary.add', { title: '她的生日', date: '2019-11-16' });
+  assert.strictEqual(second.items.length, 2);
 
   const pageA = await openHome(A);
-  assert.strictEqual(pageA.data.hugIncoming, null, '过期 pending 不能当可回应的横幅');
-  assert.strictEqual(pageA.data.hugButtonText, '我需要抱抱');
-  await waitFor(() => h.fake().get('hugs', 'h_expired_e2e_01').status === 'expired', 'incoming 过期 pending 惰性写回');
+  assert.strictEqual(pageA.data.cards.length, 3);
+  pageA.onCardChange({ detail: { index: 2 } });
+  assert.strictEqual(pageA.data.cardIndex, 2);
 
-  // 发送方 B：outgoing 显示 expired，可以重新发送
-  const pageB = await openHome(B);
-  assert.strictEqual(pageB.data.hugIncoming, null);
-  assert.strictEqual(pageB.data.hugOutgoing.status, 'expired');
-  assert.strictEqual(pageB.data.hugButtonText, '我需要抱抱');
-  assert.ok(pageB.data.hugHint.indexOf('过期') >= 0, '实际提示：' + pageB.data.hugHint);
+  // B 把 A 正在看的那张删了（另一台设备）
+  currentOpenid = B;
+  await ok(B, 'anniversary.remove', { anniversaryId: second.items[1].anniversaryId });
+  await ok(B, 'anniversary.remove', { anniversaryId: first.item.anniversaryId });
+
+  // A 回到前台静默刷新：只剩「在一起」，下标夹回 0
+  currentOpenid = A;
+  await pageA.load(true, true);
+  assert.strictEqual(pageA.data.cards.length, 1);
+  assert.strictEqual(pageA.data.cardIndex, 0);
 
   pageA.onUnload();
-  pageB.onUnload();
 });
 
 test('记账本：A 记一笔后 B 切到 TA 的账本能看到，B 改不了别人的账', async () => {

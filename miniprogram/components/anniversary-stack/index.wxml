@@ -1,0 +1,41 @@
+<!-- 纪念日卡片堆叠（文档 8.4 / 9.4）：卡片在 grid 同格里叠放，靠 transform / opacity 分层 -->
+<view class="stack">
+  <view class="stack__deck" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
+    <view
+      wx:for="{{layers}}"
+      wx:key="key"
+      class="stack__card stack__card--p{{item.pos}}"
+      aria-role="group"
+      aria-label="{{item.label}}{{item.mainText}}"
+    >
+      <text class="stack__label">{{item.label}}</text>
+      <text class="stack__main">{{item.mainText}}</text>
+      <text class="stack__sub" wx:if="{{item.subText}}">{{item.subText}}</text>
+      <text class="stack__meta" wx:if="{{item.metaText}}">{{item.metaText}}</text>
+
+      <!-- 只有当前卡可交互：后置层是半透明的同一副牌，点它只会让人困惑（9.4） -->
+      <view class="stack__foot" wx:if="{{item.pos === 0}}">
+        <view class="stack__link" wx:if="{{item.kind === 'together'}}" catchtap="onEdit" aria-role="button" aria-label="查看或修改我们的日子">改日子 ›</view>
+        <view class="stack__link" catchtap="onManage" aria-role="button" aria-label="管理纪念日">管理 ›</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 箭头 + 圆点：只做滑动会让不知道能滑的人永远只看得到第一张（9.3） -->
+  <view class="stack__controls" wx:if="{{hasMany}}">
+    <view class="stack__arrow" catchtap="onPrev" aria-role="button" aria-label="上一个纪念日">‹</view>
+    <view class="stack__dots">
+      <view
+        wx:for="{{cards}}"
+        wx:key="key"
+        class="stack__dot {{current === index ? 'is-on' : ''}}"
+        data-index="{{index}}"
+        catchtap="onSelect"
+        aria-role="button"
+        aria-selected="{{current === index}}"
+        aria-label="第 {{index + 1}} 个纪念日"
+      ></view>
+    </view>
+    <view class="stack__arrow" catchtap="onNext" aria-role="button" aria-label="下一个纪念日">›</view>
+  </view>
+</view>

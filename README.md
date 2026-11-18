@@ -1,6 +1,6 @@
 # 小怡怡安（YiyiTime）
 
-只属于两个人的微信小程序小屋：今天的心情、一个抱抱、到家报平安、第二天才解锁的日记、下次见面想做的事，都收在同一间屋子里；各自还能记自己的小账本，到点没报平安会提醒一下。
+只属于两个人的微信小程序：今天的心情、一叠能左右翻的纪念日卡、到家报平安、第二天才解锁的日记、下次见面想做的事，都收在同一间屋子里；各自还能记自己的小账本（底部常驻），到点没报平安会提醒一下。
 
 ## 技术栈
 
@@ -18,21 +18,22 @@ YiyiTime/
 │  ├─ handlers/                     # 按域拆分
 │  │  ├─ index.js                   # action 路由表
 │  │  ├─ system.js  user.js  bind.js  couple.js  home.js
-│  │  ├─ mood.js  hug.js  safety.js  diary.js  wish.js  ledger.js
+│  │  ├─ mood.js  anniversary.js  safety.js  diary.js  wish.js  ledger.js
 │  │  └─ reminder.js                # 订阅提醒（reminder.* + 定时任务 runTimer）
 │  └─ lib/                          # ctx / errors / time / validate / db / db-util / relation / home-blocks / security
 ├─ miniprogram/
 │  ├─ pages/
-│  │  ├─ home/                      # 今天（天数卡 / 抱抱卡 / 心情卡 / 四宫格入口）
+│  │  ├─ home/                      # 今天（纪念日堆叠卡 / 心情卡 / 四宫格入口）
 │  │  ├─ bind/                      # 双人绑定与邀请码
-│  │  ├─ profile/                   # 我的（昵称头像、开始日期、每日提醒、记账本入口、解绑、隐私保护指引 / 数据与隐私说明）
+│  │  ├─ profile/                   # 我的（昵称头像、开始日期、每日提醒、解绑、隐私保护指引 / 数据与隐私说明）
 │  │  ├─ safety/                    # 报平安（我到家了 + 时间线）
 │  │  ├─ diary/                     # 台灯下的日记（当天上锁，次日解锁）
 │  │  ├─ wish/                      # 下次见面想做的事
 │  │  ├─ mood/                      # 心情记录（两人按天倒序，只读时间线）
-│  │  └─ ledger/                    # 记账本（我的 / TA 的，按天分组 + 合计）
-│  ├─ custom-tab-bar/               # 自定义 tabBar（只两项：今天 / 我的）
-│  ├─ components/                   # avatar-bubble / mood-picker / hug-banner / bottom-sheet /
+│  │  ├─ anniversary/               # 纪念日管理（添加 / 修改 / 删除自定义纪念日）
+│  │  └─ ledger/                    # 记账本（tab 页：我的 / TA 的，按天分组 + 合计）
+│  ├─ custom-tab-bar/               # 自定义 tabBar（三项：今天 / 记账本 / 我的）
+│  ├─ components/                   # avatar-bubble / mood-picker / anniversary-stack / bottom-sheet /
 │  │                                # timeline-item / diary-card / wish-item / empty-state / privacy-guard
 │  ├─ utils/                        # api（唯一云函数入口）、constants、tabbar、time、format（含元/分换算）、me、upload、haptics、privacy
 │  ├─ styles/tokens.wxss            # 手绘涂鸦风设计变量（颜色 / 描边 / 硬阴影 / 间距 / 字号）
@@ -60,13 +61,14 @@ YiyiTime/
 
 ## 云开发控制台一次性配置
 
-- 集合：`users`、`couples`、`bind_invites`、`moods`、`hugs`、`safety_checkins`、`diaries`、`wishes`、`ledger_entries`
+- 集合：`users`、`couples`、`bind_invites`、`moods`、`anniversaries`、`safety_checkins`、`diaries`、`wishes`、`ledger_entries`
+  - M12 起 `hugs` 已下线：如果控制台还留着这个集合，先导出备份再删除（代码不再读它）
 - 权限：全部设置为「所有用户不可读写」（只允许云函数访问）
 - 索引：
   - `bind_invites`：`creatorOpenid`+`status`、`applicantOpenid`+`status`、`expiresAt`
   - `couples`：`memberOpenids`（单字段）
   - `moods`：`coupleId`+`date`（心情记录按 `openid in [我, TA]` 过滤，两人数据量极小可先用这条；若真机翻页监控显示慢，再加 `coupleId`+`openid`+`date`）
-  - `hugs`：`coupleId`+`toOpenid`+`status`+`createdAt`（倒序）、`coupleId`+`fromOpenid`+`createdAt`
+  - `anniversaries`：`coupleId`、`coupleId`+`date`（一次取全部 ≤8 条，排序在内存里做）
   - `safety_checkins`：`coupleId`+`date`、`coupleId`+`createdAt`
   - `diaries`：`coupleId`+`date`
   - `wishes`：`coupleId`+`done`+`createdAt`、`coupleId`+`createdAt`
@@ -76,8 +78,8 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test                       # 自动发现 tests/*.test.js（Node 22 实测 649 个用例）
-# 或只跑一个文件：node tests/hug.test.js
+node --test tests/*.test.js       # 自动发现 tests/*.test.js（Node 22 实测 654 个用例）
+# 或只跑一个文件：node tests/anniversary.test.js
 ```
 
 PowerShell 逐文件跑全部用例（Git Bash 可用 `for f in tests/*.test.js; do node "$f" || exit 1; done`）：
@@ -101,14 +103,14 @@ node scripts/release-check.js   # 页面/组件路径与注册（`usingComponent
 ## 开发约定
 
 - 前端只能通过 `miniprogram/utils/api.js` 调云函数，不允许直接 `wx.cloud.database()`。
-- action 用「域.动词」命名：`user.get`、`bind.create`、`home.get`、`mood.set` / `mood.list`、`hug.send`、`safety.checkin`、`diary.save`、`wish.add`。
+- action 用「域.动词」命名：`user.get`、`bind.create`、`home.get`、`mood.set` / `mood.list`、`anniversary.add` / `list`、`safety.checkin`、`diary.save`、`wish.add`、`ledger.add`。
 - 所有时间规则（今天 / 第几天 / 纪念日 / 日记解锁）以云函数 `lib/time.js` 为准，客户端只做展示。
 - 不信任客户端传来的 `openid` / `coupleId`，一律从上下文取。
 - handler 只返回纯数据，不返回 `bindFailCount` / `lastActiveAt` 等内部字段。
 - 日志不打日记正文、愿望备注、完整邀请码；客户端 `console` 不打 openid/coupleId/邀请码。
 - 文字对比度按 8.9：正文 `--ink`、次要文字 `--muted`（两者在 `--paper` / `--card` 上都 ≥4.5:1）；`--marker-red` / `--marker-teal` / `--marker-yellow` 只做底块与描边，不当正文色；`--ink-faint` 只做装饰。
 - 视觉按 8.7「手绘涂鸦风（hand-drawn-doodle）」：3rpx 虚线描边 + 4/6rpx 小圆角 + 彩色硬阴影（`8rpx 8rpx 0`）、150ms linear、`:active` 位移 3rpx 且阴影归零；禁渐变、禁 999rpx 胶囊、不引网络字体（字体栈本地降级）。
-- 导航：只有 `pages/home`（今天）与 `pages/profile`（我的）是 tab 页，一律 `wx.switchTab` 并按 `utils/constants.js` 的 `TAB_ROUTES` 判断；`diary` / `wish` / `mood` / `safety` / `bind` 都是普通页，用 `wx.navigateTo`（日记 / 愿望 / 心情记录 / 报平安从首页四宫格进）；两个 tab 页 `onShow` 首行 `tabbar.sync(this, ROUTES.x)` 维持自定义 tabBar 选中态。
+- 导航：`pages/home`（今天）、`pages/ledger`（记账本）、`pages/profile`（我的）是 tab 页，一律 `wx.switchTab` 并按 `utils/constants.js` 的 `TAB_ROUTES` 判断；`diary` / `wish` / `mood` / `safety` / `anniversary` / `bind` 都是普通页，用 `wx.navigateTo`（日记 / 愿望 / 心情记录 / 报平安从首页四宫格进，纪念日管理从首页堆叠卡的「管理 ›」进）；三个 tab 页 `onShow` 首行 `tabbar.sync(this, ROUTES.x)` 维持自定义 tabBar 选中态。
 
 ## 进度
 

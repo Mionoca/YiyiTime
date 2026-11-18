@@ -1,19 +1,24 @@
 'use strict';
 
-// 自定义 tabBar 的选中态同步（文档 8.2）：只有「今天 / 我的」两个 tab，
-// 其余页面都是普通页，由首页卡片 navigateTo 进入。
+// 自定义 tabBar 的选中态同步（文档 8.2）：今天 / 记账本 / 我的 三个 tab，
+// 其余页面都是普通页，由页面内入口 navigateTo 进入。
 const test = require('node:test');
 const assert = require('node:assert');
 
 const constants = require('../miniprogram/utils/constants');
 const tabbar = require('../miniprogram/utils/tabbar');
 
-test('tabbar: 只有两个 tab，下标与 TAB_ROUTES 一致', () => {
-  assert.deepStrictEqual(constants.TAB_ROUTES, ['/pages/home/index', '/pages/profile/index']);
+test('tabbar: 三个 tab，下标与 TAB_ROUTES 一致', () => {
+  assert.deepStrictEqual(constants.TAB_ROUTES, [
+    '/pages/home/index',
+    '/pages/ledger/index',
+    '/pages/profile/index',
+  ]);
   assert.strictEqual(tabbar.tabIndexOf(constants.ROUTES.home), 0);
-  assert.strictEqual(tabbar.tabIndexOf(constants.ROUTES.profile), 1);
+  assert.strictEqual(tabbar.tabIndexOf(constants.ROUTES.ledger), 1);
+  assert.strictEqual(tabbar.tabIndexOf(constants.ROUTES.profile), 2);
   // 普通页没有 tab 下标：调用方据此跳过 setData，不会把别人的 tab 点亮
-  for (const page of ['diary', 'wish', 'mood', 'safety', 'bind']) {
+  for (const page of ['diary', 'wish', 'mood', 'safety', 'bind', 'anniversary']) {
     assert.strictEqual(tabbar.tabIndexOf(constants.ROUTES[page]), -1, page + ' 不该有 tab 下标');
   }
   assert.strictEqual(tabbar.tabIndexOf(undefined), -1);
@@ -32,15 +37,15 @@ test('tabbar: sync 把选中态写给当前页的 tabBar 实例', () => {
   const page = { getTabBar: () => bar };
 
   tabbar.sync(page, constants.ROUTES.profile);
-  assert.deepStrictEqual(calls, [{ selected: 1 }]);
-  assert.strictEqual(bar.data.selected, 1);
+  assert.deepStrictEqual(calls, [{ selected: 2 }]);
+  assert.strictEqual(bar.data.selected, 2);
 
   // 已经选中就不重复 setData（切回同一页时不触发多余渲染）
   tabbar.sync(page, constants.ROUTES.profile);
   assert.strictEqual(calls.length, 1);
 
   tabbar.sync(page, constants.ROUTES.home);
-  assert.deepStrictEqual(calls, [{ selected: 1 }, { selected: 0 }]);
+  assert.deepStrictEqual(calls, [{ selected: 2 }, { selected: 0 }]);
 });
 
 test('tabbar: sync 遇到非 tab 页 / 空实例都不抛错', () => {
@@ -68,9 +73,10 @@ test('tabbar: sync 遇到非 tab 页 / 空实例都不抛错', () => {
   assert.strictEqual(touched, false, '非 tab 页不该写 tabBar');
 });
 
-test('tabbar: isTabRoute 只认两个 tab，query 不影响判断', () => {
+test('tabbar: isTabRoute 只认三个 tab，query 不影响判断', () => {
   assert.strictEqual(constants.isTabRoute('/pages/home/index'), true);
   assert.strictEqual(constants.isTabRoute('/pages/home/index?code=ABC123'), true);
+  assert.strictEqual(constants.isTabRoute('/pages/ledger/index'), true);
   assert.strictEqual(constants.isTabRoute('/pages/profile/index'), true);
   assert.strictEqual(constants.isTabRoute('/pages/diary/index'), false);
   assert.strictEqual(constants.isTabRoute('/pages/mood/index?from=profile'), false);

@@ -245,7 +245,7 @@ test('F3 场景化首页三状态：未绑定空房 / 邀请中 / 已绑定聚�
   assert.strictEqual(unbound.bind.pending, null);
   assert.deepStrictEqual(unbound.couple, null);
   assert.deepStrictEqual(unbound.partner, null);
-  for (const key of ['mood', 'hug', 'safety', 'diary', 'wish']) {
+  for (const key of ['mood', 'anniversary', 'safety', 'diary', 'wish']) {
     assert.strictEqual(unbound[key], null, '未绑定 ' + key + ' 必须为 null');
   }
   assert.deepStrictEqual(Object.keys(unbound.user).sort(), ['avatarFileID', 'nickname', 'openid', 'profileComplete']);
@@ -280,11 +280,11 @@ test('F3 场景化首页三状态：未绑定空房 / 邀请中 / 已绑定聚�
   assert.strictEqual(boundA.user.openid, A);
   assert.strictEqual(boundA.couple.daysTogether, time.daysTogether(START, boundA.todayKey));
   assert.ok(boundA.couple.anniversary && boundA.couple.anniversary.date);
-  for (const key of ['mood', 'hug', 'safety', 'diary', 'wish']) {
+  for (const key of ['mood', 'anniversary', 'safety', 'diary', 'wish']) {
     assert.notStrictEqual(boundA[key], null, '已绑定 ' + key + ' 应为聚合对象');
   }
   assert.deepStrictEqual(boundA.mood, { mine: null, partner: null });
-  assert.deepStrictEqual(boundA.hug, { incoming: null, outgoing: null });
+  assert.deepStrictEqual(boundA.anniversary, { items: [] });
   assert.deepStrictEqual(boundA.safety, { mineToday: false, partnerToday: false, partnerLastAt: null });
   assert.deepStrictEqual(boundA.wish, { total: 0, done: 0, previewTitle: null });
   assert.deepStrictEqual(boundA.diary, {
@@ -390,64 +390,64 @@ test('F4 心情打卡：四态 / 每天一条（重复是更新）/ 备注 50 �
   assert.strictEqual(crossHistory.nextBeforeDate, null);
 });
 
-// ---------------------------------------------------------------- F5 抱抱
-test('F5 抱抱：发送 pending / 7 天有效 / 重复不新建 / 对方回应 / 发送方看到 hugged / 过期', async () => {
+// ---------------------------------------------------------------- F2 自定义纪念日
+test('F2 纪念日：添加 / 双方可见 / 修改同步 / 上限 8 条 / 删除 / 未来日期与 2-29', async () => {
   seedBound();
+  const todayKey = time.dateKeyOf(new Date());
 
-  const sent = await callAs(A, 'hug.send', {});
-  assert.strictEqual(sent.existing, false);
-  assert.strictEqual(sent.hug.status, 'pending');
-  const ttl = time.toMillis(sent.hug.expiresAt) - Date.now();
-  assert.ok(ttl > 6.9 * 24 * 3600 * 1000 && ttl <= 7 * 24 * 3600 * 1000, '抱抱 7 天有效');
+  // 添加：落库字段干净（不存 nextDate / daysLeft），返回排好序的完整列表
+  const first = await callAs(A, 'anniversary.add', { title: '第一次见面', date: '2023-06-01' });
+  assert.strictEqual(first.items.length, 1);
+  assert.strictEqual(first.item.date, '2023-06-01');
+  const stored = h.fake().get('anniversaries', first.item.anniversaryId);
+  assert.strictEqual(stored.coupleId, COUPLE_ID);
+  assert.strictEqual(stored.nextDate, undefined, '剩余天数每天都会变，不能落库');
+  assert.strictEqual(stored.daysLeft, undefined);
 
-  // 同一发送者重复点：返回已有那条，不重复创建
-  const again = await callAs(A, 'hug.send', {});
-  assert.strictEqual(again.existing, true);
-  assert.strictEqual(again.hug.hugId, sent.hug.hugId);
-  assert.strictEqual(h.fake().all('hugs').filter((doc) => doc.fromOpenid === A && doc.status === 'pending').length, 1);
-
-  // 对方打开首页能看到「TA 需要抱抱」并回应；非接收者不能回应
+  // 双方可见：B 的首页与列表都能读到
   const homeB = await callAs(B, 'home.get', {});
-  assert.strictEqual(homeB.hug.incoming.hugId, sent.hug.hugId);
-  assert.strictEqual(homeB.hug.outgoing, null);
-  await expectFail(A, 'hug.respond', { hugId: sent.hug.hugId }, 'HUG_NOT_RECIPIENT');
-  const responded = await callAs(B, 'hug.respond', { hugId: sent.hug.hugId });
-  assert.strictEqual(responded.status, 'hugged');
-  assert.strictEqual(responded.already, false);
-  const respondAgain = await callAs(B, 'hug.respond', { hugId: sent.hug.hugId });
-  assert.strictEqual(respondAgain.already, true);
+  assert.strictEqual(homeB.anniversary.items.length, 1);
+  assert.strictEqual(homeB.anniversary.items[0].title, '第一次见面');
+  const listB = await callAs(B, 'anniversary.list', {});
+  assert.strictEqual(listB.todayKey, todayKey);
 
-  // 发送方下次打开：outgoing = hugged，不再 pending；可以再发新的一条
-  const homeA = await callAs(A, 'home.get', {});
-  assert.strictEqual(homeA.hug.incoming, null);
-  assert.strictEqual(homeA.hug.outgoing.status, 'hugged');
-  assert.ok(homeA.hug.outgoing.respondedAt);
-  const resent = await callAs(A, 'hug.send', {});
-  assert.strictEqual(resent.existing, false);
-  assert.notStrictEqual(resent.hug.hugId, sent.hug.hugId);
+  // 修改：B 改标题，A 立刻读到新标题（两个人共同的纪念日）
+  await callAs(B, 'anniversary.update', { anniversaryId: first.item.anniversaryId, title: '初见' });
+  assert.strictEqual((await callAs(A, 'home.get', {})).anniversary.items[0].title, '初见');
 
-  // 超过 7 天未回应：发送方 outgoing 惰性写回并显示 expired；接收方 incoming 不展示
-  // （7.8 明文「incoming 只返回未过期的 pending」，F5 的「过期」由回应过期抱抱返回 HUG_EXPIRED 覆盖）。
-  const now = Date.now();
-  h.reset({
-    users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
-    couples: [coupleDoc(COUPLE_ID)],
-    hugs: [{
-      _id: 'h_expired0000001',
-      coupleId: COUPLE_ID,
-      fromOpenid: A,
-      toOpenid: B,
-      status: 'pending',
-      createdAt: new Date(now - 8 * 24 * 3600 * 1000),
-      respondedAt: null,
-      expiresAt: new Date(now - 24 * 3600 * 1000),
-    }],
-  });
-  const homeA2 = await callAs(A, 'home.get', {});
-  assert.strictEqual(homeA2.hug.outgoing.status, 'expired');
-  assert.strictEqual(h.fake().get('hugs', 'h_expired0000001').status, 'expired', '过期要惰性写回');
-  assert.strictEqual((await callAs(B, 'home.get', {})).hug.incoming, null);
-  await expectFail(B, 'hug.respond', { hugId: 'h_expired0000001' }, 'HUG_EXPIRED');
+  // 未来日期允许：第一次发生还没到，years 为 0
+  const future = await callAs(A, 'anniversary.add', { title: '婚礼', date: '2099-12-31' });
+  const futureItem = future.items.find((item) => item.title === '婚礼');
+  assert.strictEqual(futureItem.date, '2099-12-31');
+  assert.strictEqual(futureItem.years, 0);
+
+  // 上限 8 条：补到 8 条后第 9 条被拒
+  let count = future.items.length;
+  let i = 0;
+  while (count < 8) {
+    const res = await callAs(A, 'anniversary.add', {
+      title: '纪念日' + i,
+      date: '2020-' + String((i % 9) + 1).padStart(2, '0') + '-01',
+    });
+    count = res.items.length;
+    i += 1;
+  }
+  await expectFail(A, 'anniversary.add', { title: '第九个', date: '2023-06-01' }, 'ANNIVERSARY_LIMIT_REACHED');
+
+  // 删除：物理删除，幂等
+  const removed = await callAs(A, 'anniversary.remove', { anniversaryId: first.item.anniversaryId });
+  assert.strictEqual(removed.removed, true);
+  assert.strictEqual(removed.items.length, 7);
+  const removedAgain = await callAs(A, 'anniversary.remove', { anniversaryId: first.item.anniversaryId });
+  assert.strictEqual(removedAgain.removed, false);
+
+  // 非法输入：标题超 12 字 / 日期越界
+  await expectFail(A, 'anniversary.update', {
+    anniversaryId: futureItem.anniversaryId, title: '一二三四五六七八九十一二三',
+  }, 'TEXT_TOO_LONG');
+  await expectFail(A, 'anniversary.update', {
+    anniversaryId: futureItem.anniversaryId, date: '2100-01-01',
+  }, 'INVALID_INPUT');
 });
 
 // ---------------------------------------------------------------- F6 报平安

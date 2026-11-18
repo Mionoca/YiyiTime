@@ -1,0 +1,167 @@
+/*
+ * 纪念日卡片堆叠（文档 9.4）。
+ *
+ * 组件样式是隔离的，app.wxss 的 dk-* 与页面变量都进不来：
+ * 这里用 var(--x, 默认值) 兜底，取不到变量时仍是涂鸦风的纸卡。
+ *
+ * 层级只用 transform / opacity（文档 8.9 静态检查）：
+ * 卡片在 grid 的同一格里叠放，不用绝对定位挪位置，容器高度才不会塌。
+ */
+.stack {
+  position: relative;
+  /* 为后置层留出上移空间（9.2：上下各 48rpx） */
+  padding: 48rpx 0 8rpx;
+}
+
+.stack__deck {
+  display: grid;
+  /* 同格叠放：所有卡都落在 1/1，天然等高对齐，不需要 position: absolute */
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  /* 后置层比当前卡窄，靠自身 scale 缩，容器不裁剪 */
+  overflow: visible;
+}
+
+.stack__card {
+  grid-area: 1 / 1;
+  position: relative;
+  padding: 32rpx;
+  /* 以顶边为缩放原点：后层上移量才是干净的 24 / 48rpx（居中缩放会把位移吃掉一半） */
+  transform-origin: 50% 0;
+  background-color: var(--card, #FFFEF5);
+  border: 3rpx dashed var(--line, #2C2C2C);
+  border-radius: var(--radius-md, 4rpx);
+  transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
+
+/* 当前卡：实心硬阴影，微微歪一点，像随手放上去的纸 */
+.stack__card--p0 {
+  z-index: 3;
+  opacity: 1;
+  transform: translateY(0) rotate(-1deg);
+  box-shadow: var(--shadow-card, 8rpx 8rpx 0 #FFD93D);
+}
+
+/* 后一层 / 后二层：不换底色、不加阴影，只靠变换分层 */
+.stack__card--p1 {
+  z-index: 2;
+  opacity: 0.7;
+  transform: translateY(-24rpx) scale(0.96) rotate(-1deg);
+  pointer-events: none;
+}
+
+.stack__card--p2 {
+  z-index: 1;
+  opacity: 0.4;
+  transform: translateY(-48rpx) scale(0.92) rotate(-1deg);
+  pointer-events: none;
+}
+
+.stack__label {
+  display: block;
+  font-size: 22rpx;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted, #5F574C);
+}
+
+.stack__main {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 56rpx;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--ink, #2C2C2C);
+  transform: rotate(-2deg);
+}
+
+.stack__sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--muted, #5F574C);
+}
+
+.stack__meta {
+  display: inline-block;
+  margin-top: 16rpx;
+  padding: 6rpx 16rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--accent-ink, #7A2E22);
+  background-color: var(--accent-soft, #FFE3D9);
+  border: 2rpx dashed var(--accent-ink, #7A2E22);
+  border-radius: var(--radius-sm, 4rpx);
+}
+
+.stack__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 16rpx;
+}
+
+.stack__link {
+  display: flex;
+  align-items: center;
+  min-height: 88rpx;
+  margin-left: 24rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--accent-ink, #7A2E22);
+}
+
+/* 控制条：箭头分列两侧，圆点居中（9.4） */
+.stack__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16rpx;
+}
+
+/* 箭头是次要控件：保留 88rpx 热区，但描边压在 35% 墨色，不跟当前卡抢注意力 */
+.stack__arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88rpx;
+  height: 88rpx;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--muted, #5F574C);
+  border: 2rpx dashed rgba(44, 44, 44, 0.35);
+  border-radius: var(--radius-sm, 4rpx);
+}
+
+.stack__dots {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 指示器：8rpx 小方块；激活项拉长成 24rpx。只过渡 transform（8.9），颜色随 class 即时切换 */
+.stack__dot {
+  width: 24rpx;
+  height: 8rpx;
+  margin: 0 6rpx;
+  background-color: transparent;
+  border: 2rpx dashed rgba(44, 44, 44, 0.3);
+  border-radius: 2rpx;
+  transform: scaleX(0.333);
+  transition: transform 300ms ease-out;
+}
+
+.stack__dot.is-on {
+  background-color: var(--ink, #2C2C2C);
+  border-color: var(--ink, #2C2C2C);
+  transform: scaleX(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stack__card,
+  .stack__dot {
+    transition: none;
+  }
+}

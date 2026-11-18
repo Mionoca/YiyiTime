@@ -479,13 +479,16 @@ test('profile: 对方发起的解绑确认后提示并延迟回首页', async ()
   }
 });
 
-test('profile: 解绑 / 记账本入口的 wxml 接线存在，见面基金占位已下线', () => {
+test('profile: 解绑入口的 wxml 接线存在，记账本重复入口与见面基金占位都已下线', () => {
   const root = path.join(__dirname, '..');
   const wxml = fs.readFileSync(path.join(root, 'miniprogram', 'pages', 'profile', 'index.wxml'), 'utf8');
+  const js = fs.readFileSync(path.join(root, 'miniprogram', 'pages', 'profile', 'index.js'), 'utf8');
   assert.ok(wxml.indexOf('bindtap="onTapUnbind"') >= 0, '解绑行没有绑定 onTapUnbind');
   assert.ok(wxml.indexOf('wx:if="{{bound}}"') >= 0, '解绑行只在已绑定时出现');
-  assert.ok(wxml.indexOf('bindtap="onOpenLedger"') >= 0, '记账本入口没有绑定 onOpenLedger');
   assert.ok(wxml.indexOf('{{unbindText}}') >= 0, '解绑行文案要走数据绑定');
+  // M12：记账本进 tabBar 后，「我的」里不再放一份重复入口（文档 8.2 / 8.3.6）
+  assert.strictEqual(wxml.indexOf('onOpenLedger'), -1, '「我的」不该再有记账本入口');
+  assert.strictEqual(js.indexOf('onOpenLedger'), -1, '「我的」不该再有 onOpenLedger');
   assert.strictEqual(wxml.indexOf('见面基金'), -1, '见面基金已被个人记账本替代');
   assert.strictEqual(wxml.indexOf('解绑（联系开发者）'), -1, '解绑已改为应用内双方确认');
 });

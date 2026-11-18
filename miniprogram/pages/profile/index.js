@@ -291,7 +291,6 @@ Page({
     wx.navigateTo({ url: constants.ROUTES.mood });
   },
 
-  /** 记账本（文档 8.3.8）：普通页面，navigateTo 进入；个人账本未绑定也能进（只有 TA 的账本要绑定） */
   /** 服务端出参 → 页面 data（脏值一律降级，避免 switch / picker 拿到 undefined） */
   normalizeReminder(res) {
     return {
@@ -398,10 +397,6 @@ Page({
       this.setData({ reminderSaving: false });
       api.showError(err);
     }
-  },
-
-  onOpenLedger() {
-    wx.navigateTo({ url: constants.ROUTES.ledger });
   },
 
   /** 三态对应文案（文档 8.3.6）：三处（load / 申请 / 撤回）用同一份，避免某一处写成「解绑」 */

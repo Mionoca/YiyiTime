@@ -1,6 +1,6 @@
 'use strict';
 
-// 组件级单测：直接执行 9 个组件目录下的 index.js 逻辑（observers / methods / lifetimes）。
+// 组件级单测：直接执行各组件目录下的 index.js 逻辑（observers / methods / lifetimes）。
 // 不渲染 WXML、不模拟样式，只锁组件对外行为：属性映射、一次性动画、事件载荷、防重。
 const test = require('node:test');
 const assert = require('node:assert');
@@ -136,27 +136,130 @@ test('empty-state：action 事件只发一次载荷为空对象', () => {
   assert.deepStrictEqual(comp.events, [{ name: 'action', detail: {} }]);
 });
 
-test('hug-banner：只展示 incoming，respond 载荷带 hugId，清空后不再发', () => {
+test('anniversary-stack：只渲染当前卡 + 后两层，循环取模，卡片数 ≤1 时不显示控件', () => {
   installWx();
-  const config = h.loadComponent('miniprogram/components/hug-banner/index.js');
+  const config = h.loadComponent('miniprogram/components/anniversary-stack/index.js');
   const comp = h.instantiateComponent(config);
-  assert.strictEqual(comp.data.visible, false);
 
-  comp.setProps({ incoming: { hugId: 'h_abc123' } });
-  assert.strictEqual(comp.data.visible, true);
-  assert.strictEqual(comp.data.hugId, 'h_abc123');
-  comp.onRespond();
-  assert.deepStrictEqual(comp.events, [{ name: 'respond', detail: { hugId: 'h_abc123' } }]);
+  const cards = [
+    { key: 'together', kind: 'together', label: '我们的日子', mainText: '第 911 天' },
+    { key: 'a_1', kind: 'custom', label: '第一次见面', mainText: '还有 197 天' },
+    { key: 'a_2', kind: 'custom', label: '她的生日', mainText: '就是今天' },
+    { key: 'a_3', kind: 'custom', label: '婚礼', mainText: '还有 200 天' },
+  ];
 
-  comp.setProps({ incoming: null });
-  assert.strictEqual(comp.data.visible, false);
-  assert.strictEqual(comp.data.hugId, '');
-  comp.onRespond();
-  assert.strictEqual(comp.events.length, 1, '没有 hugId 时不发 respond');
+  comp.setProps({ cards, current: 0 });
+  assert.strictEqual(comp.data.count, 4);
+  assert.strictEqual(comp.data.hasMany, true);
+  assert.deepStrictEqual(comp.data.layers.map((l) => [l.key, l.pos]), [
+    ['together', 0],
+    ['a_1', 1],
+    ['a_2', 2],
+  ], '最多三层：当前 + 后两层');
 
-  // outgoing 属性保留但当前页不传；传了也不应影响横幅可见性
-  comp.setProps({ outgoing: { hugId: 'h_out', status: 'hugged' } });
-  assert.strictEqual(comp.data.visible, false);
+  // 切到第 3 张：后两层循环回到开头，不出现空位
+  comp.setProps({ current: 3 });
+  assert.deepStrictEqual(comp.data.layers.map((l) => l.key), ['a_3', 'together', 'a_1']);
+
+  // 越界下标夹回最后一张
+  comp.setProps({ current: 99 });
+  assert.deepStrictEqual(comp.data.layers.map((l) => l.key), ['a_3', 'together', 'a_1']);
+
+  // 只有一张（只有「在一起」）：不显示箭头与圆点
+  comp.setProps({ cards: [cards[0]], current: 0 });
+  assert.strictEqual(comp.data.layers.length, 1);
+  assert.strictEqual(comp.data.hasMany, false);
+
+  // 脏数据（不是数组）也当空处理
+  comp.setProps({ cards: null });
+  assert.deepStrictEqual(comp.data.layers, []);
+  assert.strictEqual(comp.data.hasMany, false);
+});
+
+test('anniversary-stack：箭头 / 圆点发 change（循环），同一个下标不重复发', () => {
+  installWx();
+  const config = h.loadComponent('miniprogram/components/anniversary-stack/index.js');
+  const comp = h.instantiateComponent(config);
+  const cards = [
+    { key: 'a', label: 'A' },
+    { key: 'b', label: 'B' },
+    { key: 'c', label: 'C' },
+  ];
+  comp.setProps({ cards, current: 0 });
+
+  // 真实场景里页面收到 change 后会回写 current，这里逐步模拟，才能测到「同下标不重复发」
+  comp.onNext(); // 0 → 1
+  comp.setProps({ current: 1 });
+  comp.onPrev(); // 1 → 0
+  comp.setProps({ current: 0 });
+  comp.onPrev(); // 0 往回 → 2（循环）
+  comp.setProps({ current: 2 });
+  comp.onSelect({ currentTarget: { dataset: { index: 1 } } });
+  comp.setProps({ current: 1 });
+  comp.onSelect({ currentTarget: { dataset: { index: 1 } } }); // 同一个下标不重复发
+  comp.onSelect({ currentTarget: { dataset: { index: 'x' } } }); // 非法值忽略
+  assert.deepStrictEqual(comp.events, [
+    { name: 'change', detail: { index: 1 } },
+    { name: 'change', detail: { index: 0 } },
+    { name: 'change', detail: { index: 2 } },
+    { name: 'change', detail: { index: 1 } },
+  ]);
+
+  // 只有一张卡时切换无意义，不发事件
+  comp.events.length = 0;
+  comp.setProps({ cards: [cards[0]], current: 0 });
+  comp.onNext();
+  assert.strictEqual(comp.events.length, 0);
+});
+
+test('anniversary-stack：滑动阈值 60px，竖直位移优先（不劫持页面滚动）', () => {
+  installWx();
+  const config = h.loadComponent('miniprogram/components/anniversary-stack/index.js');
+  const comp = h.instantiateComponent(config);
+  comp.setProps({
+    cards: [{ key: 'a' }, { key: 'b' }, { key: 'c' }],
+    current: 0,
+  });
+
+  // 向左滑过阈值 → 下一张
+  comp.onTouchStart({ touches: [{ clientX: 300, clientY: 100 }] });
+  comp.onTouchEnd({ changedTouches: [{ clientX: 230, clientY: 105 }] });
+  assert.deepStrictEqual(comp.events, [{ name: 'change', detail: { index: 1 } }]);
+
+  // 向右滑过阈值 → 上一张
+  comp.events.length = 0;
+  comp.onTouchStart({ touches: [{ clientX: 200, clientY: 100 }] });
+  comp.onTouchEnd({ changedTouches: [{ clientX: 300, clientY: 96 }] });
+  assert.deepStrictEqual(comp.events, [{ name: 'change', detail: { index: 2 } }]);
+
+  // 没到阈值 / 竖直位移更大：都不切换
+  comp.events.length = 0;
+  comp.onTouchStart({ touches: [{ clientX: 200, clientY: 100 }] });
+  comp.onTouchEnd({ changedTouches: [{ clientX: 240, clientY: 100 }] });
+  comp.onTouchStart({ touches: [{ clientX: 200, clientY: 100 }] });
+  comp.onTouchEnd({ changedTouches: [{ clientX: 100, clientY: 300 }] });
+  assert.strictEqual(comp.events.length, 0);
+
+  // 没有 touchstart 记录时 touchend 不应误判
+  comp.onTouchEnd({ changedTouches: [{ clientX: 0, clientY: 0 }] });
+  assert.strictEqual(comp.events.length, 0);
+});
+
+test('anniversary-stack：脚注「改日子 / 管理」只发事件，事件带当前卡的类型', () => {
+  installWx();
+  const config = h.loadComponent('miniprogram/components/anniversary-stack/index.js');
+  const comp = h.instantiateComponent(config);
+  comp.setProps({
+    cards: [{ key: 'together', kind: 'together' }, { key: 'a_1', kind: 'custom' }],
+    current: 0,
+  });
+
+  comp.onEdit();
+  comp.onManage();
+  assert.deepStrictEqual(comp.events, [
+    { name: 'edit', detail: { index: 0, kind: 'together' } },
+    { name: 'manage', detail: {} },
+  ]);
 });
 
 test('mood-picker：show/value 同步、编辑中不被静默刷新覆盖、确认校验与载荷', () => {

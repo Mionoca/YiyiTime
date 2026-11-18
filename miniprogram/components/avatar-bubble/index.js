@@ -18,7 +18,6 @@ Component({
     mood: { type: Object, value: null },
     size: { type: String, value: 'md' }, // sm / md / lg
     showMood: { type: Boolean, value: true },
-    hugBadge: { type: Boolean, value: false }, // 对方有 pending 抱抱时头像旁心形
   },
 
   data: {

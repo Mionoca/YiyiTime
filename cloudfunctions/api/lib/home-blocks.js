@@ -2,8 +2,11 @@
 
 const time = require('./time');
 const relation = require('./relation');
+const anniversaryHandler = require('../handlers/anniversary');
 
 const iso = relation.iso;
+/** 自定义纪念日上限（文档 5.3.5）：与 handlers/anniversary.js 同源，避免两处常量漂移 */
+const ANNIVERSARY_MAX = anniversaryHandler.MAX_COUNT;
 
 /** 今日两个人的心情（一次查询；coupleId + date 索引） */
 async function loadMood(ctx, coupleId, todayKey, partnerOpenid) {
@@ -25,60 +28,17 @@ async function loadMood(ctx, coupleId, todayKey, partnerOpenid) {
 }
 
 /**
- * 抱抱聚合：incoming 只返回未过期 pending；outgoing 返回最近一条（任意状态），
- * 过期 pending 在响应里状态为 expired（惰性写回，不做批量更新）。
+ * 纪念日聚合（文档 7.8 / 9.4）：一次查询取回全部自定义纪念日（≤8 条），
+ * 剩余天数与周年在这里按服务端 todayKey 现算，客户端不递减、不自己算日期。
+ * 「在一起」不在这个区块里 —— 它由 couple.startDate 推导，页面自己拼第一张卡。
  */
-async function loadHug(ctx, coupleId) {
-  const nowMs = ctx.now.getTime();
-
-  let incoming = null;
-  const incomingRes = await ctx.db.collection('hugs')
-    .where({ coupleId, toOpenid: ctx.openid, status: 'pending' })
-    .orderBy('createdAt', 'desc')
-    .limit(1)
+async function loadAnniversary(ctx, coupleId, todayKey) {
+  const res = await ctx.db.collection('anniversaries')
+    .where({ coupleId })
+    .limit(ANNIVERSARY_MAX)
     .get();
-  const incomingDoc = incomingRes && incomingRes.data && incomingRes.data[0];
-  if (incomingDoc) {
-    const expiresMs = time.toMillis(incomingDoc.expiresAt);
-    if (Number.isFinite(expiresMs) && expiresMs > nowMs) {
-      incoming = {
-        hugId: incomingDoc._id,
-        createdAt: iso(incomingDoc.createdAt),
-        expiresAt: iso(incomingDoc.expiresAt),
-      };
-    } else {
-      await ctx.db.collection('hugs').doc(incomingDoc._id).update({
-        data: { status: 'expired' },
-      }).catch(() => {});
-    }
-  }
-
-  let outgoing = null;
-  const outgoingRes = await ctx.db.collection('hugs')
-    .where({ coupleId, fromOpenid: ctx.openid })
-    .orderBy('createdAt', 'desc')
-    .limit(1)
-    .get();
-  const outgoingDoc = outgoingRes && outgoingRes.data && outgoingRes.data[0];
-  if (outgoingDoc) {
-    let status = outgoingDoc.status;
-    const expiresMs = time.toMillis(outgoingDoc.expiresAt);
-    if (status === 'pending' && (!Number.isFinite(expiresMs) || expiresMs <= nowMs)) {
-      status = 'expired';
-      await ctx.db.collection('hugs').doc(outgoingDoc._id).update({
-        data: { status: 'expired' },
-      }).catch(() => {});
-    }
-    outgoing = {
-      hugId: outgoingDoc._id,
-      status,
-      createdAt: iso(outgoingDoc.createdAt),
-      respondedAt: outgoingDoc.respondedAt ? iso(outgoingDoc.respondedAt) : null,
-      expiresAt: iso(outgoingDoc.expiresAt),
-    };
-  }
-
-  return { incoming, outgoing };
+  const docs = (res && res.data) || [];
+  return { items: anniversaryHandler.toItems(docs, todayKey) };
 }
 
 /**
@@ -179,5 +139,5 @@ async function optionalBlock(ctx, name, task) {
 }
 
 module.exports = {
-  loadMood, loadHug, loadSafety, loadDiary, loadWish, optionalBlock, iso,
+  loadMood, loadAnniversary, loadSafety, loadDiary, loadWish, optionalBlock, iso,
 };

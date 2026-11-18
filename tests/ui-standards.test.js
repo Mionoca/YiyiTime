@@ -198,7 +198,7 @@ test('8.8 列表头像（timeline-item）开启 lazy-load', () => {
 test('8.9 页面集合与滚动配置：全部可滚动、可下拉刷新', () => {
   const app = JSON.parse(read(path.join(ROOT, 'app.json')));
   const pages = app.pages.map((p) => p.replace(/^pages\//, '').replace(/\/index$/, ''));
-  assert.deepStrictEqual(pages.slice().sort(), ['bind', 'diary', 'home', 'ledger', 'mood', 'profile', 'safety', 'wish'], '页面集合变了，请同步本测试与发布文档');
+  assert.deepStrictEqual(pages.slice().sort(), ['anniversary', 'bind', 'diary', 'home', 'ledger', 'mood', 'profile', 'safety', 'wish'], '页面集合变了，请同步本测试与发布文档');
   for (const page of pages) {
     const json = JSON.parse(read(path.join(ROOT, 'pages', page, 'index.json')));
     assert.strictEqual(json.enablePullDownRefresh, true, page + ' 页应支持下拉刷新');
@@ -219,7 +219,7 @@ test('8.9 动画与过渡只动 transform / opacity', () => {
       assert.ok(props.size >= 1, rel(f) + ' 的 @keyframes ' + kf.name + ' 没有任何属性');
     }
   }
-  assert.ok(total >= 14, '应扫描到至少 14 个 @keyframes，实际 ' + total);
+  assert.ok(total >= 12, '应扫描到至少 12 个 @keyframes，实际 ' + total);
 
   // transition 同样只允许 transform / opacity（width/height 过渡会触发布局，低端机掉帧）
   let transitions = 0;
@@ -330,8 +330,8 @@ test('8.9 首页在 onUnload 里清理定时器并置 _unloaded 守卫', () => {
   const body = methodBody(src, 'onUnload');
   assert.match(body, /_unloaded\s*=\s*true/, 'onUnload 应置 _unloaded 守卫（防止异步回调再 setData）');
   // 清理可以写在 onUnload 体内，也可以抽到它调用的 helper 方法里（重构不应被误判）
-  const cleanup = (text) =>
-    /clearTimeout\s*\(\s*this\._celebrateTimer\s*\)/.test(text) && /clearTimeout\s*\(\s*this\._enterTimer\s*\)/.test(text);
+  // M12 起首页只剩入场动画一个定时器（心形上浮随抱一抱下线）
+  const cleanup = (text) => /clearTimeout\s*\(\s*this\._enterTimer\s*\)/.test(text);
   let cleaned = cleanup(body);
   if (!cleaned) {
     const calls = body.match(/this\.(\w+)\s*\(/g) || [];

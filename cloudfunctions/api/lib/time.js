@@ -55,7 +55,8 @@ function normalizeHhmm(value) {
   return `${pad2(h)}:${pad2(mm)}`;
 }
 
-/** 首页氛围：morning / day / dusk / night */function phaseOf(now = new Date()) {
+/** 首页氛围：morning / day / dusk / night */
+function phaseOf(now = new Date()) {
   const d = new Date(now.getTime() + TZ_OFFSET_MS);
   const h = d.getUTCHours();
   if (h >= 6 && h < 9) return 'morning';
@@ -89,9 +90,41 @@ function nextAnniversary(startDate, todayKey) {
   return null;
 }
 
+/**
+ * 任意纪念日的下一次发生（自定义纪念日，文档 5.3.5 / 7.7）：
+ * - `date` 在今天之后：直接返回它自己，`years = 0`（第一次还没到）；
+ * - 今天或已过去：取本年同月同日；本年已过去则取明年；
+ * - 2 月 29 日在平年按当年 2 月最后一天算（与 nextAnniversary 同一规则）；
+ * - 当天发生返回 `daysLeft = 0`，页面显示「就是今天」。
+ */
+function yearlyOccurrence(date, todayKey) {
+  if (!isValidDateKey(date) || !isValidDateKey(todayKey)) return null;
+  if (date >= todayKey) {
+    return {
+      date,
+      daysLeft: Math.round((startOfDateKey(date) - startOfDateKey(todayKey)) / DAY_MS),
+      years: 0,
+    };
+  }
+
+  const [sy, sm, sd] = date.split('-').map(Number);
+  const [ty] = todayKey.split('-').map(Number);
+  for (let y = ty; y <= ty + 1; y += 1) {
+    const day = Math.min(sd, daysInMonth(y, sm));
+    const key = `${y}-${pad2(sm)}-${pad2(day)}`;
+    if (key >= todayKey) {
+      return {
+        date: key,
+        daysLeft: Math.round((startOfDateKey(key) - startOfDateKey(todayKey)) / DAY_MS),
+        years: y - sy,
+      };
+    }
+  }
+  return null;
+}
+
 /** 严格校验 YYYY-MM-DD 是真实存在的日期 */
-function isValidDateKey(key) {
-  if (typeof key !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+function isValidDateKey(key) {  if (typeof key !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
   const [y, m, d] = key.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
@@ -123,6 +156,7 @@ module.exports = {
   normalizeHhmm,
   phaseOf,
   nextAnniversary,
+  yearlyOccurrence,
   isValidDateKey,
   isValidStartDate,
 };

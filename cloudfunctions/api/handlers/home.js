@@ -42,7 +42,7 @@ async function get(payload, ctx) {
     couple: null,
     partner: null,
     mood: null,
-    hug: null,
+    anniversary: null,
     safety: null,
     diary: null,
     wish: null,
@@ -92,9 +92,9 @@ async function get(payload, ctx) {
   }
 
   // 五个区块互不依赖，并行读取；单个区块失败只降级自己（文档 10.3）
-  const [mood, hug, safety, diary, wish] = await Promise.all([
+  const [mood, anniversary, safety, diary, wish] = await Promise.all([
     blocks.optionalBlock(ctx, 'mood', () => blocks.loadMood(ctx, coupleId, todayKey, partnerOpenid)),
-    blocks.optionalBlock(ctx, 'hug', () => blocks.loadHug(ctx, coupleId)),
+    blocks.optionalBlock(ctx, 'anniversary', () => blocks.loadAnniversary(ctx, coupleId, todayKey)),
     blocks.optionalBlock(ctx, 'safety', () => blocks.loadSafety(ctx, coupleId, todayKey, partnerOpenid)),
     blocks.optionalBlock(ctx, 'diary', () => blocks.loadDiary(ctx, coupleId, todayKey, partnerOpenid)),
     blocks.optionalBlock(ctx, 'wish', () => blocks.loadWish(ctx, coupleId)),
@@ -110,7 +110,7 @@ async function get(payload, ctx) {
     },
     partner,
     mood,
-    hug,
+    anniversary,
     safety,
     diary,
     wish,

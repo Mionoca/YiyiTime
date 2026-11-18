@@ -250,7 +250,7 @@ test('内部异常对客户端的响应不含集合名 / 堆栈 / 代码路径�
     couples: [coupleDoc(COUPLE_ID, { memberOpenids: [openid, B] })],
   }, openid);
   const logs = captureConsoleError(t);
-  const boom = new Error('collection diaries read failed: users/couples/moods/hugs/safety_checkins/wishes/bind_invites');
+  const boom = new Error('collection diaries read failed: users/couples/moods/anniversaries/safety_checkins/wishes/bind_invites');
   boom.stack = 'Error: collection diaries read failed\n    at loadDiary (cloudfunctions/api/lib/home-blocks.js:10:5)\n    at async home.get (cloudfunctions/api/handlers/home.js:20:3)';
   handlers['test.leak'] = () => { throw boom; };
   t.after(() => { delete handlers['test.leak']; });

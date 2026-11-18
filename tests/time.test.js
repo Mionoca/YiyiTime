@@ -141,3 +141,31 @@ test('daysTogether / nextAnniversary: 非法或缺失日期返回 null，不抛�
   });
 });
 
+
+test('yearlyOccurrence: 当天 / 明天 / 已过去 / 未来日期（文档 6.7 / 7.7）', () => {
+  const today = '2026-11-16';
+  // 当天就是纪念日：daysLeft 0，years 按年差
+  assert.deepStrictEqual(time.yearlyOccurrence('2023-11-16', today), {
+    date: '2026-11-16', daysLeft: 0, years: 3,
+  });
+  // 明天
+  assert.deepStrictEqual(time.yearlyOccurrence('2020-11-17', today), {
+    date: '2026-11-17', daysLeft: 1, years: 6,
+  });
+  // 今年已过去 → 明年
+  assert.deepStrictEqual(time.yearlyOccurrence('2019-01-01', today), {
+    date: '2027-01-01', daysLeft: 46, years: 8,
+  });
+  // 未来日期：直接返回自己，years 为 0（第一次还没到）
+  assert.deepStrictEqual(time.yearlyOccurrence('2027-05-20', today), {
+    date: '2027-05-20', daysLeft: 185, years: 0,
+  });
+});
+
+test('yearlyOccurrence: 2 月 29 日在平年按 2 月最后一天；非法日期返回 null', () => {
+  assert.deepStrictEqual(time.yearlyOccurrence('2024-02-29', '2027-02-10'), {
+    date: '2027-02-28', daysLeft: 18, years: 3,
+  });
+  assert.strictEqual(time.yearlyOccurrence('garbage', '2026-11-16'), null);
+  assert.strictEqual(time.yearlyOccurrence('2026-11-16', null), null);
+});

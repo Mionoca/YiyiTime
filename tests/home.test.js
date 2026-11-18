@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const {
-  loadMood, loadHug, loadSafety, loadDiary, loadWish, optionalBlock,
+  loadMood, loadAnniversary, loadSafety, loadDiary, loadWish, optionalBlock,
 } = require('../cloudfunctions/api/lib/home-blocks');
 const homeHandler = require('../cloudfunctions/api/handlers/home');
 const { makeFakeDb } = require('./helpers/fake-db');
@@ -62,117 +62,27 @@ test('loadMood: 两人都没打卡时都返回 null', async () => {
   assert.deepStrictEqual(res, { mine: null, partner: null });
 });
 
-test('loadHug: 有效 incoming 与最近 outgoing（pending），只在发给我的 pending 里选', async () => {
+test('loadAnniversary: 只取本对情侣的记录，按剩余天数排序并现算 daysLeft（不落库）', async () => {
   const { ctx } = makeCtx({
-    hugs: [
-      // 干扰项：更新但不是发给我的 / 是发给我的但属于别的 couple
-      {
-        _id: 'h_other_to', coupleId: 'c_1', fromOpenid: 'oB', toOpenid: 'oC', status: 'pending',
-        createdAt: new Date(NOW.getTime() - 60 * 1000), respondedAt: null,
-        expiresAt: new Date(NOW.getTime() + WEEK_MS),
-      },
-      {
-        _id: 'h_other_couple', coupleId: 'c_2', fromOpenid: 'oX', toOpenid: 'oA', status: 'pending',
-        createdAt: new Date(NOW.getTime() - 30 * 1000), respondedAt: null,
-        expiresAt: new Date(NOW.getTime() + WEEK_MS),
-      },
-      {
-        _id: 'h_in', coupleId: 'c_1', fromOpenid: 'oB', toOpenid: 'oA', status: 'pending',
-        createdAt: new Date(NOW.getTime() - 3600 * 1000), respondedAt: null,
-        expiresAt: new Date(NOW.getTime() + WEEK_MS),
-      },
-      {
-        _id: 'h_out', coupleId: 'c_1', fromOpenid: 'oA', toOpenid: 'oB', status: 'pending',
-        createdAt: new Date(NOW.getTime() - 7200 * 1000), respondedAt: null,
-        expiresAt: new Date(NOW.getTime() + WEEK_MS),
-      },
+    anniversaries: [
+      // 干扰项：别的 couple 的记录
+      { _id: 'a_other', coupleId: 'c_2', title: '别人的', date: '2020-01-01', createdAt: NOW },
+      { _id: 'a_late', coupleId: 'c_1', title: '冬至', date: '2020-12-22', createdAt: NOW },
+      { _id: 'a_near', coupleId: 'c_1', title: '第一次见面', date: '2023-11-20', createdAt: NOW },
     ],
   });
-  const res = await loadHug(ctx, 'c_1');
-  assert.deepStrictEqual(res.incoming, {
-    hugId: 'h_in',
-    createdAt: new Date(NOW.getTime() - 3600 * 1000).toISOString(),
-    expiresAt: new Date(NOW.getTime() + WEEK_MS).toISOString(),
-  });
-  assert.deepStrictEqual(res.outgoing, {
-    hugId: 'h_out',
-    status: 'pending',
-    createdAt: new Date(NOW.getTime() - 7200 * 1000).toISOString(),
-    respondedAt: null,
-    expiresAt: new Date(NOW.getTime() + WEEK_MS).toISOString(),
-  });
+  const res = await loadAnniversary(ctx, 'c_1', TODAY);
+
+  assert.deepStrictEqual(res.items.map((item) => item.title), ['第一次见面', '冬至']);
+  assert.strictEqual(res.items[0].nextDate, '2026-11-20');
+  assert.strictEqual(res.items[0].daysLeft, 4);
+  assert.strictEqual(res.items[0].years, 3);
 });
 
-test('loadHug: 过期 incoming 不返回并惰性置 expired', async () => {
-  const { ctx, fake } = makeCtx({
-    hugs: [
-      {
-        _id: 'h_old', coupleId: 'c_1', fromOpenid: 'oB', toOpenid: 'oA', status: 'pending',
-        createdAt: new Date(NOW.getTime() - 9 * 24 * 3600 * 1000), respondedAt: null,
-        expiresAt: new Date(NOW.getTime() - 2 * 24 * 3600 * 1000),
-      },
-    ],
-  });
-  const res = await loadHug(ctx, 'c_1');
-  assert.strictEqual(res.incoming, null);
-  assert.strictEqual(fake.get('hugs', 'h_old').status, 'expired');
-});
-
-test('loadHug: outgoing 取最近一条（已回应 hugged），respondedAt 为 ISO', async () => {
-  const respondedAt = new Date('2026-11-16T03:00:00.000Z');
-  const { ctx } = makeCtx({
-    hugs: [
-      {
-        _id: 'h_old', coupleId: 'c_1', fromOpenid: 'oA', toOpenid: 'oB', status: 'hugged',
-        createdAt: new Date(NOW.getTime() - 10 * 3600 * 1000), respondedAt,
-        expiresAt: new Date(NOW.getTime() + WEEK_MS),
-      },
-      {
-        _id: 'h_new', coupleId: 'c_1', fromOpenid: 'oA', toOpenid: 'oB', status: 'hugged',
-        createdAt: new Date(NOW.getTime() - 3600 * 1000), respondedAt,
-        expiresAt: new Date(NOW.getTime() + WEEK_MS),
-      },
-    ],
-  });
-  const res = await loadHug(ctx, 'c_1');
-  assert.strictEqual(res.outgoing.hugId, 'h_new');
-  assert.strictEqual(res.outgoing.status, 'hugged');
-  assert.strictEqual(res.outgoing.respondedAt, respondedAt.toISOString());
-});
-
-test('loadHug: outgoing 过期 pending 在响应里是 expired 并写回库', async () => {
-  const { ctx, fake } = makeCtx({
-    hugs: [
-      {
-        _id: 'h_stale', coupleId: 'c_1', fromOpenid: 'oA', toOpenid: 'oB', status: 'pending',
-        createdAt: new Date(NOW.getTime() - 9 * 24 * 3600 * 1000), respondedAt: null,
-        expiresAt: new Date(NOW.getTime() - 2 * 24 * 3600 * 1000),
-      },
-    ],
-  });
-  const res = await loadHug(ctx, 'c_1');
-  assert.strictEqual(res.outgoing.status, 'expired');
-  assert.strictEqual(fake.get('hugs', 'h_stale').status, 'expired');
-});
-
-test('loadHug: 没有记录时两块都是 null', async () => {
+test('loadAnniversary: 一个都没加时返回空数组（不是 null，页面只剩「在一起」一张卡）', async () => {
   const { ctx } = makeCtx();
-  const res = await loadHug(ctx, 'c_1');
-  assert.deepStrictEqual(res, { incoming: null, outgoing: null });
-});
-
-test('optionalBlock: 查询失败时返回 null 而不是抛错', async () => {
-  const { ctx } = makeCtx();
-  const originalError = console.error;
-  console.error = () => {};
-  try {
-    const res = await optionalBlock(ctx, 'mood', async () => {
-      throw new Error('mock db down');
-    });
-    assert.strictEqual(res, null);
-  } finally {
-    console.error = originalError;
-  }
+  const res = await loadAnniversary(ctx, 'c_1', TODAY);
+  assert.deepStrictEqual(res, { items: [] });
 });
 
 test('loadSafety: 今日两人是否报平安 + 伴侣最近一次时间，剔除别的 couple', async () => {
@@ -326,7 +236,7 @@ test('loadWish: 没有愿望时 previewTitle 为 null', async () => {
   assert.deepStrictEqual(res, { total: 0, done: 0, previewTitle: null });
 });
 
-test('home.get: 已绑定返回 mood/hug/safety/diary/wish 真实聚合', async () => {
+test('home.get: 已绑定返回 mood/anniversary/safety/diary/wish 真实聚合', async () => {
   const { ctx } = makeCtx({
     users: [{ _id: 'oA', coupleId: 'c_1' }, { _id: 'oB', nickname: '小怡' }],
     couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
@@ -334,12 +244,9 @@ test('home.get: 已绑定返回 mood/hug/safety/diary/wish 真实聚合', async 
       { _id: 'oA_' + TODAY, coupleId: 'c_1', openid: 'oA', date: TODAY, mood: 'sunny', note: '', updatedAt: NOW },
       { _id: 'oB_' + TODAY, coupleId: 'c_1', openid: 'oB', date: TODAY, mood: 'cloudy', note: '想抱抱', updatedAt: NOW },
     ],
-    hugs: [
-      {
-        _id: 'h_in', coupleId: 'c_1', fromOpenid: 'oB', toOpenid: 'oA', status: 'pending',
-        createdAt: new Date(NOW.getTime() - 3600 * 1000), respondedAt: null,
-        expiresAt: new Date(NOW.getTime() + WEEK_MS),
-      },
+    anniversaries: [
+      { _id: 'a_one', coupleId: 'c_1', title: '第一次见面', date: '2023-11-20', createdAt: NOW },
+      { _id: 'a_other', coupleId: 'c_2', title: '别人的', date: '2020-01-01', createdAt: NOW },
     ],
     safety_checkins: [
       {
@@ -387,8 +294,17 @@ test('home.get: 已绑定返回 mood/hug/safety/diary/wish 真实聚合', async 
     mine: { mood: 'sunny', note: '', updatedAt: NOW.toISOString() },
     partner: { mood: 'cloudy', note: '想抱抱', updatedAt: NOW.toISOString() },
   });
-  assert.strictEqual(res.hug.incoming.hugId, 'h_in');
-  assert.strictEqual(res.hug.outgoing, null);
+  assert.deepStrictEqual(res.anniversary, {
+    items: [{
+      anniversaryId: 'a_one',
+      title: '第一次见面',
+      date: '2023-11-20',
+      nextDate: '2026-11-20',
+      daysLeft: 4,
+      years: 3,
+      createdAt: NOW.toISOString(),
+    }],
+  });
   assert.deepStrictEqual(res.safety, {
     mineToday: true,
     partnerToday: true,
@@ -440,16 +356,13 @@ test('home.get: 报平安区块查询失败只让 safety 为 null，日记/愿�
   }
 });
 
-test('home.get: 心情区块查询失败只让 mood 为 null，抱抱照常返回（文档 10.3）', async () => {
+test('home.get: 心情区块查询失败只让 mood 为 null，纪念日照常返回（文档 10.3）', async () => {
   const { ctx, fake } = makeCtx({
     users: [{ _id: 'oA', coupleId: 'c_1' }],
     couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
-    hugs: [
-      {
-        _id: 'h_in', coupleId: 'c_1', fromOpenid: 'oB', toOpenid: 'oA', status: 'pending',
-        createdAt: new Date(NOW.getTime() - 3600 * 1000), respondedAt: null,
-        expiresAt: new Date(NOW.getTime() + WEEK_MS),
-      },
+    anniversaries: [
+      { _id: 'a_one', coupleId: 'c_1', title: '第一次见面', date: '2023-11-20', createdAt: NOW },
+      { _id: 'a_other', coupleId: 'c_2', title: '别人的', date: '2020-01-01', createdAt: NOW },
     ],
   });
   const realDb = fake.db;
@@ -468,7 +381,7 @@ test('home.get: 心情区块查询失败只让 mood 为 null，抱抱照常返�
   try {
     const res = await homeHandler.get({}, ctx);
     assert.strictEqual(res.mood, null);
-    assert.strictEqual(res.hug.incoming.hugId, 'h_in');
+    assert.strictEqual(res.anniversary.items[0].title, '第一次见面');
     assert.strictEqual(res.couple.coupleId, 'c_1');
   } finally {
     console.error = originalError;
@@ -487,14 +400,14 @@ test('home.get: 未绑定返回 3 个区块 null，并按 bind 状态机返回',
   assert.strictEqual(res.couple, null);
   assert.strictEqual(res.partner, null);
   assert.strictEqual(res.mood, null);
-  assert.strictEqual(res.hug, null);
+  assert.strictEqual(res.anniversary, null);
   assert.strictEqual(res.safety, null);
   assert.strictEqual(res.diary, null);
   assert.strictEqual(res.wish, null);
   assert.strictEqual(res.bind.state, 'unbound');
 });
 
-test('home.get: 抱抱/日记/愿望区块各自失败只让对应块为 null（文档 10.3）', async () => {
+test('home.get: 纪念日/日记/愿望区块各自失败只让对应块为 null（文档 10.3）', async () => {
   const { ctx, fake } = makeCtx({
     users: [{ _id: 'oA', coupleId: 'c_1' }],
     couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
@@ -503,7 +416,7 @@ test('home.get: 抱抱/日记/愿望区块各自失败只让对应块为 null（
     ],
   });
   const realDb = fake.db;
-  const down = ['hugs', 'diaries', 'wishes'];
+  const down = ['anniversaries', 'diaries', 'wishes'];
   ctx.db = {
     collection(name) {
       if (down.indexOf(name) !== -1) throw new Error('mock ' + name + ' down');
@@ -518,7 +431,7 @@ test('home.get: 抱抱/日记/愿望区块各自失败只让对应块为 null（
   console.error = () => {};
   try {
     const res = await homeHandler.get({}, ctx);
-    assert.strictEqual(res.hug, null);
+    assert.strictEqual(res.anniversary, null);
     assert.strictEqual(res.diary, null);
     assert.strictEqual(res.wish, null);
     assert.strictEqual(res.mood.mine.mood, 'sunny');

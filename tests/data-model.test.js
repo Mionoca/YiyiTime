@@ -19,7 +19,7 @@ const { createHarness } = require('./helpers/cloud-entry');
 const DOC_PATH = path.join(__dirname, '..', 'docs', '技术设计文档.md');
 const COLLECTIONS = [
   'users', 'couples', 'bind_invites', 'moods',
-  'hugs', 'safety_checkins', 'diaries', 'wishes', 'ledger_entries',
+  'anniversaries', 'safety_checkins', 'diaries', 'wishes', 'ledger_entries',
 ];
 
 function stripTicks(text) {
@@ -111,7 +111,7 @@ function validateDoc(schema, collection, doc) {
   }
 }
 
-/** 一条完整双人链路，尽量让 8 个集合都落盘 */
+/** 一条完整双人链路，尽量让 9 个集合都落盘 */
 async function runHappyFlow(h) {
   const A = 'oDM_A_000000000001';
   const B = 'oDM_B_000000000002';
@@ -128,9 +128,8 @@ async function runHappyFlow(h) {
   await call(A, 'couple.updateStartDate', { startDate: '2024-05-20' });
   await call(A, 'mood.set', { mood: 'sunny', note: '开心' });
   await call(B, 'mood.set', { mood: 'cloudy' });
-  const hug = await call(A, 'hug.send', {});
-  const hugId = (hug.hug && hug.hug.hugId) || hug.hugId;
-  await call(B, 'hug.respond', { hugId });
+  const anniversary = await call(A, 'anniversary.add', { title: '第一次见面', date: '2023-06-01' });
+  await call(B, 'anniversary.update', { anniversaryId: anniversary.item.anniversaryId, title: '初见' });
   await call(A, 'safety.checkin', { note: '到家了' });
   await call(A, 'diary.save', { content: '今天很好' });
   await call(B, 'diary.save', { content: '我也很好' });
@@ -203,15 +202,16 @@ test('数据模型：唯一键 / 日期格式 / 跨集合不变量', async () =>
     assert.ok(['sunny', 'cloudy', 'rainy', 'thunder'].indexOf(mood.mood) !== -1);
     assert.ok(mood.note.length <= 50);
   }
-  const hug = one('hugs');
-  assert.match(hug._id, /^h_[0-9a-f]{16}$/);
-  assert.strictEqual(hug.coupleId, couple._id);
-  assert.strictEqual(hug.fromOpenid, A);
-  assert.strictEqual(hug.toOpenid, B);
-  assert.strictEqual(hug.status, 'hugged');
-  assert.ok(hug.respondedAt instanceof Date);
-  assert.ok(hug.respondedAt.getTime() >= hug.createdAt.getTime());
-  assert.strictEqual(hug.expiresAt.getTime() - hug.createdAt.getTime(), 7 * 24 * 3600 * 1000);
+  const anniversaryDoc = one('anniversaries');
+  assert.match(anniversaryDoc._id, /^a_[0-9a-f]{16}$/);
+  assert.strictEqual(anniversaryDoc.coupleId, couple._id);
+  assert.strictEqual(anniversaryDoc.title, '初见');
+  assert.match(anniversaryDoc.date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.strictEqual(anniversaryDoc.createdBy, A);
+  // 剩余天数 / 周年每天都变，不许落库
+  for (const forbidden of ['nextDate', 'daysLeft', 'years']) {
+    assert.strictEqual(anniversaryDoc[forbidden], undefined, 'anniversaries 不该存 ' + forbidden);
+  }
   const safety = one('safety_checkins');
   assert.strictEqual(safety.coupleId, couple._id);
   assert.strictEqual(safety.openid, A);

@@ -10,6 +10,7 @@ const api = require('../../utils/api');
 const constants = require('../../utils/constants');
 const timeUtil = require('../../utils/time');
 const format = require('../../utils/format');
+const tabbar = require('../../utils/tabbar');
 
 const LIMITS = constants.LIMITS;
 /**
@@ -69,6 +70,8 @@ Page({
   },
 
   onShow() {
+    // 自定义 tabBar 的选中态要页面自己报（文档 8.2）
+    tabbar.sync(this, constants.ROUTES.ledger);
     // onLoad 已经拉过一次；之后从别的页面回来静默刷新，保留列表不闪 loading（10.3）
     if (this._firstShow) {
       this._firstShow = false;

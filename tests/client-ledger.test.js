@@ -416,11 +416,22 @@ test('ledger 页: 卸载后不再 setData', async () => {
   }
 });
 
-test('ledger 页: 模板与注册静态自检（页面、组件、下拉刷新、入口）', () => {
+test('ledger 页: 模板与注册静态自检（页面、组件、下拉刷新、tab 入口）', () => {
   const app = JSON.parse(fs.readFileSync(path.join(ROOT, 'miniprogram/app.json'), 'utf8'));
   assert.ok(app.pages.indexOf('pages/ledger/index') >= 0, '新页面必须在 app.json 注册');
   assert.strictEqual(constants.ROUTES.ledger, '/pages/ledger/index');
-  assert.strictEqual(constants.isTabRoute(constants.ROUTES.ledger), false, '记账本是普通页，只能 navigateTo');
+  // M12：记账本从「我的」列表挪到底部 tab（文档 8.2）
+  assert.strictEqual(constants.isTabRoute(constants.ROUTES.ledger), true, '记账本已是 tab 页，只能 switchTab');
+  assert.deepStrictEqual(app.tabBar.list.map((item) => item.pagePath), [
+    'pages/home/index',
+    'pages/ledger/index',
+    'pages/profile/index',
+  ]);
+  const ledgerJs = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/ledger/index.js'), 'utf8');
+  assert.ok(ledgerJs.includes('tabbar.sync(this, constants.ROUTES.ledger)'), 'tab 页要在 onShow 里同步选中态');
+  const ledgerWxss = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/ledger/index.wxss'), 'utf8');
+  assert.ok(ledgerWxss.includes('calc(100rpx + env(safe-area-inset-bottom))'),
+    '「记一笔」要抬到 tabBar 之上，不能被底部 tab 压住');
 
   const json = JSON.parse(fs.readFileSync(path.join(ROOT, 'miniprogram/pages/ledger/index.json'), 'utf8'));
   assert.strictEqual(json.enablePullDownRefresh, true);
@@ -434,7 +445,7 @@ test('ledger 页: 模板与注册静态自检（页面、组件、下拉刷新�
   assert.ok(wxml.includes('aria-label'), '可点区域要有无障碍标签');
 
   const profileWxml = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/profile/index.wxml'), 'utf8');
-  assert.ok(profileWxml.includes('onOpenLedger'), '「我的」要有记账本入口');
+  assert.ok(!profileWxml.includes('onOpenLedger'), '记账本已经是 tab，不在「我的」里重复放入口（文档 8.3.6）');
   assert.ok(!profileWxml.includes('见面基金'), '见面基金占位已经下线');
 });
 

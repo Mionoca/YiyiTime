@@ -103,30 +103,28 @@ async function fail(openid, action, payload, expectedCode) {
   return res;
 }
 
-test('抱抱：别家的人回应返回 HUG_NOT_FOUND，发送者本人返回 HUG_NOT_RECIPIENT', async () => {
+test('纪念日：别家改/删都返回 FORBIDDEN，列表互不干扰，本对双方都能改', async () => {
   seedTwoCouples();
-  const sent = await ok(A, 'hug.send', {});
-  const hugId = sent.hug.hugId;
-  assert.strictEqual(sent.existing, false);
+  const added = await ok(A, 'anniversary.add', { title: '第一次见面', date: '2023-06-01' });
+  const anniversaryId = added.item.anniversaryId;
 
-  // 别的情侣成员拿到 hugId 也不能回应：先按 coupleId 判归属
-  await fail(C, 'hug.respond', { hugId }, 'HUG_NOT_FOUND');
-  await fail(D, 'hug.respond', { hugId }, 'HUG_NOT_FOUND');
+  // 别的情侣成员拿到 id 也不能改 / 删：先按 coupleId 判归属
+  await fail(C, 'anniversary.update', { anniversaryId, title: '改不动' }, 'FORBIDDEN');
+  await fail(C, 'anniversary.remove', { anniversaryId }, 'FORBIDDEN');
 
-  // 同对但自己是发送者：抱抱不是给 TA 的
-  await fail(A, 'hug.respond', { hugId }, 'HUG_NOT_RECIPIENT');
+  // 列表按 coupleId 隔离：别的对看不到
+  const listC = await ok(C, 'anniversary.list', {});
+  assert.deepStrictEqual(listC.items, []);
+  const listA = await ok(A, 'anniversary.list', {});
+  assert.strictEqual(listA.items.length, 1);
 
-  // 接收者才能回应，且重复回应幂等
-  const hugged = await ok(B, 'hug.respond', { hugId });
-  assert.strictEqual(hugged.status, 'hugged');
-  assert.strictEqual(hugged.already, false);
-  const again = await ok(B, 'hug.respond', { hugId });
-  assert.strictEqual(again.already, true);
+  // 本对另一个人可以改（纪念日是两个人共同的）
+  const updated = await ok(B, 'anniversary.update', { anniversaryId, title: '初见' });
+  assert.strictEqual(updated.item.title, '初见');
 
-  const stored = h.fake().get('hugs', hugId);
+  const stored = h.fake().get('anniversaries', anniversaryId);
   assert.strictEqual(stored.coupleId, COUPLE_AB);
-  assert.strictEqual(stored.fromOpenid, A);
-  assert.strictEqual(stored.toOpenid, B);
+  assert.strictEqual(stored.createdBy, A);
 });
 
 test('愿望：别家改/完成/删除都返回 FORBIDDEN，且数据保持不变', async () => {
@@ -261,12 +259,13 @@ test('客户端传的 openid / coupleId / date / unlockAt 一律被忽略，只�
   assert.strictEqual(moodDoc.coupleId, COUPLE_AB);
   assert.strictEqual(moodDoc.openid, A);
 
-  // 抱抱：接收者只能是本对伴侣
-  const hug = await ok(A, 'hug.send', Object.assign({ toOpenid: C }, injected));
-  const hugDoc = store.get('hugs', hug.hug.hugId);
-  assert.strictEqual(hugDoc.coupleId, COUPLE_AB);
-  assert.strictEqual(hugDoc.fromOpenid, A);
-  assert.strictEqual(hugDoc.toOpenid, B);
+  // 纪念日：coupleId / createdBy 由服务端定
+  const ann = await ok(A, 'anniversary.add', {
+    title: '初见', date: '2023-06-01', openid: C, coupleId: COUPLE_CD, createdBy: C,
+  });
+  const annDoc = store.get('anniversaries', ann.item.anniversaryId);
+  assert.strictEqual(annDoc.coupleId, COUPLE_AB, '归属只认当前关系');
+  assert.strictEqual(annDoc.createdBy, A, 'createdBy 只认服务端身份');
 
   // 报平安：记录归属和日期都由服务端定
   const checkin = await ok(A, 'safety.checkin', Object.assign({ note: '到家' }, injected));
@@ -304,8 +303,10 @@ test('未绑定用户调用双人接口统一 NOT_BOUND，首页仍返回未绑�
   h.reset({ users: [userDoc(E, '单身', null)] });
   const dualActions = [
     ['mood.set', { mood: 'sunny' }],
-    ['hug.send', {}],
-    ['hug.respond', { hugId: 'h_not_mine' }],
+    ['anniversary.add', { title: '初见', date: '2023-06-01' }],
+    ['anniversary.list', {}],
+    ['anniversary.update', { anniversaryId: 'a_not_mine', title: '改不动' }],
+    ['anniversary.remove', { anniversaryId: 'a_not_mine' }],
     ['safety.checkin', { note: '' }],
     ['safety.list', {}],
     ['diary.save', { content: '今天很好' }],
@@ -326,7 +327,7 @@ test('未绑定用户调用双人接口统一 NOT_BOUND，首页仍返回未绑�
   assert.strictEqual(home.couple, null);
   assert.strictEqual(home.partner, null);
   assert.strictEqual(home.mood, null);
-  assert.strictEqual(home.hug, null);
+  assert.strictEqual(home.anniversary, null);
   assert.strictEqual(home.safety, null);
   assert.strictEqual(home.diary, null);
   assert.strictEqual(home.wish, null);

@@ -1,0 +1,11 @@
+{
+  "navigationBarTitleText": "纪念日",
+  "navigationBarBackgroundColor": "#FFFEF5",
+  "navigationBarTextStyle": "black",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#FFFEF5",
+  "usingComponents": {
+    "empty-state": "/components/empty-state/index",
+    "bottom-sheet": "/components/bottom-sheet/index"
+  }
+}

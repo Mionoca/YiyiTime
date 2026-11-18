@@ -1,15 +1,10 @@
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
 const timeUtil = require('../../utils/time');
-const haptics = require('../../utils/haptics');
 const tabbar = require('../../utils/tabbar');
 
 const DEFAULT_AVATAR = constants.DEFAULT_AVATAR;
 const MOODS = constants.MOODS;
-const HUG_SEEN_KEY = 'hug_seen_ids';
-const HUG_SEEN_MAX = 20;
-// 文档 9.7：心形上浮 1400ms；多留 40ms 余量，避免定时器先于动画结束
-const HUG_FLOAT_MS = 1440;
 // 卡片入场 300ms（文档 9.7），多留 20ms 再摘 class
 const CARD_ENTER_MS = 320;
 
@@ -71,14 +66,10 @@ Page({
     moodSaving: false,
     partnerMoodSheet: false,
     partnerMood: null,
-    // 抱抱（文档 7.8 / 9.4）
-    hugIncoming: null,
-    hugOutgoing: null,
-    hugButtonText: '我需要抱抱',
-    hugButtonDisabled: false,
-    hugHint: '',
-    hugSending: false,
-    hugCelebrate: false,
+    // 纪念日堆叠（文档 9.4）：卡 0 是「在一起」，后面是自定义纪念日
+    cards: [],
+    cardIndex: 0,
+    cardCount: 0,
     // 四个入口的状态摘要（文档 9.2）
     diarySub: '今天还没写',
     wishSub: '还没有愿望',
@@ -112,7 +103,6 @@ Page({
   onUnload() {
     // 页面已卸载：之后的定时器 / nextTick 回调不再 setData（微信会告警）
     this._unloaded = true;
-    clearTimeout(this._celebrateTimer);
     clearTimeout(this._enterTimer);
   },
 
@@ -144,7 +134,6 @@ Page({
         const firstHome = !this.data.home;
         this.setData(Object.assign({ loading: false, error: '', refreshError: '', home }, this.derive(home)));
         if (firstHome) this.playCardEnter();
-        this.maybeCelebrate(home);
       })
       .catch((err) => {
         // 已有更新请求发出时，旧请求的失败不打扰用户
@@ -167,7 +156,6 @@ Page({
     const user = home.user || {};
     const partner = home.partner;
     const mood = home.mood || {};
-    const hug = home.hug || {};
     // 三个区块可能是 null（查询失败降级，文档 10.3），这里按「没有数据」渲染
     const safety = home.safety || null;
     const diary = home.diary || null;
@@ -186,8 +174,6 @@ Page({
       moodPartner: mood.partner || null,
       moodMineText: moodText(mood.mine),
       moodPartnerText: moodText(mood.partner),
-      hugIncoming: hug.incoming || null,
-      hugOutgoing: hug.outgoing || null,
       // 只有自己刚创建的邀请码可以分享；applied_* 阶段的 code 已失效或属于对方（文档 11.5）
       shareCode: (home.bind && home.bind.state === 'code_created' && home.bind.pending && home.bind.pending.code) || '',
       diarySub: diarySubText(home.couple, diary),
@@ -221,91 +207,40 @@ Page({
       patch.startDateText = '';
       patch.anniversaryText = '';
     }
-    return Object.assign(patch, this.deriveHugState(patch));
+
+    // 纪念日堆叠（文档 9.4）：卡 0 永远是「在一起」，后面按服务端给的剩余天数顺序排
+    patch.cards = buildCards(home, patch.daysText, patch.startDateText);
+    patch.cardCount = patch.cards.length;
+    // 对方可能刚删掉你正在看的那张 → 下标夹回合法范围，不留空白卡
+    patch.cardIndex = patch.cardCount
+      ? Math.min(Math.max(this.data.cardIndex | 0, 0), patch.cardCount - 1)
+      : 0;
+    return patch;
   },
 
-  /** 按文档 9.4 的抱抱状态矩阵算按钮与提示 */
-  deriveHugState(patch) {
-    const incoming = patch.hugIncoming;
-    const outgoing = patch.hugOutgoing;
-    const days = patch.daysText || '';
-    if (incoming) {
-      return { hugButtonText: '抱抱 TA', hugButtonDisabled: false, hugHint: 'TA 现在需要抱抱' };
-    }
-    if (outgoing && outgoing.status === 'pending') {
-      return {
-        hugButtonText: '等 TA 抱抱',
-        hugButtonDisabled: true,
-        hugHint: '抱抱已经送出去啦，等 TA 回应',
-      };
-    }
-    if (outgoing && outgoing.status === 'hugged') {
-      return {
-        hugButtonText: '再抱一次',
-        hugButtonDisabled: false,
-        hugHint: days ? days + ' · TA 抱了你' : 'TA 抱了你',
-      };
-    }
-    if (outgoing && outgoing.status === 'expired') {
-      return {
-        hugButtonText: '我需要抱抱',
-        hugButtonDisabled: false,
-        hugHint: '上次抱抱过期了，再抱一次吧',
-      };
-    }
-    return {
-      hugButtonText: '我需要抱抱',
-      hugButtonDisabled: false,
-      hugHint: days ? days + ' · 一起的日子还在继续' : '一起的日子还在继续',
-    };
+  /** 堆叠切换：只改下标，组件按位置重算 transform / opacity（文档 9.4） */
+  onCardChange(e) {
+    const index = Number(e && e.detail && e.detail.index);
+    if (!Number.isFinite(index) || index === this.data.cardIndex) return;
+    if (index < 0 || index >= this.data.cards.length) return;
+    this.setData({ cardIndex: index });
   },
 
-  /** 对方回应后只播一次心形动画（按 hugId 记录，已在本次会话/本机播过就不再播） */
-  maybeCelebrate(home) {
-    const outgoing = home && home.hug && home.hug.outgoing;
-    if (!outgoing || outgoing.status !== 'hugged' || !outgoing.hugId) return;
-    if (this.hasSeenHug(outgoing.hugId)) return;
-    this.markHugSeen(outgoing.hugId);
-    this.playHugCelebrate();
+  /** 卡片脚注「改日子」：只有「在一起」那张卡会出现这个链接 */
+  onCardEdit(e) {
+    const kind = e && e.detail && e.detail.kind;
+    if (kind !== 'together') return;
+    this.onTapCalendar();
   },
 
-  hasSeenHug(hugId) {
-    // 存储不可用时用内存数组兜底，避免每次刷新重播心形动画
-    if ((this._seenHugIds || []).indexOf(hugId) !== -1) return true;
-    try {
-      const seen = wx.getStorageSync(HUG_SEEN_KEY);
-      return Array.isArray(seen) && seen.indexOf(hugId) !== -1;
-    } catch (err) {
-      return false;
+  /** 卡片脚注「管理 ›」：进纪念日管理页（增删改都在那一页） */
+  onManageAnniversary() {
+    const home = this.data.home;
+    if (!home || !home.couple) {
+      this.toast('等 TA 住进来再一起记日子');
+      return;
     }
-  },
-
-  markHugSeen(hugId) {
-    if (!hugId) return;
-    this._seenHugIds = this._seenHugIds || [];
-    if (this._seenHugIds.indexOf(hugId) === -1) this._seenHugIds.push(hugId);
-    try {
-      const seen = wx.getStorageSync(HUG_SEEN_KEY);
-      const list = (Array.isArray(seen) ? seen : []).filter((id) => id !== hugId);
-      list.push(hugId);
-      wx.setStorageSync(HUG_SEEN_KEY, list.slice(-HUG_SEEN_MAX));
-    } catch (err) {
-      // 存储不可用就只用上面的内存标记
-    }
-  },
-
-  playHugCelebrate() {
-    clearTimeout(this._celebrateTimer);
-    this.setData({ hugCelebrate: false });
-    this._celebrateTimer = setTimeout(() => {
-      if (this._unloaded) return;
-      this.setData({ hugCelebrate: true });
-      this._celebrateTimer = setTimeout(() => {
-        if (this._unloaded) return;
-        this.setData({ hugCelebrate: false });
-        // 文档 9.7 心形上浮 1.4s：必须等动画播完再摘 class，否则尾巴被剪掉
-      }, HUG_FLOAT_MS);
-    }, 16);
+    wx.navigateTo({ url: constants.ROUTES.anniversary });
   },
 
   /** 首屏卡片入场（文档 9.7）：一次性 class，不永久挂 */
@@ -438,80 +373,6 @@ Page({
     this.setData({ partnerMoodSheet: false });
   },
 
-  onTapHug() {
-    const home = this.data.home;
-    if (!home || !home.couple) {
-      this.onTapBind();
-      return;
-    }
-    if (this.data.hugIncoming && this.data.hugIncoming.hugId) {
-      this.respondHug(this.data.hugIncoming.hugId);
-      return;
-    }
-    this.sendHug();
-  },
-
-  onHugRespond(e) {
-    const hugId = (e && e.detail && e.detail.hugId) || (this.data.hugIncoming && this.data.hugIncoming.hugId);
-    this.respondHug(hugId);
-  },
-
-  async sendHug() {
-    if (this.data.hugSending) return;
-    if (this.data.hugOutgoing && this.data.hugOutgoing.status === 'pending') {
-      this.toast('抱抱已经发出去了，等 TA 回应');
-      return;
-    }
-    this.setData({ hugSending: true });
-    try {
-      const res = await api.call('hug.send');
-      this.setData({
-        hugSending: false,
-        hugOutgoing: res.hug,
-        hugButtonText: '等 TA 抱抱',
-        hugButtonDisabled: true,
-        hugHint: '抱抱已经送出去啦，等 TA 回应',
-      });
-      this.toast(res.existing ? '抱抱已经发出去了，等 TA 回应' : '抱抱送出去啦');
-      if (!res.existing) {
-        this.playHugCelebrate();
-        haptics.light();
-      }
-      await this.load(true, true);
-    } catch (err) {
-      this.setData({ hugSending: false });
-      api.showError(err);
-    }
-  },
-
-  async respondHug(hugId) {
-    if (!hugId || this.data.hugSending) return;
-    this.setData({ hugSending: true });
-    try {
-      const res = await api.call('hug.respond', { hugId });
-      // 先把本地状态从「TA 需要抱抱」切走，即使随后的静默刷新失败也不会停在旧状态上。
-      // 注意不要伪造 hugOutgoing：回应方此刻并没有自己的发出记录，真实状态交给刷新补。
-      this.setData({
-        hugSending: false,
-        hugCelebrate: false,
-        hugIncoming: null,
-        hugButtonText: '我需要抱抱',
-        hugButtonDisabled: false,
-        hugHint: '抱抱送到啦',
-      });
-      this.playHugCelebrate();
-      if (!res.already) haptics.light();
-      this.toast(res.already ? '你们已经抱过啦' : '抱到啦');
-      await this.load(true, true);
-    } catch (err) {
-      this.setData({ hugSending: false });
-      api.showError(err);
-      if (err && (err.code === 'HUG_EXPIRED' || err.code === 'HUG_NOT_FOUND')) {
-        this.load(true, true);
-      }
-    }
-  },
-
   onTapCalendar() {
     const home = this.data.home;
     if (home && home.couple) {
@@ -600,8 +461,44 @@ Page({
   noop() {},
 });
 
-/** 心情一行摘要：「晴 · 今天很好」，没打卡是「还没说」 */
-function moodText(mood) {
+/**
+ * 拼堆叠卡（文档 9.4）：卡 0 永远是「在一起」（来自 couple），后面是自定义纪念日。
+ * 组件不认识这两种卡，所以文案全部在这里算好；
+ * 剩余天数与周年都用服务端返回的值，客户端不自己算日期（1.5 / 12.5）。
+ */
+function buildCards(home, daysText, startDateText) {
+  if (!home || !home.couple) return [];
+  const couple = home.couple;
+  const ann = couple.anniversary;
+  const cards = [{
+    key: 'together',
+    kind: 'together',
+    label: '我们的日子',
+    mainText: daysText || '从今天开始',
+    subText: startDateText ? '开始于 ' + startDateText : '还没选开始的日子',
+    metaText: ann
+      ? (ann.daysLeft === 0 ? '周年 · 就是今天' : '周年 · 还有 ' + ann.daysLeft + ' 天')
+      : (couple.startDate ? '开始那天就是纪念日' : ''),
+  }];
+
+  const items = (home.anniversary && home.anniversary.items) || [];
+  items.forEach((item, i) => {
+    const daysLeft = typeof item.daysLeft === 'number' ? item.daysLeft : null;
+    cards.push({
+      key: item.anniversaryId || 'custom-' + i,
+      kind: 'custom',
+      label: item.title || '纪念日',
+      mainText: daysLeft === null
+        ? '日子还没算好'
+        : (daysLeft === 0 ? '就是今天' : '还有 ' + daysLeft + ' 天'),
+      subText: item.nextDate ? timeUtil.formatMonthDay(item.nextDate) : '',
+      metaText: item.years ? '第 ' + item.years + ' 个' : '',
+    });
+  });
+  return cards;
+}
+
+/** 心情一行摘要：「晴 · 今天很好」，没打卡是「还没说」 */function moodText(mood) {
   if (!mood || !mood.mood) return '还没说';
   const meta = MOODS.find((item) => item.key === mood.mood);
   const label = meta ? meta.label : '';

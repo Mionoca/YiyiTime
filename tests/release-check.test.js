@@ -868,7 +868,7 @@ test('发布预检：客户端悬空的 api.call 会被拦下（13.11 未处理�
       "  await api.call('home.get');",
       "  return api.call('user.get');",
       "  api.call('mood.set').catch(() => {});",
-      "  api.call('hug.send')",
+      "  api.call('anniversary.add')",
       '    .then(() => {})',
       '    .catch(() => {});',
       "  // api.call('line.comment');",

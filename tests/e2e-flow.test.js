@@ -96,7 +96,7 @@ async function bindTwoAccounts() {
   return { coupleId: confirmed.coupleId, code: created.code };
 }
 
-test('双账号端到端主链路：绑定 → 首页聚合 → 心情/抱抱/报平安/日记/愿望 → 改开始日期', async (t) => {
+test('双账号端到端主链路：绑定 → 首页聚合 → 心情/纪念日/报平安/日记/愿望 → 改开始日期', async (t) => {
   captureConsoleError(t);
   const { coupleId } = await bindTwoAccounts();
   const todayKey = today();
@@ -122,7 +122,7 @@ test('双账号端到端主链路：绑定 → 首页聚合 → 心情/抱抱/�
   assert.strictEqual(homeA.partner.nickname, '阿安');
   assert.strictEqual(homeA.partner.openid, B);
   assert.deepStrictEqual(homeA.mood, { mine: null, partner: null });
-  assert.deepStrictEqual(homeA.hug, { incoming: null, outgoing: null });
+  assert.deepStrictEqual(homeA.anniversary, { items: [] });
   assert.deepStrictEqual(homeA.safety, { mineToday: false, partnerToday: false, partnerLastAt: null });
   assert.deepStrictEqual(homeA.diary, {
     mineWritten: false,
@@ -145,26 +145,20 @@ test('双账号端到端主链路：绑定 → 首页聚合 → 心情/抱抱/�
   const homeA1 = await callAs(A, 'home.get', {});
   assert.strictEqual(homeA1.mood.mine.mood, 'sunny');
 
-  // 抱抱：发送 → 对方首页横幅 → 回应 → 幂等 → 发送方 outgoing 状态变成 hugged
-  const sent = await callAs(A, 'hug.send', {});
-  assert.strictEqual(sent.existing, false);
-  assert.strictEqual(sent.hug.status, 'pending');
-  assert.strictEqual(sent.hug.respondedAt, null);
-  assert.match(sent.hug.hugId, /^h_[0-9a-f]+$/);
+  // 纪念日：A 加一个 → 双方首页都能看到（同一条数据），B 改标题后 A 也读到新标题
+  const annAdded = await callAs(A, 'anniversary.add', { title: '第一次见面', date: '2023-06-01' });
+  assert.match(annAdded.item.anniversaryId, /^a_[0-9a-f]+$/);
+  assert.strictEqual(annAdded.items.length, 1);
   const homeB2 = await callAs(B, 'home.get', {});
-  assert.strictEqual(homeB2.hug.incoming.hugId, sent.hug.hugId);
-  const responded = await callAs(B, 'hug.respond', { hugId: sent.hug.hugId });
-  assert.strictEqual(responded.status, 'hugged');
-  assert.strictEqual(responded.already, false);
-  const respondAgain = await callAs(B, 'hug.respond', { hugId: sent.hug.hugId });
-  assert.strictEqual(respondAgain.already, true);
+  assert.strictEqual(homeB2.anniversary.items.length, 1);
+  assert.strictEqual(homeB2.anniversary.items[0].title, '第一次见面');
+  assert.strictEqual(homeB2.anniversary.items[0].daysLeft, annAdded.item.daysLeft, '剩余天数只由服务端 todayKey 决定');
+  const renamed = await callAs(B, 'anniversary.update', {
+    anniversaryId: annAdded.item.anniversaryId, title: '初见',
+  });
+  assert.strictEqual(renamed.item.title, '初见');
   const homeA2 = await callAs(A, 'home.get', {});
-  assert.strictEqual(homeA2.hug.incoming, null);
-  assert.strictEqual(homeA2.hug.outgoing.status, 'hugged');
-  // 回应后可以再发一次，不会被旧 pending 去重挡住
-  const resent = await callAs(A, 'hug.send', {});
-  assert.strictEqual(resent.existing, false);
-  assert.notStrictEqual(resent.hug.hugId, sent.hug.hugId);
+  assert.strictEqual(homeA2.anniversary.items[0].title, '初见');
 
   // 报平安：10 分钟去重；时间线带昵称；对方首页 partnerToday 亮起
   const checkin = await callAs(A, 'safety.checkin', { note: '到家啦' });
@@ -270,30 +264,28 @@ test('跨天日记解锁后，能读到对方正文（直接种库）', async (t
   assert.strictEqual(list.items[0].partner.content, '昨天 TA 写的');
 });
 
-test('过期的 pending 抱抱首页不展示，并惰性写回 expired', async (t) => {
+test('纪念日 8 条上限：第 9 条被拒，首页仍返回全部 8 条', async (t) => {
   captureConsoleError(t);
   const coupleId = 'c_00000000deadbeef';
-  const now = Date.now();
   h.reset({
     users: [userDoc(A, '小怡', coupleId), userDoc(B, '阿安', coupleId)],
     couples: [coupleDoc(coupleId)],
-    hugs: [{
-      _id: 'h_00000000000000ff',
-      coupleId,
-      fromOpenid: B,
-      toOpenid: A,
-      status: 'pending',
-      createdAt: new Date(now - 8 * 24 * 60 * 60 * 1000),
-      respondedAt: null,
-      expiresAt: new Date(now - 24 * 60 * 60 * 1000), // 8 天前发的，7 天有效期已过
-    }],
   });
 
+  for (let i = 0; i < 8; i += 1) {
+    const res = await callAs(A, 'anniversary.add', {
+      title: '纪念日 ' + i,
+      date: '2020-' + String(i + 1).padStart(2, '0') + '-01',
+    });
+    assert.strictEqual(res.items.length, i + 1);
+  }
+  const ninth = await h.callAs(A, 'anniversary.add', { title: '第九个', date: '2023-06-01' });
+  assert.strictEqual(ninth.ok, false);
+  assert.strictEqual(ninth.code, 'ANNIVERSARY_LIMIT_REACHED');
+
   const homeA = await callAs(A, 'home.get', {});
-  assert.strictEqual(homeA.hug.incoming, null);
-  const homeB = await callAs(B, 'home.get', {});
-  assert.strictEqual(homeB.hug.outgoing.status, 'expired');
-  assert.strictEqual(h.fake().get('hugs', 'h_00000000000000ff').status, 'expired');
+  assert.strictEqual(homeA.anniversary.items.length, 8);
+  assert.strictEqual(h.fake().all('anniversaries').length, 8);
 });
 
 test('user.coupleId 指向不存在的 couple 时，home.get 自愈回未绑定', async (t) => {

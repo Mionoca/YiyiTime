@@ -1,8 +1,8 @@
 /* 记账本：涂鸦风（文档 8.7 / 8.3.8） */
 .page {
   min-height: 100vh;
-  /* 底部留出「记一笔」按钮的高度，最后一条不被压住 */
-  padding: 24rpx 24rpx calc(220rpx + env(safe-area-inset-bottom));
+  /* 底部留出「记一笔」按钮 + tabBar + 安全区，最后一条不被压住（文档 9.9） */
+  padding: 24rpx 24rpx calc(360rpx + env(safe-area-inset-bottom));
   background-color: var(--bg);
 }
 
@@ -191,12 +191,13 @@
 }
 
 /* ---------- 固定底部按钮 ---------- */
+/* M12 起是 tab 页：「记一笔」要抬到 tabBar 之上，否则会被 100rpx 的 tabBar 压住 */
 .fab {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
-  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  bottom: calc(100rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 24rpx;
   background-color: var(--bg);
   border-top: 2rpx dashed var(--line);
 }

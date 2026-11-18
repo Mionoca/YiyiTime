@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * 查询预算回归测试（文档 7.8「查询预算：约 9–10 次读」、13.11 性能 DoD）。
+ * 查询预算回归测试（文档 7.8「查询预算：约 9 次读」、13.11 性能 DoD）。
  *
  * 做法：利用 tests/helpers/fake-db.js 的操作钩子 setOperationHook（doc.get /
  * doc.update / where.get / where.count / add ... 每次真实读写前触发一次），
@@ -23,7 +23,7 @@ const A = 'oQB_A_000000000001';
 const B = 'oQB_B_000000000002';
 const COUPLE = 'c_abcdef0123456789';
 /**
- * 每次取当前时刻：种子里的相对时间戳（lastActiveAt、过期抱抱等）在用例执行时求值；
+ * 每次取当前时刻：种子里的相对时间戳（lastActiveAt、纪念日等）在用例执行时求值；
  * 不能写成模块加载时的固定值，否则「模块加载 → 用例执行」间隔一旦超过 lastActiveAt
  * 的 5 分钟节流阈值，节流会被判成需要回写，精确次数表就会假红（与日期/午夜无关）。
  */
@@ -59,9 +59,8 @@ function seedBound(today, extra) {
       { _id: A + '_' + today, coupleId: COUPLE, openid: A, date: today, mood: 'sunny', note: '开心', createdAt: now(), updatedAt: now() },
       { _id: B + '_' + today, coupleId: COUPLE, openid: B, date: today, mood: 'cloudy', note: '', createdAt: now(), updatedAt: now() },
     ],
-    hugs: [
-      { _id: 'h_incoming', coupleId: COUPLE, fromOpenid: B, toOpenid: A, status: 'pending', createdAt: now(), respondedAt: null, expiresAt: new Date(now().getTime() + 7 * 86400000) },
-      { _id: 'h_outgoing', coupleId: COUPLE, fromOpenid: A, toOpenid: B, status: 'hugged', createdAt: new Date(now().getTime() - 86400000), respondedAt: now(), expiresAt: new Date(now().getTime() + 6 * 86400000) },
+    anniversaries: [
+      { _id: 'a_first', coupleId: COUPLE, title: '第一次见面', date: '2023-06-01', createdBy: A, createdAt: now(), updatedAt: now() },
     ],
     safety_checkins: [
       { _id: 's_mine', coupleId: COUPLE, openid: A, note: '', date: today, createdAt: now() },
@@ -114,7 +113,7 @@ function assertNoN1(q, maxPerCollection) {
   });
 }
 
-test('查询预算：已绑定首页一次 home.get 约 10 次库操作（文档 7.8 的 9–10 次读）', async () => {
+test('查询预算：已绑定首页一次 home.get 约 9 次库操作（文档 7.8 的 9 次读）', async () => {
   const h = createHarness();
   const today = todayKey();
   h.reset(seedBound(today), A);
@@ -124,7 +123,7 @@ test('查询预算：已绑定首页一次 home.get 约 10 次库操作（文档
   assert.strictEqual(res.ok, true, 'home.get 应成功');
   assert.strictEqual(res.data.mood.mine.mood, 'sunny');
   assert.strictEqual(res.data.mood.partner.mood, 'cloudy');
-  assert.strictEqual(res.data.hug.incoming.hugId, 'h_incoming');
+  assert.strictEqual(res.data.anniversary.items[0].title, '第一次见面');
   assert.strictEqual(res.data.safety.mineToday, true);
   assert.strictEqual(res.data.wish.total, 2);
 
@@ -133,12 +132,12 @@ test('查询预算：已绑定首页一次 home.get 约 10 次库操作（文档
     users: 2,             // 本人 + 伴侣
     couples: 1,           // 关系
     moods: 1,             // 今日两人一次查
-    hugs: 2,              // incoming + outgoing
+    anniversaries: 1,     // 一次读全部自定义纪念日（≤8 条）
     safety_checkins: 2,   // 我今日 + 伴侣最近
     diaries: 1,           // 今日两人一次查
     wishes: 1,            // 一次读全量本地统计
   });
-  assert.strictEqual(q.total(), 10, '一次首页聚合应约 10 次库操作');
+  assert.strictEqual(q.total(), 9, '一次首页聚合应约 9 次库操作');
   assertNoN1(q, 2);
 });
 
@@ -154,7 +153,7 @@ test('查询预算：lastActiveAt 超过 5 分钟才多一次写，其余不变'
   assert.strictEqual(res.ok, true);
   assert.strictEqual(q.counts.users, 3, '本人 + 伴侣 + 更新 lastActiveAt 一次');
   assert.deepStrictEqual(q.ops['users:doc.update'], 1, '只有一次回写');
-  assert.strictEqual(q.total(), 11);
+  assert.strictEqual(q.total(), 10);
   assertNoN1(q, 3);
 });
 
@@ -174,7 +173,7 @@ test('查询预算：未绑定首页不碰双人集合，只读邀请（空屋�
 
   assert.strictEqual(q.counts.couples, undefined, '未绑定不应读 couples');
   assert.strictEqual(q.counts.moods, undefined);
-  assert.strictEqual(q.counts.hugs, undefined);
+  assert.strictEqual(q.counts.anniversaries, undefined);
   assert.strictEqual(q.counts.safety_checkins, undefined);
   assert.strictEqual(q.counts.diaries, undefined);
   assert.strictEqual(q.counts.wishes, undefined);
@@ -184,28 +183,26 @@ test('查询预算：未绑定首页不碰双人集合，只读邀请（空屋�
   assert.strictEqual(q.total(), 3);
 });
 
-test('查询预算：过期 pending 抱抱只多一次写，不额外查询', async () => {
+test('查询预算：纪念日多也不多查（8 条仍是一次 where.get，排序在内存里做）', async () => {
   const h = createHarness();
   const today = todayKey();
-  const expired = new Date(now().getTime() - 86400000);
-  h.reset(seedBound(today, {
-    hugs: [
-      { _id: 'h_expired', coupleId: COUPLE, fromOpenid: B, toOpenid: A, status: 'pending', createdAt: new Date(now().getTime() - 8 * 86400000), respondedAt: null, expiresAt: expired },
-      { _id: 'h_outgoing', coupleId: COUPLE, fromOpenid: A, toOpenid: B, status: 'hugged', createdAt: now(), respondedAt: now(), expiresAt: new Date(now().getTime() + 7 * 86400000) },
-    ],
-  }), A);
+  const items = [];
+  for (let i = 0; i < 8; i += 1) {
+    items.push({
+      _id: 'a_' + i, coupleId: COUPLE, title: '纪念日 ' + i, date: '2020-0' + ((i % 9) + 1) + '-01',
+      createdBy: A, createdAt: now(), updatedAt: now(),
+    });
+  }
+  h.reset(seedBound(today, { anniversaries: items }), A);
   const q = instrument(h);
 
   const res = await h.callAs(A, 'home.get', {});
   assert.strictEqual(res.ok, true);
-  assert.strictEqual(res.data.hug.incoming, null, '过期抱抱不能当 incoming');
-  // 2 次读（incoming / outgoing）+ 1 次写（把过期 pending 惰性改成 expired），写回不新增读
-  assert.strictEqual(q.counts.hugs, 3);
-  assert.deepStrictEqual(q.ops['hugs:doc.update'], 1);
-  assert.strictEqual(q.total(), 11);
-  // 惰性写回确实落库
-  const expiredDoc = h.fake().get('hugs', 'h_expired');
-  assert.strictEqual(expiredDoc.status, 'expired');
+  assert.strictEqual(res.data.anniversary.items.length, 8);
+  // 1 次读，无写；排序 / 剩余天数都在内存里算
+  assert.strictEqual(q.counts.anniversaries, 1);
+  assert.strictEqual(q.ops['anniversaries:doc.update'], undefined);
+  assert.strictEqual(q.total(), 9);
 });
 
 test('查询预算：列表接口每页只多一次数据读（分页不 N+1）', async () => {
@@ -261,10 +258,10 @@ test('查询预算：关系里没有伴侣时少读伴侣相关项（users/safet
   assert.strictEqual(res.ok, true);
   assert.strictEqual(res.data.partner, null);
   assert.deepStrictEqual(q.counts, {
-    users: 1, couples: 1, moods: 1, hugs: 2,
+    users: 1, couples: 1, moods: 1, anniversaries: 1,
     safety_checkins: 1, diaries: 1, wishes: 1,
   });
-  assert.strictEqual(q.total(), 8);
+  assert.strictEqual(q.total(), 7);
 });
 
 test('查询预算：couple 文档丢失自愈只多两次用户读写，不继续查双人集合', async () => {
@@ -313,10 +310,10 @@ test('查询预算：可选区块降级不重试、不额外扫库（mood 失败
   assert.strictEqual(res.ok, true, '单区块失败不影响整页');
   assert.strictEqual(res.data.mood, null, '降级区块按 null 返回');
   assert.strictEqual(res.data.safety.mineToday, true, '其它区块正常');
-  // 降级路径少一次 moods 读、且不因失败重试：9 次操作
+  // 降级路径少一次 moods 读、且不因失败重试：8 次操作
   assert.deepStrictEqual(q.counts, {
-    users: 2, couples: 1, hugs: 2, safety_checkins: 2, diaries: 1, wishes: 1,
+    users: 2, couples: 1, anniversaries: 1, safety_checkins: 2, diaries: 1, wishes: 1,
   });
   assert.strictEqual(q.counts.moods, undefined);
-  assert.strictEqual(q.total(), 9);
+  assert.strictEqual(q.total(), 8);
 });

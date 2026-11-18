@@ -1,0 +1,112 @@
+<view class="page">
+  <view class="intro">
+    <text class="intro__title">你们的日子</text>
+    <text class="intro__sub">「在一起」由开始日期算，不用加；这里记其他要一起记住的日子。</text>
+  </view>
+
+  <view
+    class="add {{canAdd ? '' : 'add--disabled'}}"
+    bindtap="onAdd"
+    aria-role="button"
+    aria-label="添加纪念日"
+    aria-disabled="{{!canAdd}}"
+  >
+    <text class="add__plus">＋</text>
+    <text>添加纪念日</text>
+  </view>
+  <view wx:if="{{!canAdd}}" class="limit-hint">最多记 {{maxCount}} 个，先删一个再加吧</view>
+
+  <view wx:if="{{loading}}" class="hint">正在翻日历…</view>
+
+  <empty-state
+    wx:elif="{{error}}"
+    title="{{error}}"
+    action-text="再试一次"
+    bind:action="onRetry"
+  />
+
+  <block wx:else>
+    <view class="list">
+      <view
+        class="row"
+        wx:for="{{items}}"
+        wx:key="anniversaryId"
+        data-id="{{item.anniversaryId}}"
+        bindtap="onEdit"
+        aria-role="button"
+        aria-label="编辑 {{item.title}}"
+      >
+        <view class="row__main">
+          <text class="row__title">{{item.title}}</text>
+          <text class="row__sub">{{item.dateText}}{{item.metaText ? ' · ' + item.metaText : ''}}</text>
+        </view>
+        <view class="row__right">
+          <text class="row__days {{item.daysText === '就是今天' ? 'is-today' : ''}}">{{item.daysText}}</text>
+          <view
+            class="row__del"
+            data-id="{{item.anniversaryId}}"
+            catchtap="onDelete"
+            aria-role="button"
+            aria-label="删掉 {{item.title}}"
+          >删</view>
+        </view>
+      </view>
+    </view>
+
+    <empty-state
+      wx:if="{{!items.length}}"
+      icon="📅"
+      title="还没有别的纪念日"
+      desc="在一起的日子已经在首页了，这里可以加生日、第一次见面、计划中的那一天"
+    />
+
+    <view wx:if="{{listError}}" class="list-error" bindtap="onRetryList" aria-role="button" aria-label="重新加载纪念日">
+      {{listError}}
+    </view>
+  </block>
+
+  <!-- 新增 / 编辑共用底部弹层（文档 8.3.9 / 8.4） -->
+  <bottom-sheet
+    show="{{formOpen}}"
+    title="{{editing ? '改这个纪念日' : '新的纪念日'}}"
+    mask-closable="{{false}}"
+    bind:close="onCloseForm"
+  >
+    <view class="form">
+      <view class="field">
+        <text class="field__label">叫什么</text>
+        <input
+          class="field__input"
+          value="{{form.title}}"
+          maxlength="{{titleMax}}"
+          placeholder="第一次见面 / 她的生日 / 我们结婚那天"
+          placeholder-class="input-placeholder"
+          bindinput="onTitleInput"
+          aria-label="纪念日名称"
+        />
+      </view>
+
+      <view class="field">
+        <text class="field__label">哪一天</text>
+        <picker
+          mode="date"
+          value="{{form.date}}"
+          start="{{minDate}}"
+          end="{{maxDate}}"
+          bindchange="onDateChange"
+        >
+          <view class="field__picker" aria-role="button" aria-label="选择纪念日日期">
+            {{form.date || '选一天'}}
+          </view>
+        </picker>
+        <text class="field__tip">每年这一天都会重新倒数；还没到的日子也可以先记下来。</text>
+      </view>
+
+      <button
+        class="btn-primary btn-solid form__save"
+        bindtap="onSave"
+        disabled="{{saving}}"
+      >{{saving ? '保存中…' : (editing ? '保存' : '记下来')}}</button>
+    </view>
+  </bottom-sheet>
+</view>

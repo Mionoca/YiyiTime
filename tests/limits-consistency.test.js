@@ -161,6 +161,8 @@ test('文档 6.5 长度限制表与客户端 LIMITS 一致', () => {
     ['日记正文', 'diary', 1],
     ['愿望标题', 'wishTitle', 1],
     ['愿望备注', 'wishNote', 0],
+    ['纪念日标题', 'anniversaryTitle', 1],
+    ['纪念日条数', 'anniversaryCount', 0],
     ['记账备注', 'ledgerNote', 0],
     ['记账金额（分）', 'ledgerAmountMax', 1],
     ['记账笔数', 'ledgerMonthCount', 0],
@@ -180,6 +182,8 @@ test('服务端 handler 的长度上限常量与客户端 LIMITS 一致', () => 
   assert.strictEqual(constantIn(HANDLERS + 'wish.js', 'TITLE_MAX'), LIMITS.wishTitle, 'wish.TITLE_MAX');
   assert.strictEqual(constantIn(HANDLERS + 'wish.js', 'NOTE_MAX'), LIMITS.wishNote, 'wish.NOTE_MAX');
   assert.strictEqual(constantIn(HANDLERS + 'wish.js', 'WISH_MAX'), LIMITS.wishCount, 'wish.WISH_MAX');
+  assert.strictEqual(constantIn(HANDLERS + 'anniversary.js', 'TITLE_MAX'), LIMITS.anniversaryTitle, 'anniversary.TITLE_MAX');
+  assert.strictEqual(constantIn(HANDLERS + 'anniversary.js', 'MAX_COUNT'), LIMITS.anniversaryCount, 'anniversary.MAX_COUNT');
   assert.strictEqual(constantIn(HANDLERS + 'ledger.js', 'NOTE_MAX'), LIMITS.ledgerNote, 'ledger.NOTE_MAX');
   assert.strictEqual(constantIn(HANDLERS + 'ledger.js', 'MONTH_LIMIT'), LIMITS.ledgerMonthCount, 'ledger.MONTH_LIMIT');
   assert.strictEqual(constantIn(HANDLERS + 'ledger.js', 'AMOUNT_MIN'), LIMITS.ledgerAmountMin, 'ledger.AMOUNT_MIN');
@@ -208,7 +212,7 @@ test('输入框 maxlength 全部走数据绑定，昵称不再硬编码 12', () 
   });
   Object.keys(byFile).forEach((rel) => byFile[rel].sort());
 
-  // 整个仓库只有这 6 个文件有 maxlength；新加输入框必须登记（同时接受 limx 与单/双引号，顺序无关）
+  // 整个仓库只有这些文件有 maxlength；新加输入框必须登记（同时接受 limx 与单/双引号，顺序无关）
   const expected = {
     'miniprogram/pages/profile/index.wxml': ['{{nicknameMax}}'],
     'miniprogram/pages/bind/index.wxml': ['6', '{{nicknameMax}}'],
@@ -216,6 +220,7 @@ test('输入框 maxlength 全部走数据绑定，昵称不再硬编码 12', () 
     'miniprogram/pages/safety/index.wxml': ['{{noteMax}}'],
     'miniprogram/pages/wish/index.wxml': ['{{noteMax}}', '{{titleMax}}'],
     'miniprogram/pages/ledger/index.wxml': ['{{amountMaxLength}}', '{{noteMax}}'],
+    'miniprogram/pages/anniversary/index.wxml': ['{{titleMax}}'],
     'miniprogram/components/mood-picker/index.wxml': ['{{noteMax}}'],
   };
   assert.deepStrictEqual(Object.keys(byFile).sort(), Object.keys(expected).sort(), '出现未登记 / 缺少的含 maxlength 的 wxml：' + Object.keys(byFile).join(', '));

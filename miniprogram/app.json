@@ -7,6 +7,7 @@
     "pages/diary/index",
     "pages/wish/index",
     "pages/mood/index",
+    "pages/anniversary/index",
     "pages/ledger/index"
   ],
   "window": {
@@ -27,6 +28,10 @@
       {
         "pagePath": "pages/home/index",
         "text": "今天"
+      },
+      {
+        "pagePath": "pages/ledger/index",
+        "text": "记账本"
       },
       {
         "pagePath": "pages/profile/index",

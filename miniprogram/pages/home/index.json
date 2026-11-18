@@ -6,6 +6,7 @@
   "backgroundColor": "#FFFEF5",
   "usingComponents": {
     "avatar-bubble": "/components/avatar-bubble/index",
+    "anniversary-stack": "/components/anniversary-stack/index",
     "mood-picker": "/components/mood-picker/index",
     "privacy-guard": "/components/privacy-guard/index"
   }

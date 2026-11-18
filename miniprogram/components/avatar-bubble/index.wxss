@@ -128,31 +128,3 @@
   border-width: 4rpx;
 }
 
-/* 对方有 pending 抱抱：心形角标 */
-.hug-badge {
-  position: absolute;
-  right: -8rpx;
-  top: 6rpx;
-  width: 34rpx;
-  height: 34rpx;
-  line-height: 34rpx;
-  text-align: center;
-  border-radius: 50%;
-  background: var(--accent-strong);
-  color: var(--card);
-  font-size: 20rpx;
-  box-shadow: 2rpx 2rpx 0 var(--marker-red);
-  animation: badge-beat 1400ms linear infinite;
-}
-
-@keyframes badge-beat {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.14);
-  }
-  100% {
-    transform: scale(1);
-  }
-}

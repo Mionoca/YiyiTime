@@ -97,10 +97,7 @@
         <text>心情记录</text>
         <text class="list-arrow">›</text>
       </view>
-      <view class="list-item" bindtap="onOpenLedger" aria-role="button" aria-label="记账本">
-        <text>记账本</text>
-        <text class="list-arrow">›</text>
-      </view>
+      <!-- 记账本已移到 tabBar（M12，文档 8.2）：这里不再放重复入口 -->
       <!-- M9 解绑：已绑定才出现；三态文案由服务端 unbind.requestedByMe 决定（文档 8.3.6） -->
       <view
         class="list-item"

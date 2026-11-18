@@ -27,7 +27,13 @@ function baseHome(overrides) {
       mine: { mood: 'sunny', note: '今天很好', updatedAt: NOW },
       partner: { mood: 'rainy', note: '有点累', updatedAt: NOW },
     },
-    hug: { incoming: null, outgoing: null },
+    anniversary: {
+      items: [
+        // 服务端已按剩余天数升序：近的在前
+        { anniversaryId: 'a_1', title: '第一次见面', date: '2023-06-01', nextDate: '2027-06-01', daysLeft: 197, years: 4 },
+        { anniversaryId: 'a_2', title: '她的生日', date: '2019-11-16', nextDate: '2026-11-16', daysLeft: 0, years: 7 },
+      ],
+    },
     safety: { mineToday: true, partnerToday: true, partnerLastAt: NOW },
     diary: { mineWritten: true, partnerWritten: true, partnerUnlocked: false, unlockAt: '' },
     wish: { total: 3, done: 1, previewTitle: '去看海' },
@@ -144,7 +150,7 @@ test('derive: 未绑定只给邀请卡文案，不泄漏对方字段（文档 9.
     couple: null,
     partner: null,
     mood: null,
-    hug: null,
+    anniversary: null,
     safety: null,
     diary: null,
     wish: null,
@@ -205,30 +211,98 @@ test('derive: 只有自己刚创建的邀请码才进分享路径，applied 阶�
   assert.strictEqual(appliedByPartner.shareCode, '');
 });
 
-test('derive: 把 hug.incoming/outgoing 映射进页面 data 并接到 9.4 抱抱状态', () => {
+test('derive: 拼出纪念日堆叠卡，卡 0 永远是「在一起」（文档 9.4）', () => {
   const page = instantiate(config);
-  const incoming = { hugId: 'h2', status: 'pending', createdAt: NOW };
-  const outgoing = { hugId: 'h1', status: 'hugged', respondedAt: NOW };
-  const patch = page.derive(baseHome({ hug: { incoming, outgoing } }));
-  // 抱抱卡直接读这两个字段（wxml 的 hugIncoming/hugOutgoing），必须原样透出
-  assert.deepStrictEqual(patch.hugIncoming, incoming);
-  assert.deepStrictEqual(patch.hugOutgoing, outgoing);
-  assert.strictEqual(patch.hugButtonText, '抱抱 TA');
-  assert.strictEqual(patch.hugButtonDisabled, false);
-  assert.strictEqual(patch.hugHint, 'TA 现在需要抱抱');
+  const patch = page.derive(baseHome());
 
-  const waiting = page.derive(baseHome({
-    hug: { incoming: null, outgoing: Object.assign({}, outgoing, { status: 'pending', respondedAt: null }) },
+  assert.strictEqual(patch.cards.length, 3);
+  assert.deepStrictEqual(patch.cards[0], {
+    key: 'together',
+    kind: 'together',
+    label: '我们的日子',
+    mainText: '第 911 天',
+    subText: '开始于 2024年5月20日',
+    metaText: '周年 · 还有 185 天',
+  });
+  // 自定义纪念日：主文案是剩余天数，副文案是「下一次」的月-日
+  assert.strictEqual(patch.cards[1].label, '第一次见面');
+  assert.strictEqual(patch.cards[1].mainText, '还有 197 天');
+  assert.strictEqual(patch.cards[1].subText, '6月1日');
+  assert.strictEqual(patch.cards[1].metaText, '第 4 个');
+  // daysLeft 为 0 写「就是今天」，不写「还有 0 天」
+  assert.strictEqual(patch.cards[2].mainText, '就是今天');
+  assert.strictEqual(patch.cardCount, 3);
+  assert.strictEqual(patch.cardIndex, 0);
+});
+
+test('derive: 纪念日区块降级为 null / 空数组时只剩「在一起」一张卡（10.3）', () => {
+  const page = instantiate(config);
+  for (const value of [null, { items: [] }, undefined]) {
+    const patch = page.derive(baseHome({ anniversary: value }));
+    assert.strictEqual(patch.cards.length, 1, 'anniversary=' + JSON.stringify(value));
+    assert.strictEqual(patch.cards[0].kind, 'together');
+    assert.strictEqual(patch.cardIndex, 0);
+  }
+});
+
+test('derive: 未绑定时没有堆叠卡（只渲染邀请卡）', () => {
+  const page = instantiate(config);
+  const patch = page.derive(baseHome({ couple: null, partner: null }));
+  assert.deepStrictEqual(patch.cards, []);
+  assert.strictEqual(patch.cardCount, 0);
+  assert.strictEqual(patch.cardIndex, 0);
+});
+
+test('derive: 对方删掉你正在看的那张后，cardIndex 夹回合法范围（不留空白卡）', () => {
+  const page = instantiate(config);
+  page.setData({ cardIndex: 2 });
+  const shrunk = page.derive(baseHome({
+    anniversary: { items: [{ anniversaryId: 'a_1', title: '第一次见面', date: '2023-06-01', nextDate: '2027-06-01', daysLeft: 197, years: 4 }] },
   }));
-  assert.strictEqual(waiting.hugIncoming, null);
-  assert.strictEqual(waiting.hugButtonText, '等 TA 抱抱');
-  assert.strictEqual(waiting.hugButtonDisabled, true);
+  assert.strictEqual(shrunk.cardCount, 2);
+  assert.strictEqual(shrunk.cardIndex, 1, '下标不能超过最后一张');
 
-  // 10.3：hug 整块查询失败降级为 null 时按「没有抱抱」渲染，不能抛错
-  const degraded = page.derive(baseHome({ hug: null }));
-  assert.strictEqual(degraded.hugIncoming, null);
-  assert.strictEqual(degraded.hugOutgoing, null);
-  assert.strictEqual(degraded.hugButtonText, '我需要抱抱');
+  const empty = page.derive(baseHome({ anniversary: null }));
+  assert.strictEqual(empty.cardIndex, 0);
+});
+
+test('derive: 8 个自定义纪念日已满时仍拼出 9 张卡（添加上限由管理页拦，管理入口不消失）', () => {
+  const page = instantiate(config);
+  const items = [];
+  for (let i = 0; i < 8; i += 1) {
+    items.push({ anniversaryId: 'a_' + i, title: '纪念日 ' + i, date: '2020-01-01', nextDate: '2027-01-01', daysLeft: 46, years: 7 });
+  }
+  const patch = page.derive(baseHome({ anniversary: { items } }));
+  assert.strictEqual(patch.cardCount, 9);
+});
+
+test('onCardChange: 只接受合法下标，越界/重复/非法值都不改（文档 9.4）', () => {
+  const page = instantiate(config);
+  page.setData(page.derive(baseHome()));
+  const calls = [];
+  const original = page.setData.bind(page);
+  page.setData = (patch) => { calls.push(patch); original(patch); };
+
+  page.onCardChange({ detail: { index: 2 } });
+  assert.strictEqual(page.data.cardIndex, 2);
+
+  page.onCardChange({ detail: { index: 2 } }); // 同一个下标不重复 setData
+  page.onCardChange({ detail: { index: 9 } }); // 越界
+  page.onCardChange({ detail: { index: -1 } });
+  page.onCardChange({ detail: {} });
+  page.onCardChange({});
+  assert.strictEqual(page.data.cardIndex, 2);
+  assert.strictEqual(calls.length, 1);
+});
+
+test('onCardEdit: 只有「在一起」那张卡的「改日子」会打开浮层', () => {
+  const page = instantiate(config);
+  const home = baseHome();
+  page.setData(Object.assign({ home }, page.derive(home)));
+  page.onCardEdit({ detail: { kind: 'custom' } });
+  assert.strictEqual(page.data.showDaysSheet, false);
+  page.onCardEdit({ detail: { kind: 'together' } });
+  assert.strictEqual(page.data.showDaysSheet, true);
 });
 
 test('derive: 服务端没给纪念日时兜底为「开始那天就是纪念日」', () => {
@@ -247,115 +321,6 @@ test('derive: todayKey 缺省时 maxStartDate 退回本机日期（13.5）', () 
   // 正常路径服务端一定给 todayKey；取不到时才退回本机（东八区）日期。
   // 这里读真实时钟，跨东八区 00:00 的毫秒级窗口理论上会偶发红，可接受。
   assert.strictEqual(patch.maxStartDate, timeUtil.todayKey());
-});
-
-test('deriveHugState: 按文档 9.4 的抱抱状态矩阵给按钮文案与提示', () => {
-  const page = instantiate(config);
-  const base = { hugIncoming: null, hugOutgoing: null, daysText: '第 911 天' };
-  assert.deepStrictEqual(page.deriveHugState(base), {
-    hugButtonText: '我需要抱抱',
-    hugButtonDisabled: false,
-    hugHint: '第 911 天 · 一起的日子还在继续',
-  });
-  assert.deepStrictEqual(page.deriveHugState(Object.assign({}, base, {
-    hugOutgoing: { hugId: 'h1', status: 'pending' },
-  })), {
-    hugButtonText: '等 TA 抱抱',
-    hugButtonDisabled: true,
-    hugHint: '抱抱已经送出去啦，等 TA 回应',
-  });
-  assert.deepStrictEqual(page.deriveHugState(Object.assign({}, base, {
-    hugOutgoing: { hugId: 'h1', status: 'hugged' },
-  })), {
-    hugButtonText: '再抱一次',
-    hugButtonDisabled: false,
-    hugHint: '第 911 天 · TA 抱了你',
-  });
-  assert.deepStrictEqual(page.deriveHugState(Object.assign({}, base, {
-    hugOutgoing: { hugId: 'h1', status: 'expired' },
-  })), {
-    hugButtonText: '我需要抱抱',
-    hugButtonDisabled: false,
-    hugHint: '上次抱抱过期了，再抱一次吧',
-  });
-  // 对方需要抱抱时优先展示「抱抱 TA」，即使我这边还有一个 pending
-  assert.deepStrictEqual(page.deriveHugState(Object.assign({}, base, {
-    hugIncoming: { hugId: 'h2', status: 'pending' },
-    hugOutgoing: { hugId: 'h1', status: 'pending' },
-  })), {
-    hugButtonText: '抱抱 TA',
-    hugButtonDisabled: false,
-    hugHint: 'TA 现在需要抱抱',
-  });
-  // 未知状态按「可以再发」处理
-  assert.strictEqual(page.deriveHugState(Object.assign({}, base, {
-    hugOutgoing: { hugId: 'h1', status: 'cancelled' },
-  })).hugButtonText, '我需要抱抱');
-  // 未绑定时没有天数，提示不拼「第 N 天」
-  assert.strictEqual(page.deriveHugState({ hugIncoming: null, hugOutgoing: null, daysText: '' }).hugHint, '一起的日子还在继续');
-});
-
-test('maybeCelebrate: 同一个 hugId 只播一次心形，换 hugId 才再播', () => {
-  const store = {};
-  installWx({
-    getStorageSync: (key) => store[key],
-    setStorageSync: (key, value) => { store[key] = value; },
-  });
-  const page = instantiate(config);
-  let plays = 0;
-  page.playHugCelebrate = () => { plays += 1; };
-  const home = { hug: { outgoing: { hugId: 'h_abc', status: 'hugged' } } };
-  page.maybeCelebrate(home);
-  assert.strictEqual(plays, 1);
-  page.maybeCelebrate(home);
-  assert.strictEqual(plays, 1);
-
-  // 新的页面实例也能从 storage 知道已经播过
-  const page2 = instantiate(config);
-  page2.playHugCelebrate = () => { plays += 1; };
-  page2.maybeCelebrate(home);
-  assert.strictEqual(plays, 1);
-
-  page2.maybeCelebrate({ hug: { outgoing: { hugId: 'h_new', status: 'hugged' } } });
-  assert.strictEqual(plays, 2);
-});
-
-test('maybeCelebrate: 对方没回应 / 没有 hugId 时不播', () => {
-  installWx({ getStorageSync: () => [], setStorageSync: () => {} });
-  const page = instantiate(config);
-  let plays = 0;
-  page.playHugCelebrate = () => { plays += 1; };
-  page.maybeCelebrate(null);
-  page.maybeCelebrate({});
-  page.maybeCelebrate({ hug: { outgoing: { hugId: 'h1', status: 'pending' } } });
-  page.maybeCelebrate({ hug: { outgoing: { status: 'hugged' } } });
-  assert.strictEqual(plays, 0);
-});
-
-test('markHugSeen: storage 只保留最近 20 个 hugId', () => {
-  const store = {};
-  installWx({
-    getStorageSync: (key) => store[key],
-    setStorageSync: (key, value) => { store[key] = value; },
-  });
-  const page = instantiate(config);
-  for (let i = 1; i <= 25; i += 1) page.markHugSeen('h' + i);
-  const seen = store.hug_seen_ids;
-  assert.strictEqual(seen.length, 20);
-  assert.strictEqual(seen[0], 'h6');
-  assert.strictEqual(seen[19], 'h25');
-  assert.strictEqual(page.hasSeenHug('h25'), true);
-});
-
-test('hasSeenHug: storage 不可用时用内存兜底，不会每次刷新重播', () => {
-  installWx({
-    getStorageSync() { throw new Error('storage unavailable'); },
-    setStorageSync() { throw new Error('storage unavailable'); },
-  });
-  const page = instantiate(config);
-  assert.strictEqual(page.hasSeenHug('h1'), false);
-  page.markHugSeen('h1');
-  assert.strictEqual(page.hasSeenHug('h1'), true);
 });
 
 test('分享：已绑定分享小屋，未绑定分享邀请（带码时直达绑定页），朋友圈不带路径', () => {
@@ -399,8 +364,8 @@ test('derive: 服务端把脏 startDate 降级为 null 时，天数/开始日/�
   assert.strictEqual(patch.anniversaryText, '');
   // startDate 为 null 时选择器回显也是 null（wxml 的 picker value 接受 null/空）
   assert.strictEqual(patch.startDateSelect, null);
-  assert.strictEqual(String(patch.hugHint || '').includes('null'), false);
   assert.strictEqual(String(patch.daysText || '').includes('null'), false);
+  assert.strictEqual(String(patch.cards[0].metaText || '').includes('null'), false);
 });
 
 test('derive: 只有 startDate 没有纪念日时仍提示「开始那天就是纪念日」', () => {

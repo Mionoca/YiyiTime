@@ -92,6 +92,7 @@ function contrast(a, b) {
 
 const tokens = parseTokens(read('miniprogram/styles/tokens.wxss'));
 const homeRules = parseRules(read('miniprogram/pages/home/index.wxss'));
+const stackRules = parseRules(read('miniprogram/components/anniversary-stack/index.wxss'));
 
 /** 把 var(--x) 还原成色值；不是变量就原样返回 */
 function colorOf(value) {
@@ -105,19 +106,40 @@ function ratioOn(selector, bgHex) {
   return contrast(colorOf(d.color), bgHex);
 }
 
+/**
+ * 组件样式是隔离的，取不到页面 CSS 变量，颜色写成 var(--x, 兜底值)：
+ * 这里把兜底值取出来算对比度（真实的 --muted / --accent-ink 与兜底一致）。
+ */
+function componentColorOf(value) {
+  const raw = String(value || '').trim();
+  const fallback = /var\(\s*--[\w-]+\s*,\s*(#[0-9a-fA-F]{6})\s*\)/.exec(raw);
+  if (fallback) return fallback[1];
+  return colorOf(raw);
+}
+
+function componentRatio(selector, bgHex) {
+  const d = findRule(stackRules, selector);
+  return contrast(componentColorOf(d.color), bgHex);
+}
+
 test('对比度：首页卡片里的说明文字在纸上 ≥4.5:1（文档 8.9）', () => {
   // 一张便签卡是一片纸：卡片底色与页面底色同色（--card = --bg = #FFFEF5）
   assert.strictEqual(tokens.card, tokens.bg, '便签卡与纸同色是这套风格的前提');
-  for (const selector of ['.days-meta', '.mood-desc', '.grid__sub', '.invite-tip', '.hug-hint']) {
+  for (const selector of ['.mood-desc', '.grid__sub', '.invite-tip']) {
     const ratio = ratioOn(selector, tokens.card);
     assert.ok(ratio >= 4.5, selector + ' 对比度 ' + ratio.toFixed(2) + ':1 低于 4.5:1');
   }
 });
 
-test('对比度：纪念日小标签（浅色底 + 深色字）≥4.5:1（文档 8.9）', () => {
-  const d = findRule(homeRules, '.days-anniv');
-  const ratio = contrast(colorOf(d.color), colorOf(d['background-color']));
-  assert.ok(ratio >= 4.5, '.days-anniv 对比度 ' + ratio.toFixed(2) + ':1 低于 4.5:1');
+test('对比度：纪念日卡里的说明与脚注小标签 ≥4.5:1（文档 8.9 / 9.4）', () => {
+  // 卡片底色与纸同色（--card = --bg = #FFFEF5）
+  for (const selector of ['.stack__sub', '.stack__label']) {
+    const ratio = componentRatio(selector, tokens.card);
+    assert.ok(ratio >= 4.5, selector + ' 对比度 ' + ratio.toFixed(2) + ':1 低于 4.5:1');
+  }
+  const meta = findRule(stackRules, '.stack__meta');
+  const ratio = contrast(componentColorOf(meta.color), componentColorOf(meta['background-color']));
+  assert.ok(ratio >= 4.5, '.stack__meta 对比度 ' + ratio.toFixed(2) + ':1 低于 4.5:1');
 });
 
 test('对比度：刷新失败横幅的文字 ≥4.5:1（文档 9.12）', () => {
@@ -148,22 +170,32 @@ test('对比度：马克笔色只做装饰，不做正文色（文档 8.7）', (
     assert.ok(ratio < 4.5, '--' + name + ' 若已能当正文色（' + ratio.toFixed(2) + ':1），要重新审视 8.7 的用色规则');
   }
   // 正文/说明文字必须是 ink / muted / accent-ink，不能直接写 var(--marker-*)。
-  // 例外：抱抱心形是装饰符号（不是可读文案），允许用马克笔红。
-  const DECORATIVE = ['.hug-heart-float'];
+  // 例外（装饰符号、不是可读文案）按选择器列在这里。
+  const DECORATIVE = [];
   const offenders = parseRules(read('miniprogram/pages/home/index.wxss'))
     .filter((rule) => /color\s*:\s*var\(--marker-/.test(rule.body) && DECORATIVE.indexOf(rule.selector) === -1)
     .map((rule) => rule.selector);
   assert.deepStrictEqual(offenders, [], '首页正文色不能直接用马克笔色：' + offenders.join('、'));
 });
 
-test('动画：心形上浮的 JS 清理定时器不短于 CSS 动画时长（文档 9.7）', () => {
-  const { animation } = findRule(homeRules, '.hug-heart-float');
-  const cssMs = Number((String(animation).match(/(\d+)ms/) || [])[1]);
-  assert.ok(cssMs > 0, '.hug-heart-float 的 animation 应写明毫秒时长');
-  const js = read('miniprogram/pages/home/index.js');
-  const jsMs = Number((js.match(/HUG_FLOAT_MS\s*=\s*(\d+)/) || [])[1]);
-  assert.ok(jsMs > 0, '首页 js 里应有 HUG_FLOAT_MS 常量');
-  assert.ok(jsMs >= cssMs, 'JS 清理时间 ' + jsMs + 'ms 短于 CSS 动画 ' + cssMs + 'ms，心形会被截断');
+test('动画：纪念日堆叠切换 400ms 缓出，只过渡 transform / opacity（文档 9.4 / 9.7）', () => {
+  const card = findRule(stackRules, '.stack__card');
+  const transition = String(card.transition || '');
+  assert.match(transition, /transform 400ms/, '切换必须过渡 transform');
+  assert.match(transition, /opacity 400ms/, '切换必须过渡 opacity');
+  assert.match(transition, /cubic-bezier\(0\.22, 1, 0\.36, 1\)/, '用 9.4 指定的缓出曲线');
+  // 超过 500ms 会觉得卡，低于 300ms 看不出前后关系
+  for (const ms of transition.match(/(\d+)ms/g) || []) {
+    const n = Number(ms.replace('ms', ''));
+    assert.ok(n >= 300 && n <= 500, '过渡时长 ' + n + 'ms 超出 300–500ms 的区间');
+  }
+  assert.ok(!/(^|[^-])(top|left|right|bottom|width|height|margin)\s/.test(transition),
+    '切换只能动 transform / opacity，不能动布局属性（8.9）');
+
+  // 指示器拉长用 scaleX，不改 width（改宽度会重排）
+  const dot = findRule(stackRules, '.stack__dot');
+  assert.match(String(dot.transform), /scaleX/, '指示器用 scaleX 拉长');
+  assert.match(String(dot.transition), /300ms/, '指示器过渡 300ms');
 });
 
 test('对比度：心情气泡四态在淡底上 ≥4.5:1（文档 9.5）', () => {

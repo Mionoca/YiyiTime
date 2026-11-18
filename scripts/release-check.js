@@ -366,7 +366,7 @@ function checkStructure(root, lines, warnings) {
   if (!badComponent && !badTag) lines.push({ level: 'PASS', msg: '自定义组件文件齐全且按页面/组件作用域注册（app.json 全局注册也放行）' });
 
   // 3) 云函数只访问预期集合（新增集合要先去控制台创建 + 配权限 + 建索引）
-  const expected = ['users', 'couples', 'bind_invites', 'moods', 'hugs', 'safety_checkins', 'diaries', 'wishes', 'ledger_entries'];
+  const expected = ['users', 'couples', 'bind_invites', 'moods', 'anniversaries', 'safety_checkins', 'diaries', 'wishes', 'ledger_entries'];
   const used = new Set();
   let badCollection = 0;
   for (const rel of files) {

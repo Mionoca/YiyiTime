@@ -46,6 +46,7 @@ function methodBody(src, name) {
 
 test('pull-down: 非自定义导航的子页都开启了 enablePullDownRefresh（文档 L637）', () => {
   assert.deepStrictEqual(subPages().slice().sort(), [
+    'pages/anniversary/index',
     'pages/bind/index',
     'pages/diary/index',
     'pages/home/index',

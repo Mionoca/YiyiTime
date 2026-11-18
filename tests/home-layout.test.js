@@ -56,14 +56,18 @@ function walk(dir, out) {
 const ALL_WXSS = walk(MINI).filter((f) => f.endsWith('.wxss'));
 const relOf = (f) => path.relative(MINI, f).split(path.sep).join('/');
 
-test('8.2 tabBar：2 个 tab（今天 / 我的），顺序与 constants.TAB_ROUTES 一致', () => {
+test('8.2 tabBar：3 个 tab（今天 / 记账本 / 我的），顺序与 constants.TAB_ROUTES 一致', () => {
   const tabBar = APP_JSON.tabBar;
   assert.ok(tabBar, 'app.json 缺 tabBar');
   assert.strictEqual(tabBar.custom, true, '外观由 custom-tab-bar 组件渲染，必须 custom: true');
-  assert.strictEqual(tabBar.list.length, 2, '只有「今天」「我的」两个 tab，其余功能从首页卡片进');
+  assert.strictEqual(tabBar.list.length, 3, '今天 / 记账本 / 我的 三个 tab，其余功能从页面内入口进');
   const list = tabBar.list.map((item) => '/' + item.pagePath);
   assert.deepStrictEqual(list, constants.TAB_ROUTES, 'tabBar.list 与 TAB_ROUTES 顺序不一致');
-  assert.deepStrictEqual(constants.TAB_ROUTES, ['/pages/home/index', '/pages/profile/index']);
+  assert.deepStrictEqual(constants.TAB_ROUTES, [
+    '/pages/home/index',
+    '/pages/ledger/index',
+    '/pages/profile/index',
+  ]);
   for (const item of tabBar.list) {
     assert.ok(item.text && item.text.length <= 4, item.pagePath + ' 的 tab 文案要短（≤4 字）');
     assert.ok(APP_JSON.pages.indexOf(item.pagePath) >= 0, item.pagePath + ' 未在 pages 注册');
@@ -71,8 +75,8 @@ test('8.2 tabBar：2 个 tab（今天 / 我的），顺序与 constants.TAB_ROUT
     const json = JSON.parse(read(item.pagePath + '.json'));
     assert.notStrictEqual(json.navigationStyle, 'custom', item.pagePath + ' 不该再用自定义导航');
   }
-  // 日记 / 愿望 / 心情 / 报平安都退成普通页：不在 tabBar 里，也不在 TAB_ROUTES 里
-  for (const page of ['diary', 'wish', 'mood', 'safety']) {
+  // 日记 / 愿望 / 心情 / 报平安 / 纪念日管理都是普通页：不在 tabBar 里，也不在 TAB_ROUTES 里
+  for (const page of ['diary', 'wish', 'mood', 'safety', 'anniversary']) {
     assert.strictEqual(constants.isTabRoute('/pages/' + page + '/index'), false, page + ' 不该再是 tab 页');
     assert.strictEqual(list.indexOf('/pages/' + page + '/index'), -1, page + ' 还留在 tabBar.list 里');
   }
@@ -168,13 +172,12 @@ test('8.7 页面卡片换成便签：日记/愿望/报平安/我的都走虚线 
   }
 });
 
-test('9.2 首页：三张卡 + 四个入口，且不再有场景物件', () => {
+test('9.2 首页：纪念日堆叠 + 心情卡 + 四个入口，且不再有场景物件', () => {
   for (const gone of ['class="scene', 'class="lamp', 'class="fridge', 'class="sofa', 'class="door ', 'envelope']) {
     assert.strictEqual(HOME_WXML.includes(gone), false, '场景残留：' + gone + '（9.1 已废弃物件隐喻）');
   }
   const expects = [
-    ['class="dk-card days-card', '日子卡'],
-    ['class="dk-card hug-card', '抱抱卡'],
+    ['<anniversary-stack', '纪念日堆叠卡'],
     ['class="dk-card mood-card', '心情卡'],
     ['bindtap="onTapDiary"', '写日记入口'],
     ['bindtap="onTapWish"', '愿望清单入口'],
@@ -188,10 +191,14 @@ test('9.2 首页：三张卡 + 四个入口，且不再有场景物件', () => {
   assert.ok(HOME_WXML.includes('{{diarySub}}'), '日记入口缺状态摘要');
   assert.ok(HOME_WXML.includes('{{wishSub}}'), '愿望入口缺状态摘要');
   assert.ok(HOME_WXML.includes('{{safetySub}}'), '报平安入口缺状态摘要');
-  // 旋转卡最多两张（9.2）；邀请卡与日子卡互斥（未绑定 / 已绑定），不会同时出现
+  // 抱抱卡与心形动画已经整块下线（M12 / 15.3）
+  for (const gone of ['hug-card', 'hugHint', 'hug-heart', 'onTapHug']) {
+    assert.strictEqual(HOME_WXML.includes(gone), false, '抱抱残留：' + gone);
+  }
+  // 旋转卡最多一张：堆叠里的当前卡 -1deg；邀请卡与堆叠互斥（未绑定 / 已绑定）
   const visible = HOME_WXML.replace(/<view class="dk-card invite-card[\s\S]*?<\/view>\s*<\/view>/, '');
   const tilts = (visible.match(/dk-card--tilt-/g) || []).length;
-  assert.ok(tilts <= 2, '同屏旋转卡超过 2 张会让整页歪斜，实际 ' + tilts);
+  assert.ok(tilts <= 1, '同屏旋转卡超过 1 张会让整页歪斜，实际 ' + tilts);
 });
 
 test('9.3 首页可点区域都有 aria-role 与 aria-label', () => {
