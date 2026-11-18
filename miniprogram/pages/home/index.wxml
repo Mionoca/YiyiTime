@@ -43,6 +43,55 @@
       <text class="unbind-bar__btn">去看看 ›</text>
     </view>
 
+    <!-- 0.5 暂停便签（M11 / 文档 9.2）：条件卡，平时不存在；牛皮纸底 + 红硬阴影，不用胶带也不旋转 -->
+    <view
+      class="pause-note card-gap {{pauseState === 'ended' ? 'pause-note--ended' : ''}}"
+      wx:if="{{home.couple && pauseState}}"
+      aria-role="alert"
+      aria-label="{{pauseState === 'active' ? '先停一下，' + pauseRemainText : '可以回来了'}}"
+    >
+      <text class="dk-label">{{pauseState === 'active' ? '今天先停一下' : '可以回来了'}}</text>
+      <text class="pause-note__title">{{pauseState === 'active' ? '我们先停一下' : '缓好了再说话'}}</text>
+
+      <block wx:if="{{pauseState === 'active'}}">
+        <text class="pause-note__meta">{{pauseByMe ? '你按的暂停' : pauseByName + ' 按的暂停'}} · {{pauseRemainText}}</text>
+        <view
+          class="dk-link pause-note__action"
+          wx:if="{{pauseByMe && !pauseSaving}}"
+          bindtap="onTapPauseEnd"
+          aria-role="button"
+          aria-label="我缓好了，提前结束暂停"
+        >我缓好了</view>
+      </block>
+
+      <block wx:else>
+        <text class="pause-note__meta">到点了。选一句，让这件事过去</text>
+        <view class="pause-choices">
+          <view
+            class="pause-choice"
+            data-choice="hurry"
+            bindtap="onTapPauseChoose"
+            aria-role="button"
+            aria-label="我刚才有点急"
+          >我刚才有点急</view>
+          <view
+            class="pause-choice"
+            data-choice="later"
+            bindtap="onTapPauseChoose"
+            aria-role="button"
+            aria-label="晚点再说"
+          >晚点再说</view>
+          <view
+            class="pause-choice"
+            data-choice="hug"
+            bindtap="onTapPauseChoose"
+            aria-role="button"
+            aria-label="抱一下"
+          >抱一下</view>
+        </view>
+      </block>
+    </view>
+
     <!-- 未绑定 / 邀请中：只留一张邀请卡，其他卡片进去也是空态（文档 9.12） -->
     <view class="dk-card invite-card dk-card--tilt-l" wx:if="{{!home.couple}}">
       <view class="dk-tape"></view>
@@ -90,6 +139,18 @@
           <text class="mood-desc {{moodPartner ? '' : 'mood-desc--empty'}}">{{moodPartnerText}}</text>
         </view>
       </view>
+    </view>
+
+    <!-- 先停一下入口（M11 / 文档 9.3）：心情卡下方一行文字链，全 app 唯一入口；
+         已经在暂停里（便签在顶上）时不再出现，避免同一件事两个入口 -->
+    <view
+      class="pause-entry"
+      wx:if="{{home.couple && !pauseState}}"
+      bindtap="onTapPauseStart"
+      aria-role="button"
+      aria-label="先停一下"
+    >
+      <text class="pause-entry__text">先停一下 · 给彼此一点时间</text>
     </view>
 
     <!-- 4 四个入口（文档 9.2）：动词短语 + 一行状态，不做物件隐喻 -->

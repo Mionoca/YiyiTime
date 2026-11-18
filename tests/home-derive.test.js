@@ -376,3 +376,58 @@ test('derive: 只有 startDate 没有纪念日时仍提示「开始那天就是�
   assert.strictEqual(patch.daysText, '第 1 天');
   assert.strictEqual(patch.anniversaryText, '开始那天就是纪念日');
 });
+
+test('derive: 暂停便签三态——active 有剩余分钟、ended 翻面、无暂停全空（M11 / 文档 7.17）', () => {
+  const page = instantiate(config);
+  const active = page.derive(baseHome({
+    pause: {
+      pauseId: 'p_1', byMe: false, byName: '阿安', durationMin: 30, status: 'active',
+      startedAt: '2026-11-16T06:10:00.000Z', endsAt: '2026-11-16T06:40:00.000Z', endChoice: null,
+    },
+  }));
+  assert.strictEqual(active.pauseState, 'active');
+  assert.strictEqual(active.pauseByMe, false);
+  assert.strictEqual(active.pauseByName, '阿安');
+  // serverNow 14:30 → endsAt 14:40，还剩 10 分钟
+  assert.strictEqual(active.pauseRemainText, '还有 10 分钟');
+
+  const ended = page.derive(baseHome({
+    pause: {
+      pauseId: 'p_1', byMe: true, byName: '小怡', durationMin: 30, status: 'ended',
+      startedAt: '2026-11-16T06:10:00.000Z', endsAt: '2026-11-16T06:40:00.000Z', endChoice: null,
+    },
+  }));
+  assert.strictEqual(ended.pauseState, 'ended');
+  assert.strictEqual(ended.pauseByMe, true);
+  assert.strictEqual(ended.pauseRemainText, '', '翻面后不再显示倒计时');
+
+  const none = page.derive(baseHome({ pause: null }));
+  assert.strictEqual(none.pauseState, '');
+  assert.strictEqual(none.pauseByName, '');
+});
+
+test('derive: 剩余不到 1 分钟说「马上就到点了」，未知状态不渲染便签（M11）', () => {
+  const page = instantiate(config);
+  const soon = page.derive(baseHome({
+    pause: {
+      pauseId: 'p_1', byMe: true, byName: '小怡', durationMin: 10, status: 'active',
+      startedAt: '2026-11-16T06:29:30.000Z', endsAt: '2026-11-16T06:30:20.000Z', endChoice: null,
+    },
+  }));
+  assert.strictEqual(soon.pauseRemainText, '还有 1 分钟', '向上取整到分钟');
+
+  const closed = page.derive(baseHome({
+    pause: {
+      pauseId: 'p_1', byMe: true, byName: '小怡', durationMin: 10, status: 'closed',
+      startedAt: NOW, endsAt: NOW, endChoice: 'later',
+    },
+  }));
+  assert.strictEqual(closed.pauseState, '', 'closed 等于不存在，不能留残影');
+
+  // 未绑定时即使服务端误带 pause 也不渲染（文档 9.2：未绑定不显示便签）
+  const unbound = page.derive(baseHome({
+    couple: null,
+    pause: { pauseId: 'p_1', byMe: false, byName: 'TA', status: 'active', endsAt: NOW },
+  }));
+  assert.strictEqual(unbound.pauseState, '');
+});
