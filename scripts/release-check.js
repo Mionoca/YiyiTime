@@ -1072,7 +1072,8 @@ function runChecks(root) {
   lines.push({ level: 'TODO', msg: '微信公众平台确认：用户隐私保护指引（头像/昵称）已声明' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 的定时触发器 reminder-tick 已生效（config.json 的 triggers 随部署上传）' });
   lines.push({ level: 'TODO', msg: '云函数环境变量确认：YIYI_REMINDER_TEMPLATE_ID 已配订阅消息模板 ID（未配时「我的」页提醒开关是禁用态）' });
-  lines.push({ level: 'TODO', msg: '双人真机按 docs/M6-真机验收与发布.md 跑 F1–F12，并导出一次数据库备份' });
+  lines.push({ level: 'TODO', msg: '云函数环境变量确认：YIYI_GROWTH_TEMPLATE_ID 已配任务提醒模板 ID（可选；未配时成长任务提醒静默降级、页面不弹授权）' });
+  lines.push({ level: 'TODO', msg: '双人真机按 docs/M6-真机验收与发布.md 跑 F1–F14，并导出一次数据库备份' });
 
   const failed = lines.filter((l) => l.level === 'FAIL');
   return { ok: failed.length === 0, lines, warnings };

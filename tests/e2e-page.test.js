@@ -657,3 +657,132 @@ test('解绑：A 在我的页申请，B 首页出现提示，B 确认后双方�
   profileA.onUnload();
   profileB.onUnload();
 });
+
+// ── M11：先停一下（F13）与一起变好（F14）跨层校验 ─────────────────────────
+
+/**
+ * 页面方法里的 api.call 走的是全局 currentOpenid，所以**每次操作前都要显式切换身份**
+ * （否则 A 的页面会以 B 的身份发请求，pause.end 会拿到 PAUSE_NOT_OWNER）。
+ * 页面注册到 t.after 里统一 onUnload，避免失败时首页倒计时定时器把进程挂住。
+ */
+function trackPage(t, page) {
+  t.after(() => { try { page.onUnload(); } catch (err) { /* 只为清理定时器 */ } });
+  return page;
+}
+
+test('先停一下：A 按暂停后双方首页都出现便签，A 提前结束后 B 选和好话，卡片消失', async (t) => {
+  setup();
+  await seedBound();
+
+  // A 按 30 分钟（页面入口是 ActionSheet，这里直接调 startPause，等价于选完 30 分钟）
+  currentOpenid = A;
+  const pageA = trackPage(t, await openHome(A));
+  await pageA.startPause(30);
+  await waitFor(() => pageA.data.pauseState === 'active', 'A 首页出现便签');
+  assert.strictEqual(pageA.data.pauseByMe, true, '发起方看到「我缓好了」');
+
+  // B 打开首页：同一条暂停，视角是「TA 按的」
+  const pageB = trackPage(t, await openHome(B));
+  assert.strictEqual(pageB.data.pauseState, 'active');
+  assert.strictEqual(pageB.data.pauseByMe, false);
+  assert.strictEqual(pageB.data.pauseByName, '小怡');
+  assert.ok(/还有 \d+ 分钟/.test(pageB.data.pauseRemainText), '要有倒计时文案');
+
+  // A 提前结束 → 翻面成和好卡（切回 A 的身份再操作）
+  currentOpenid = A;
+  await pageA.onTapPauseEnd();
+  assert.strictEqual(pageA.data.pauseState, 'ended', '发起方结束后立刻翻面');
+
+  const pageB2 = trackPage(t, await openHome(B));
+  assert.strictEqual(pageB2.data.pauseState, 'ended', '双方都看到和好卡');
+
+  // B 选一句 → 双方便签消失
+  currentOpenid = B;
+  await pageB2.onTapPauseChoose({ currentTarget: { dataset: { choice: 'later' } } });
+  assert.strictEqual(pageB2.data.pauseState, '', '选完本端立刻收起');
+
+  const pageA2 = trackPage(t, await openHome(A));
+  assert.strictEqual(pageA2.data.pauseState, '', 'closed 之后对方也看不到了（等于不存在）');
+});
+
+test('一起变好：A 起草 → B 认领 → A 标记完成 → 双方写收获后自动进成长日志', async (t) => {
+  setup();
+  await seedBound();
+
+  // A 起草
+  currentOpenid = A;
+  const pageA = openPage('miniprogram/pages/growth/index.js');
+  pageA.onLoad();
+  await waitFor(() => !pageA.data.loading, 'A 任务池加载');
+  assert.deepStrictEqual(pageA.data.items, []);
+
+  pageA.onAdd();
+  pageA.onFormInput({ currentTarget: { dataset: { field: 'title' } }, detail: { value: '一起背完六级词汇' } });
+  pageA.onPickCategory({ currentTarget: { dataset: { key: 'learn' } } });
+  pageA.onFormInput({ currentTarget: { dataset: { field: 'myPart' } }, detail: { value: '每天中午 30 个' } });
+  pageA.onFormInput({ currentTarget: { dataset: { field: 'partnerPart' } }, detail: { value: '晚上互相抽 20 个' } });
+  await pageA.onSubmit();
+  await waitFor(() => pageA.data.items.length === 1, '起草后列表出现任务');
+  const created = pageA.data.items[0];
+  assert.strictEqual(created.status, 'confirming');
+  assert.strictEqual(created.createdByMe, true);
+  assert.strictEqual(created.statusText, '等 TA 认领');
+  assert.strictEqual(created.canConfirm, false, '自己起草的不能自己认领');
+
+  // B 的任务池：同一条，视角相反
+  currentOpenid = B;
+  const pageB = openPage('miniprogram/pages/growth/index.js');
+  pageB.onLoad();
+  await waitFor(() => !pageB.data.loading, 'B 任务池加载');
+  const seen = pageB.data.items[0];
+  assert.strictEqual(seen.createdByMe, false);
+  assert.strictEqual(seen.myPart, '晚上互相抽 20 个', '服务端视角映射：B 的「我的」是 A 的 partnerPart');
+  assert.strictEqual(seen.canConfirm, true);
+
+  await pageB.onConfirm({ detail: { task: seen } });
+  await waitFor(() => pageB.data.items[0].status === 'active', 'B 认领后变进行中');
+
+  // A 刷新看到进行中，标记完成
+  currentOpenid = A;
+  await pageA.load(true, true);
+  assert.strictEqual(pageA.data.items[0].status, 'active');
+  await pageA.onDone({ detail: { task: pageA.data.items[0] } });
+  await waitFor(() => pageA.data.items[0].status === 'harvesting', 'A 标记完成');
+
+  // A 写收获 → 还不归档
+  pageA.onHarvest({ detail: { task: pageA.data.items[0] } });
+  pageA.onTextInput({ detail: { value: '背完了，最后三天在赶' } });
+  await pageA.onSubmitText();
+  await waitFor(() => pageA.data.items[0].myHarvestWritten === true, 'A 的收获落库');
+
+  // B 写收获 → 自动归档
+  currentOpenid = B;
+  await pageB.load(true, true);
+  assert.strictEqual(pageB.data.items[0].status, 'harvesting');
+  assert.strictEqual(pageB.data.items[0].myHarvestWritten, false);
+  pageB.onHarvest({ detail: { task: pageB.data.items[0] } });
+  pageB.onTextInput({ detail: { value: '抽单词抽到吵架又和好' } });
+  await pageB.onSubmitText();
+  await waitFor(() => pageB.data.items.length === 0, '归档后任务池清空');
+
+  // 成长日志：双方都能看到两段收获
+  pageB.onSwitchSeg({ currentTarget: { dataset: { seg: 'log' } } });
+  await waitFor(() => pageB.data.logGroups.length === 1, 'B 成长日志出现一条');
+  const entryB = pageB.data.logGroups[0].items[0];
+  assert.strictEqual(entryB.chipText, '一起完成');
+  assert.strictEqual(entryB.myText, '抽单词抽到吵架又和好');
+  assert.strictEqual(entryB.partnerText, '背完了，最后三天在赶');
+
+  currentOpenid = A;
+  pageA.onSwitchSeg({ currentTarget: { dataset: { seg: 'log' } } });
+  await waitFor(() => pageA.data.logGroups.length === 1, 'A 成长日志出现一条');
+  assert.strictEqual(pageA.data.logGroups[0].items[0].myText, '背完了，最后三天在赶');
+  assert.strictEqual(pageA.data.logGroups[0].items[0].partnerText, '抽单词抽到吵架又和好');
+
+  // 归档的删不掉（服务端兜底）
+  const res = await h.callAs(A, 'growth.remove', { taskId: entryB.taskId });
+  assert.strictEqual(res.code, 'GROWTH_STATE_INVALID');
+
+  pageA.onUnload();
+  pageB.onUnload();
+});
