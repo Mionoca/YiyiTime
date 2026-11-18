@@ -48,7 +48,7 @@ YiyiTime/
 ├─ scripts/
 │  ├─ check-secrets.js              # 推送前扫描环境 ID / 密钥
 │  └─ release-check.js              # M6 静态预检（页面/组件路径与作用域/隐私接线/敏感日志/密钥/部署配置/图片资源与包体/未处理 Promise/客户端云访问边界）
-└─ docs/                            # 技术设计文档、开发进度、M6 真机验收与发布
+└─ docs/                            # 文档索引、技术设计文档、开发进度、真机验收清单、archive/ 归档
 ```
 
 ## 本地开发
@@ -60,7 +60,7 @@ YiyiTime/
 4. 云函数：右键 `cloudfunctions/api` →「上传并部署：云端安装依赖」。**每次云函数代码有改动都要重新部署。**
 5. 云数据库：手动创建 11 个集合（见下方「云开发控制台一次性配置」）。
 6. 删除云端模板遗留的 `quickstartFunctions` 云函数（本地代码已清理，云端需手动删）。
-7. 隐私：微信公众平台 →「设置 - 服务内容声明 - 用户隐私保护指引」声明头像、昵称用途，否则隐私接口会被拦截。
+7. 隐私：微信公众平台 →「设置 - 服务内容声明 - 用户隐私保护指引」声明头像、昵称用途，否则隐私接口会被拦截。**没声明时的表现是「点头像完全没反应」**：渲染层报 `chooseAvatar:fail api scope is not declared in the privacy agreement`（errno 112），昵称输入框每敲一个字报 `showNicknameAccessory:fail ... errno:112`。声明要选「收集你的昵称、头像」，提交后等审核通过才生效；本地调试临时把 `app.json` 的 `__usePrivacyCheck__` 改 `false` 可以绕过，**但不要随版本发布**（真机与审核都要求它是 `true`）。
 8. 订阅提醒（可选，不配也能跑）：公众平台「订阅消息」里选一个「打卡 / 待办提醒」类模板，把模板 ID 配到云函数环境变量 `YIYI_REMINDER_TEMPLATE_ID`；模板关键词要和 `cloudfunctions/api/handlers/reminder.js` 的 `templateData` 对齐（默认 `thing1` + `time2`），字段名不一致微信返回 47003。没配时「我的」页的提醒开关是禁用态，定时任务静默跳过。
    云调用权限（`security.msgSecCheck`、`subscribeMessage.send`）与定时触发器（`reminder-tick`）都写在 `cloudfunctions/api/config.json` 里，随「上传并部署」一起生效，不用在控制台另配。
 9. 任务提醒模板（M11.3 起用，可选，不配也能跑）：公众平台「订阅消息」再选一个「任务 / 待办提醒」类模板，模板 ID 配到云函数环境变量 `YIYI_GROWTH_TEMPLATE_ID`（关键词默认 `thing1` + `time2`，同 `handlers/growth.js` 的 `templateData`）。不配时成长任务的订阅提醒整体静默，页面不出现订阅入口；**先停一下（F13）不需要任何模板**——它没有推送，靠打开首页看到便签。
@@ -121,9 +121,10 @@ node scripts/release-check.js   # 页面/组件路径与注册（`usingComponent
 - 视觉按 8.7「手绘涂鸦风（hand-drawn-doodle）」：3rpx 虚线描边 + 4/6rpx 小圆角 + 彩色硬阴影（`8rpx 8rpx 0`）、150ms linear、`:active` 位移 3rpx 且阴影归零；禁渐变、禁 999rpx 胶囊、不引网络字体（字体栈本地降级）。
 - 导航：`pages/home`（今天）、`pages/ledger`（记账本）、`pages/profile`（我的）是 tab 页，一律 `wx.switchTab` 并按 `utils/constants.js` 的 `TAB_ROUTES` 判断；`diary` / `wish` / `mood` / `safety` / `anniversary` / `bind` 都是普通页，用 `wx.navigateTo`（日记 / 愿望 / 心情记录 / 报平安从首页四宫格进，纪念日管理从首页堆叠卡的「管理 ›」进）；三个 tab 页 `onShow` 首行 `tabbar.sync(this, ROUTES.x)` 维持自定义 tabBar 选中态。
 
-## 进度
+## 进度与文档
 
-- 技术设计文档：`docs/技术设计文档.md`
-- 已完成功能、已知偏差、手动操作与下一步：`docs/开发进度.md`
-- M6 双人真机验收与发布清单：`docs/M6-真机验收与发布.md`
-- 接手交接说明（当前状态与待办）：`docs/交接说明-WorkBuddy.md`
+- 文档索引（哪份看什么）：[`docs/README.md`](docs/README.md)
+- 技术设计文档（契约唯一真相，v0.1.7）：`docs/技术设计文档.md`
+- 开发进度与项目现状（**做到哪了 / 还剩什么 / 已知偏差**）：`docs/开发进度.md`
+- 双人真机验收与发布清单（边做边打勾）：`docs/M6-真机验收与发布.md`
+- 2026-11-18 合并前的旧文档（逐轮明细、M11 增补稿、旧交接说明）：`docs/archive/2026-11-18/`
