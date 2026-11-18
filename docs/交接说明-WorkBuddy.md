@@ -30,7 +30,7 @@ node scripts/check-secrets.js
 
 ## 三、仍需用户手动完成的（卡真机验收）
 
-1. 云开发控制台：按 `docs/M6-真机验收与发布.md` 建 **9 个集合**、配权限与索引（本轮没有新增集合，M10 的数据都落在 `users` 里）。
+1. 云开发控制台：按 `docs/M6-真机验收与发布.md` 建 **9 个集合**、配权限与索引（本轮没有新增集合，M10 的数据都落在 `users` 里；**M11 上线前**另有 2 个新集合 `pauses` / `growth_tasks` 与 3 条索引要加建，步骤见 `docs/开发进度.md` 第三节与增补稿 9.3，当前代码未动不必提前建）。
 2. **部署顺序：先云函数、再小程序端。** `cloudfunctions/api` →「上传并部署：云端安装依赖」（超时 10s、内存 256MB）。本轮云函数改了（新增 `handlers/reminder.js`、`lib/security.js`、3 个 action、`config.json` 的 openapi 与触发器），必须重部署，否则提醒会报「这个操作还不存在」。
 3. **配订阅消息模板（可选，不配也能跑）**：公众平台「订阅消息」选一个「打卡 / 待办提醒」类模板 → 模板 ID 配到云函数环境变量 `YIYI_REMINDER_TEMPLATE_ID`。关键词要和 `handlers/reminder.js` 的 `templateData` 对齐（默认 `thing1` + `time2`），不一致微信返回 47003。没配时「我的」页提醒开关是禁用态、定时任务静默跳过。
 4. **小程序端要重新上传**：`pages/profile` 改了 wxml / wxss / js，漏传会看到旧占位「每日提醒（即将上线）」。
@@ -41,9 +41,10 @@ node scripts/check-secrets.js
 ## 四、尚未完成的代码侧事项（按优先级）
 
 1. **等用户真机验收反馈**：F1–F12 + 14.4 的 A/B 14 步 + `docs/M6-真机验收与发布.md` 第 2–4 节。收到问题按 P0/P1 修。
-2. 唯一还剩的 P1 功能是 `diary.calendar`（心情 / 日记日历，7.12 的预留项），属于「可做可不做」的视觉增强。
-3. 若继续做自动化加固（非阻塞）：`runTimer` 没有并发压测（同一分钟两个实例同时跑到同一个用户，靠 `reminderLastSentDate` 事后去重，理论上可能发两条）；`ledger.list` 的 `summary` 与按天分组由客户端算，「同一秒两条账」的排序稳定性没锁；解绑的并发边界靠事务重读兜住，没有压测。
-4. 已实现功能的边界说明、已知偏差与手动项都记在 `docs/开发进度.md`，改功能时同步更新。
+2. **M11 先停一下 + 一起变好（成长任务池）**：规格已定稿于 `docs/技术设计增补-M11-先停一下与成长任务池.md`（集合字段表 / API 契约 / 状态机 / 验收 F13·F14 / 测试规划 / M11.0–M11.5 拆解），按拆解顺序开发；**M11.0（主文档合并）必须与 M11.1（pause 服务端）同一 PR**——契约测试锁主文档 16.x 与代码双向一致，表先合并会打红 `node --test`。
+3. 唯一还剩的 P1 功能是 `diary.calendar`（心情 / 日记日历，7.12 的预留项），属于「可做可不做」的视觉增强。
+4. 若继续做自动化加固（非阻塞）：`runTimer` 没有并发压测（同一分钟两个实例同时跑到同一个用户，靠 `reminderLastSentDate` 事后去重，理论上可能发两条）；`ledger.list` 的 `summary` 与按天分组由客户端算，「同一秒两条账」的排序稳定性没锁；解绑的并发边界靠事务重读兜住，没有压测。
+5. 已实现功能的边界说明、已知偏差与手动项都记在 `docs/开发进度.md`，改功能时同步更新。
 
 ## 五、工作流约定（沿用）
 
@@ -56,6 +57,7 @@ node scripts/check-secrets.js
 ## 六、关键文件索引
 
 - 需求与验收：`docs/技术设计文档.md`（4400+ 行）、`docs/M6-真机验收与发布.md`。
+- M11 新功能规格：`docs/技术设计增补-M11-先停一下与成长任务池.md`（`pause` / `growth` 的字段表、action 契约、状态机、验收 F13 / F14；合并清单在其第 9 节）。
 - 进度与偏差：`docs/开发进度.md`（当前单测数、已完成功能、已知缺口、手动操作、变更记录）。
 - 客户端入口：`miniprogram/utils/api.js`（唯一云函数调用入口）、`miniprogram/utils/constants.js`（`LIMITS` / `ROUTES` / `TAB_ROUTES` / `LEDGER_CATEGORIES` / `isTabRoute`）、`miniprogram/utils/tabbar.js`、`miniprogram/utils/format.js`（元↔分换算唯一实现）。
 - 订阅提醒：`cloudfunctions/api/handlers/reminder.js`（`get` / `set` / `grant` / `runTimer` / `templateData`）、`cloudfunctions/api/index.js`（Timer 分流）、`cloudfunctions/api/config.json`（openapi + triggers）、`miniprogram/pages/profile/index.js`（`onToggleReminder` / `onReminderTimeChange` / `requestReminderSubscribe`）。
