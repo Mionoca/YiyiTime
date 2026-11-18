@@ -465,6 +465,24 @@ test('订阅提醒：标记完成后提醒对方写收获', async (t) => {
   assert.strictEqual(h.fake().get('users', B).growthSubQuota, 1);
 });
 
+test('订阅提醒：done 重复点幂等，不会重复发；发起人自己的额度不动', async (t) => {
+  withGrowthTemplate(t);
+  const h = setup({
+    users: [userDoc(A, { growthSubQuota: 4 }), userDoc(B, { growthSubQuota: 3 })],
+    growth_tasks: [taskDoc({ status: 'active', confirmedAt: NOW })],
+  });
+
+  const first = await h.callAs(A, 'growth.done', { taskId: 'g_test0000000001' });
+  assert.strictEqual(first.ok, true, JSON.stringify(first));
+  const second = await h.callAs(B, 'growth.done', { taskId: 'g_test0000000001' });
+  assert.strictEqual(second.ok, true, '幂等返回而不是报错');
+
+  assert.strictEqual(sentCalls(h).length, 1, '只有第一次推进状态时发提醒');
+  assert.strictEqual(sentCalls(h)[0].args.touser, B, '第一次是 A 点的，提醒 B');
+  assert.strictEqual(h.fake().get('users', B).growthSubQuota, 2);
+  assert.strictEqual(h.fake().get('users', A).growthSubQuota, 4, '发起人自己的额度不动');
+});
+
 test('订阅提醒：模板未配 / 对方没额度 / 当天已 3 条 都不发，业务照常成功', async (t) => {
   // 1) 模板未配
   let h = setup({ users: [userDoc(A), userDoc(B, { growthSubQuota: 3 })] });

@@ -90,6 +90,9 @@ async function notify(ctx, opts) {
   const options = opts || {};
   const kind = options.kind === 'done' ? 'done' : 'draft';
   const out = { sent: false, reason: '' };
+  // 只有真的扣过额度才允许退还：读库失败、暂停判断抛错都发生在扣款之前，
+  // 那时候「还额度」会凭空多给一条（额度只增不减，越用越多）
+  let deducted = false;
 
   try {
     if (!configured()) { out.reason = 'template-not-configured'; return out; }
@@ -127,6 +130,7 @@ async function notify(ctx, opts) {
     await ctx.db.collection('users').doc(toOpenid).update({
       data: { growthSubQuota: ctx.db.command.inc(-1) },
     });
+    deducted = true;
 
     const sent = await cloud.openapi.subscribeMessage.send({
       touser: toOpenid,
@@ -140,22 +144,32 @@ async function notify(ctx, opts) {
       throw err;
     }
 
-    // 发送成功才计数：失败的不占当天的 3 条名额
-    await ctx.db.collection('users').doc(toOpenid).update({
-      data: { growthSubSentDate: todayKey, growthSubSentCount: sentToday + 1 },
-    });
     out.sent = true;
     out.reason = 'sent';
+    // 发送成功才计数：失败的不占当天的 3 条名额。
+    // 这一步失败**不能再退额度**（消息已经发出去了），只记日志——
+    // 最坏情况是当天少记一条，多条性由「发了就发一条」本身兜底。
+    try {
+      await ctx.db.collection('users').doc(toOpenid).update({
+        data: { growthSubSentDate: todayKey, growthSubSentCount: sentToday + 1 },
+      });
+    } catch (countErr) {
+      console.error('[growth-sub]', JSON.stringify({
+        reason: 'count-failed',
+        openidTail: String(toOpenid || '').slice(-6),
+        code: String((countErr && (countErr.errCode || countErr.code)) || ''),
+      }));
+    }
     return out;
   } catch (err) {
     const code = String((err && (err.errCode || err.code)) || '');
     out.reason = code === '43101' ? 'rejected' : 'send-failed';
     try {
       const toOpenid = options.toOpenid;
-      if (toOpenid && code === '43101') {
+      if (toOpenid && deducted && code === '43101') {
         // 用户拒收：别再发了，额度归零（再发只会继续被拒）
         await ctx.db.collection('users').doc(toOpenid).update({ data: { growthSubQuota: 0 } });
-      } else if (toOpenid) {
+      } else if (toOpenid && deducted) {
         // 其它错误（网络 / 频率限制 / 模板参数）：把刚扣的额度还回去
         await ctx.db.collection('users').doc(toOpenid).update({
           data: { growthSubQuota: ctx.db.command.inc(1) },

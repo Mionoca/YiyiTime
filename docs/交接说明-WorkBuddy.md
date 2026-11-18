@@ -2,7 +2,7 @@
 
 > 更新时间：2026-11-18 22:40（Asia/Shanghai）
 > 仓库：`D:/大学/YiyiTime`　分支：`hjj`　最新提交见 `git log -1 --oneline`（每轮都已推送，核对 `git rev-parse HEAD` 与 `git ls-remote origin hjj` 一致）
-> 单测基线：718 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
+> 单测基线：719 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
 
 ## 一、当前状态
 

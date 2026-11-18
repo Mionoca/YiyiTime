@@ -225,6 +225,7 @@ async function done(payload, ctx) {
     if (doc.coupleId !== coupleId) throw new AppError('FORBIDDEN', '这件事不属于你们');
     if (doc.status === 'harvesting') {
       result = doc;                    // 幂等：已经在写收获了
+      shouldNotify = false;            // 事务重试进来时也别把提醒再发一次
       return;
     }
     if (doc.status !== 'active') {
