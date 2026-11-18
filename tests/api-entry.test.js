@@ -29,6 +29,8 @@ const EXPECTED_ACTIONS = [
   'home.get',
   'reminder.get', 'reminder.set', 'reminder.grant',
   'pause.start', 'pause.status', 'pause.end', 'pause.choose',
+  'growth.add', 'growth.confirm', 'growth.update', 'growth.remove',
+  'growth.done', 'growth.harvest', 'growth.review', 'growth.list', 'growth.log',
 ];
 
 const REQUEST_ID = /^\d+-[a-z0-9]{6}$/;

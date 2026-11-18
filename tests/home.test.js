@@ -663,3 +663,92 @@ test('home.get: pause 区块读库失败只降级自己，其余区块照常（�
     console.error = originalError;
   }
 });
+
+// ── 成长卡（M11.3 / 文档 7.8 / 7.18）──────────────────────────────────────
+
+test('home.get: growth 区块聚合在档数与待认领红点（M11.3）', async () => {
+  const { ctx } = makeCtx({
+    users: [{ _id: 'oA', coupleId: 'c_1' }],
+    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
+    growth_tasks: [
+      {
+        _id: 'g_a', coupleId: 'c_1', createdBy: 'oA', title: '一起背单词', category: 'learn',
+        status: 'active', createdAt: new Date(NOW.getTime() - 3000), archivedAt: null,
+      },
+      {
+        _id: 'g_b', coupleId: 'c_1', createdBy: 'oB', title: '一起跑步', category: 'sport',
+        status: 'confirming', createdAt: new Date(NOW.getTime() - 2000), archivedAt: null,
+      },
+      {
+        _id: 'g_c', coupleId: 'c_1', createdBy: 'oA', title: '旧的', category: 'other',
+        status: 'archived', archivedType: 'done', createdAt: NOW,
+        archivedAt: new Date(NOW.getTime() - 1000),
+      },
+      // 别的情侣的干扰项
+      { _id: 'g_x', coupleId: 'c_2', createdBy: 'oX', title: '别人家', category: 'other', status: 'active', createdAt: NOW },
+    ],
+  });
+  ctx.user = { _id: 'oA', coupleId: 'c_1' };
+  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
+  ctx.partner = { _id: 'oB', nickname: '小安' };
+
+  const res = await homeHandler.get({}, ctx);
+  assert.strictEqual(res.growth.inFlight, 2, '在档两件');
+  assert.strictEqual(res.growth.awaitingConfirm, true, '有 confirming 就要红点');
+  assert.strictEqual(res.growth.firstActiveTitle, '一起背单词');
+  assert.strictEqual(res.growth.archivedCount, 1, '归档数量单独 count');
+});
+
+test('home.get: 没有进行中的任务时 firstActiveTitle 为 null；未绑定整块为 null', async () => {
+  const { ctx } = makeCtx({
+    users: [{ _id: 'oA', coupleId: 'c_1' }],
+    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
+    growth_tasks: [
+      { _id: 'g_b', coupleId: 'c_1', createdBy: 'oA', title: '在等人认领', category: 'other', status: 'confirming', createdAt: NOW },
+    ],
+  });
+  ctx.user = { _id: 'oA', coupleId: 'c_1' };
+  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
+  ctx.partner = { _id: 'oB' };
+
+  const res = await homeHandler.get({}, ctx);
+  assert.strictEqual(res.growth.firstActiveTitle, null, '只有待认领的，没有进行中的');
+  assert.strictEqual(res.growth.awaitingConfirm, true);
+
+  // 未绑定：整块 null（不用查库）
+  const { ctx: unbound } = makeCtx({ users: [{ _id: 'oA', coupleId: null }] });
+  unbound.user = { _id: 'oA', coupleId: null };
+  unbound.couple = null;
+  const empty = await homeHandler.get({}, unbound);
+  assert.strictEqual(empty.growth, null);
+});
+
+test('home.get: growth 区块读库失败只降级自己（文档 10.3）', async () => {
+  const { ctx, fake } = makeCtx({
+    users: [{ _id: 'oA', coupleId: 'c_1' }],
+    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
+    moods: [
+      { _id: 'oA_' + TODAY, coupleId: 'c_1', openid: 'oA', date: TODAY, mood: 'sunny', note: '', updatedAt: NOW },
+    ],
+  });
+  const realDb = fake.db;
+  ctx.db = {
+    collection(name) {
+      if (name === 'growth_tasks') throw new Error('mock growth down');
+      return realDb.collection(name);
+    },
+  };
+  ctx.user = { _id: 'oA', coupleId: 'c_1' };
+  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
+  ctx.partner = { _id: 'oB' };
+
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const res = await homeHandler.get({}, ctx);
+    assert.strictEqual(res.growth, null, 'growth 块失败降级 null');
+    assert.strictEqual(res.mood.mine.mood, 'sunny', '心情块不受影响');
+  } finally {
+    console.error = originalError;
+  }
+});

@@ -22,6 +22,7 @@ const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
 const time = require('../lib/time');
 const pause = require('./pause');
+const growthSub = require('../lib/growth-sub');
 
 /** 模板 ID 从环境变量读（控制台改环境变量比改代码安全），没配就是空串 */
 const TEMPLATE_PAGE = 'pages/safety/index';
@@ -174,8 +175,35 @@ async function set(payload, ctx) {
  * 客户端拿到订阅授权结果（accept）后上报，攒一次下发额度。
  * 这里只加不校验来源：授权本身由微信判定，客户端伪造一次 grant 最多让自己多一条
  * 提醒额度——没有越权价值，但要卡上限（QUOTA_MAX）。
+ *
+ * M11 起支持两档模板（文档 7.15 / 7.18）：`safety`（报平安，缺省）与 `task`（成长任务）。
+ * **额度按模板分开记**：报平安用 `reminderQuota`，任务用 `growthSubQuota`；共用一个字段会让
+ * 任务事件把报平安的额度吃光。入参缺省 `safety`，老的客户端不改也能继续用。
  */
 async function grant(payload, ctx) {
+  const p = validate.asObject(payload);
+  let template = 'safety';
+  if (p.template !== undefined && p.template !== null && p.template !== '') {
+    template = validate.oneOf(p.template, ['safety', 'task'], '提醒类型');
+  }
+
+  if (template === 'task') {
+    const current = growthSub.quotaOf(ctx.user);
+    const next = Math.min(current + 1, growthSub.QUOTA_MAX);
+    if (next !== current) {
+      await ctx.db.collection('users').doc(ctx.openid).update({
+        data: { growthSubQuota: next },
+      });
+    }
+    // buildView 是异步的，必须先 await 再挂任务模板字段（直接 Object.assign 到 Promise 上会丢）
+    const base = await buildView(Object.assign(ctx, { user: Object.assign({}, ctx.user, { growthSubQuota: next }) }));
+    return Object.assign(base, {
+      taskQuota: next,
+      taskQuotaMax: growthSub.QUOTA_MAX,
+      taskConfigured: growthSub.configured(),
+    });
+  }
+
   const current = Math.max(0, Number(ctx.user.reminderQuota) || 0);
   const next = Math.min(current + 1, QUOTA_MAX);
   if (next !== current) {

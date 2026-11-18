@@ -50,4 +50,13 @@ module.exports = {
   'pause.status': require('./pause').status,
   'pause.end': require('./pause').end,
   'pause.choose': require('./pause').choose,
+  'growth.add': require('./growth').add,
+  'growth.confirm': require('./growth').confirm,
+  'growth.update': require('./growth').update,
+  'growth.remove': require('./growth').remove,
+  'growth.done': require('./growth').done,
+  'growth.harvest': require('./growth').harvest,
+  'growth.review': require('./growth').review,
+  'growth.list': require('./growth').list,
+  'growth.log': require('./growth').log,
 };

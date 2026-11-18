@@ -20,8 +20,10 @@ YiyiTime/
 │  │  ├─ system.js  user.js  bind.js  couple.js  home.js
 │  │  ├─ mood.js  anniversary.js  safety.js  diary.js  wish.js  ledger.js
 │  │  ├─ reminder.js                # 订阅提醒（reminder.* + 定时任务 runTimer；grant 兼任务模板）
-│  │  └─ pause.js                   # 先停一下（pause.*，M11：关系刹车）
+│  │  ├─ pause.js                   # 先停一下（pause.*，M11：关系刹车）
+│  │  └─ growth.js                  # 一起变好（growth.*，M11：任务池 + 成长日志）
 │  └─ lib/                          # ctx / errors / time / validate / db / db-util / relation / home-blocks / security
+│     └─ growth-sub.js              # 成长任务订阅提醒（事件驱动即时发，失败绝不打断业务）
 ├─ miniprogram/
 │  ├─ pages/
 │  │  ├─ home/                      # 今天（纪念日堆叠卡 / 心情卡 / 四宫格入口）
@@ -54,7 +56,7 @@ YiyiTime/
    该文件已被 `.gitignore` 忽略，**不要提交**。
 3. 用微信开发者工具导入仓库根目录（appid 见 `project.config.json`）。
 4. 云函数：右键 `cloudfunctions/api` →「上传并部署：云端安装依赖」。**每次云函数代码有改动都要重新部署。**
-5. 云数据库：手动创建 10 个集合（见下方「云开发控制台一次性配置」）。**M11.3（一起变好）上线前再加建 `growth_tasks`。**
+5. 云数据库：手动创建 11 个集合（见下方「云开发控制台一次性配置」）。
 6. 删除云端模板遗留的 `quickstartFunctions` 云函数（本地代码已清理，云端需手动删）。
 7. 隐私：微信公众平台 →「设置 - 服务内容声明 - 用户隐私保护指引」声明头像、昵称用途，否则隐私接口会被拦截。
 8. 订阅提醒（可选，不配也能跑）：公众平台「订阅消息」里选一个「打卡 / 待办提醒」类模板，把模板 ID 配到云函数环境变量 `YIYI_REMINDER_TEMPLATE_ID`；模板关键词要和 `cloudfunctions/api/handlers/reminder.js` 的 `templateData` 对齐（默认 `thing1` + `time2`），字段名不一致微信返回 47003。没配时「我的」页的提醒开关是禁用态，定时任务静默跳过。
@@ -63,9 +65,9 @@ YiyiTime/
 
 ## 云开发控制台一次性配置
 
-- 集合：`users`、`couples`、`bind_invites`、`moods`、`anniversaries`、`safety_checkins`、`diaries`、`wishes`、`ledger_entries`、`pauses`
+- 集合：`users`、`couples`、`bind_invites`、`moods`、`anniversaries`、`safety_checkins`、`diaries`、`wishes`、`ledger_entries`、`pauses`、`growth_tasks`
   - M12 起 `hugs` 已下线：如果控制台还留着这个集合，先导出备份再删除（代码不再读它）
-  - M11.3（一起变好）上线前另建 `growth_tasks`（先建集合再部署，同 `ledger_entries` 先例）
+  - `pauses` / `growth_tasks` 是 M11 新增：云函数写不存在的集合会报错，**先建集合再部署**（同 `ledger_entries` 先例）
 - 权限：全部设置为「所有用户不可读写」（只允许云函数访问）
 - 索引：
   - `bind_invites`：`creatorOpenid`+`status`、`applicantOpenid`+`status`、`expiresAt`
@@ -77,13 +79,13 @@ YiyiTime/
   - `wishes`：`coupleId`+`done`+`createdAt`、`coupleId`+`createdAt`
   - `ledger_entries`：`openid`+`month`+`date`+`createdAt`（我的账本按月查）、`openid`+`coupleId`+`month`+`date`+`createdAt`（伴侣视角按月查；后两位是同一天内的时间倒序）
   - `pauses`：`coupleId`+`status`+`startedAt`（倒序；查「当前这一条未 closed 的暂停」）
-  - M11.3 前加建 `growth_tasks`：`coupleId`+`status`+`createdAt`、`coupleId`+`status`+`archivedAt`（倒序）
+  - `growth_tasks`：`coupleId`+`status`+`createdAt`（任务池列表）、`coupleId`+`status`+`archivedAt`（倒序，成长日志复合游标）
 - 存储：头像由前端上传到云存储 `avatars/` 目录，默认权限即可；客户端上传前校验格式（JPG / PNG）与单张 ≤2MB（文档 11.9 / 3442），格式不符或超限直接提示、不发起上传
 
 ## 测试
 
 ```bash
-node --test tests/*.test.js       # 自动发现 tests/*.test.js（Node 22 实测 691 个用例）
+node --test tests/*.test.js       # 自动发现 tests/*.test.js（Node 22 实测 718 个用例）
 # 或只跑一个文件：node tests/anniversary.test.js
 ```
 

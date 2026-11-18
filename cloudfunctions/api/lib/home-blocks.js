@@ -4,6 +4,7 @@ const time = require('./time');
 const relation = require('./relation');
 const anniversaryHandler = require('../handlers/anniversary');
 const pauseHandler = require('../handlers/pause');
+const growthHandler = require('../handlers/growth');
 
 const iso = relation.iso;
 /** 自定义纪念日上限（文档 5.3.5）：与 handlers/anniversary.js 同源，避免两处常量漂移 */
@@ -135,6 +136,33 @@ async function loadWish(ctx, coupleId) {
   };
 }
 
+/**
+ * 成长卡聚合（文档 7.8 / 7.18）：在档列表（≤10 条）一次取回，本地算三个数；
+ * 已归档数量单独 count（归档可以很多，不能整取）。未绑定时整块为 null。
+ */
+async function loadGrowth(ctx, coupleId) {
+  const statuses = growthHandler.IN_FLIGHT;
+  const [res, archivedRes] = await Promise.all([
+    ctx.db.collection('growth_tasks')
+      .where({ coupleId, status: ctx.db.command.in(statuses) })
+      .limit(growthHandler.IN_FLIGHT_MAX)
+      .get(),
+    ctx.db.collection('growth_tasks')
+      .where({ coupleId, status: 'archived' })
+      .count(),
+  ]);
+  const docs = (res && res.data) || [];
+  const active = docs
+    .filter((doc) => doc.status === 'active')
+    .sort((a, b) => time.toMillis(a.createdAt) - time.toMillis(b.createdAt));
+  return {
+    inFlight: docs.length,
+    firstActiveTitle: active.length ? (active[0].title || '') : null,
+    awaitingConfirm: docs.some((doc) => doc.status === 'confirming'),
+    archivedCount: (archivedRes && archivedRes.total) || 0,
+  };
+}
+
 /** 可选区块单块失败：记日志并按 null 返回，不影响整页（文档 10.3） */
 async function optionalBlock(ctx, name, task) {
   try {
@@ -150,5 +178,6 @@ async function optionalBlock(ctx, name, task) {
 }
 
 module.exports = {
-  loadMood, loadAnniversary, loadSafety, loadDiary, loadWish, loadPause, optionalBlock, iso,
+  loadMood, loadAnniversary, loadSafety, loadDiary, loadWish, loadPause, loadGrowth,
+  optionalBlock, iso,
 };

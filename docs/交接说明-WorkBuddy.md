@@ -1,13 +1,13 @@
 # 交接说明（WorkBuddy 接手用）
 
-> 更新时间：2026-11-18 19:40（Asia/Shanghai）
-> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　M12 功能提交：`7afdd02`，文档同步提交：`f545c5f`（**均已推送**，远端 `hjj` = `f545c5f`）
-> 单测基线：662 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
+> 更新时间：2026-11-18 22:40（Asia/Shanghai）
+> 仓库：`D:/大学/YiyiTime`　分支：`hjj`　最新提交见 `git log -1 --oneline`（每轮都已推送，核对 `git rev-parse HEAD` 与 `git ls-remote origin hjj` 一致）
+> 单测基线：718 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
 
 ## 一、当前状态
 
 - 代码侧 M0–M6 与 F1–F12 全部实现（历史轮次与每轮验证记录见 `docs/开发进度.md` → 六、变更记录）。
-- 前几轮交付：**M7 心情记录时间线**（只读 `mood.list` + `pages/mood`）、**M8 前端改版**（手绘涂鸦风）、**M9 记账本 + 应用内解绑**、**M10 订阅提醒 + 内容安全**。
+- 前几轮交付：**M7 心情记录时间线**（只读 `mood.list` + `pages/mood`）、**M8 前端改版**（手绘涂鸦风）、**M9 记账本 + 应用内解绑**、**M10 订阅提醒 + 内容安全**、**M11.0–M11.3**（主文档合并 v0.1.5 / v0.1.6、`pause` 服务端 + 首页便签客户端、`growth` 服务端九 action + 任务订阅提醒）。
 - 本轮交付 **M12（文档 v0.1.4）**，三件事一起做（它们在首页与 tabBar 上互相牵连）：
   1. **抱一抱整体下线**：F5、`hugs` 集合、`hug.send|respond`、`hug-banner`、首页抱抱卡、心形上浮动画、头像心形角标、`hug_seen_ids` 本地记录、`HUG_*` 错误码一并删除。文档里相关段落是**直接删掉或重写**，只在 15.3 留一条决策记录说明为什么删（异步「打开时可见」让这个按钮点下去像没反应）。
   2. **自定义纪念日 + 卡片堆叠**：新集合 `anniversaries`（每对 8 条、允许未来日期、不落 `nextDate`/`daysLeft`）、`anniversary.add|update|remove|list`、`lib/time.js` 的 `yearlyOccurrence`（未来日期 `years=0`、2-29 平年按 2 月末）、`home.get` 的 `anniversary` 区块（查询预算 10 → 9 次）、新页面 `pages/anniversary`（增删改）、首页把「日子卡 + 抱抱卡」合并成一张**卡片堆叠**（`components/anniversary-stack`）。
@@ -35,9 +35,9 @@ node scripts/check-secrets.js
 
 ## 三、仍需用户手动完成的（卡真机验收）
 
-1. 云开发控制台：**新建 `anniversaries`**（权限「所有用户不可读写」，索引 `coupleId`、`coupleId + date`），**删除已下线的 `hugs`**（先导出备份）；其余 8 个集合沿用（`docs/M6-真机验收与发布.md` 第 1 节）。**先建 / 删集合，再部署云函数** —— 云函数写不存在的集合会直接报错。
+1. 云开发控制台：共 **11 个集合**——`users`、`couples`、`bind_invites`、`moods`、`anniversaries`、`safety_checkins`、`diaries`、`wishes`、`ledger_entries`、**`pauses`**、**`growth_tasks`**（全部「所有用户不可读写」；`pauses` 索引 `coupleId + status + startedAt` 倒序，`growth_tasks` 索引 `coupleId + status + createdAt`、`coupleId + status + archivedAt` 倒序）；**删除已下线的 `hugs`**（先导出备份）。**先建集合，再部署云函数** —— 云函数写不存在的集合会直接报错。
 2. **部署顺序：先云函数、再小程序端。** `cloudfunctions/api` →「上传并部署：云端安装依赖」（超时 10s、内存 256MB）。本轮云函数改了（新增 `handlers/anniversary.js`、删 `handlers/hug.js`、`home.get` 返回 `anniversary`），不重部署会看到「这个操作还不存在」或首页缺纪念日区块。
-3. **配订阅消息模板（可选，不配也能跑）**：公众平台「订阅消息」选一个「打卡 / 待办提醒」类模板 → 模板 ID 配到云函数环境变量 `YIYI_REMINDER_TEMPLATE_ID`。关键词要和 `handlers/reminder.js` 的 `templateData` 对齐（默认 `thing1` + `time2`），不一致微信返回 47003。没配时「我的」页提醒开关是禁用态、定时任务静默跳过。
+3. **配订阅消息模板（可选，不配也能跑）**：两个模板 —— 报平安用 `YIYI_REMINDER_TEMPLATE_ID`，成长任务用 `YIYI_GROWTH_TEMPLATE_ID`（关键词分别对齐 `handlers/reminder.js` 与 `lib/growth-sub.js` 的 `templateData`，默认都是 `thing1` + `time2`，不一致微信返回 47003）。没配时「我的」页提醒开关是禁用态、定时任务与任务提醒都静默跳过（`growth.list` 的 `subConfigured` 为 false）。
 4. **小程序端要重新上传**：`app.json`（三 tab + 新页面）、`custom-tab-bar`、`pages/home` / `ledger` / `profile`、新增的 `pages/anniversary` 与 `components/anniversary-stack` 都要传；漏传会出现「Component is not found」或底部只有两个 tab。
 5. 微信公众平台：配置《用户隐私保护指引》（头像、昵称用途）。
 6. 微信开发者工具上传体验版，并把对方微信号加为体验成员；发布前导出一次数据库备份。
@@ -46,7 +46,7 @@ node scripts/check-secrets.js
 ## 四、尚未完成的代码侧事项（按优先级）
 
 1. **等用户真机验收反馈**：F1–F12 + 14.4 的 A/B 14 步 + `docs/M6-真机验收与发布.md` 第 2–4 节。收到问题按 P0/P1 修。
-2. **M11 先停一下 + 一起变好（成长任务池）**：规格已定稿于 `docs/技术设计增补-M11-先停一下与成长任务池.md`（集合字段表 / API 契约 / 状态机 / 验收 F13·F14 / 测试规划 / M11.0–M11.5 拆解），按拆解顺序开发；**M11.0（主文档合并）必须与 M11.1（pause 服务端）同一 PR**——契约测试锁主文档 16.x 与代码双向一致，表先合并会打红 `node --test`。
+2. **M11 先停一下 + 一起变好（成长任务池）**：M11.0（主文档合并到 v0.1.6）、M11.1（`pause` 服务端）、M11.2（pause 客户端：首页便签 / 和好卡 / 入口）、M11.3（`growth` 服务端九 action + 订阅提醒）**已完成**；**只剩 M11.4 growth 客户端**（首页成长卡 + `pages/growth` 任务池 / 成长日志 + `growth-item` / `growth-log-item` 组件 + 授权时机：动作完成且 `subQuota < 2` 才弹）与 **M11.5 收尾回归**（`e2e-page` 扩展、真机 F13 / F14）。
 3. 唯一还剩的 P1 功能是 `diary.calendar`（心情 / 日记日历，7.12 的预留项），属于「可做可不做」的视觉增强。
 4. 若继续做自动化加固（非阻塞）：`runTimer` 没有并发压测（同一分钟两个实例同时跑到同一个用户，靠 `reminderLastSentDate` 事后去重，理论上可能发两条）；`ledger.list` 的 `summary` 与按天分组由客户端算，「同一秒两条账」的排序稳定性没锁；解绑的并发边界靠事务重读兜住，没有压测。
 5. 已实现功能的边界说明、已知偏差与手动项都记在 `docs/开发进度.md`，改功能时同步更新。
