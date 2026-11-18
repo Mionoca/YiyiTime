@@ -44,6 +44,7 @@
   border-radius: 50%;
   background-color: var(--wall);
   border: 2rpx dashed var(--line);
+  position: relative;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -56,6 +57,19 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
+}
+
+/* 换头像提示：与 bind 页同款，避免头像看着像「只能看」的静态图 */
+.avatar-tip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 32rpx;
+  line-height: 32rpx;
+  font-size: 18rpx;
+  color: var(--card);
+  background-color: rgba(44, 44, 44, 0.55);
 }
 
 .profile-main {
