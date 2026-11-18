@@ -359,6 +359,7 @@ test('growth.list：待认领排前面，stats 与订阅额度一起返回', asy
   assert.strictEqual(res.data.subConfigured, false, '没配模板要如实告诉客户端');
   assert.strictEqual(res.data.subQuota, 0);
   assert.strictEqual(res.data.subQuotaMax, 7);
+  assert.strictEqual(res.data.subTemplateId, '', '没配时模板 ID 是空串（客户端据此不弹授权）');
 
   // B 有额度、且模板配好了
   process.env.YIYI_GROWTH_TEMPLATE_ID = 'tpl_growth';
@@ -366,6 +367,7 @@ test('growth.list：待认领排前面，stats 与订阅额度一起返回', asy
   const asB = await h.callAs(B, 'growth.list');
   assert.strictEqual(asB.data.subConfigured, true);
   assert.strictEqual(asB.data.subQuota, 2);
+  assert.strictEqual(asB.data.subTemplateId, 'tpl_growth', '客户端 requestSubscribeMessage 要用它');
 });
 
 test('growth.log：自己写了才解锁对方那段；补写后两段都返回', async (t) => {

@@ -198,7 +198,7 @@ test('8.8 列表头像（timeline-item）开启 lazy-load', () => {
 test('8.9 页面集合与滚动配置：全部可滚动、可下拉刷新', () => {
   const app = JSON.parse(read(path.join(ROOT, 'app.json')));
   const pages = app.pages.map((p) => p.replace(/^pages\//, '').replace(/\/index$/, ''));
-  assert.deepStrictEqual(pages.slice().sort(), ['anniversary', 'bind', 'diary', 'home', 'ledger', 'mood', 'profile', 'safety', 'wish'], '页面集合变了，请同步本测试与发布文档');
+  assert.deepStrictEqual(pages.slice().sort(), ['anniversary', 'bind', 'diary', 'growth', 'home', 'ledger', 'mood', 'profile', 'safety', 'wish'], '页面集合变了，请同步本测试与发布文档');
   for (const page of pages) {
     const json = JSON.parse(read(path.join(ROOT, 'pages', page, 'index.json')));
     assert.strictEqual(json.enablePullDownRefresh, true, page + ' 页应支持下拉刷新');

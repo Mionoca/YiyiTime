@@ -8,7 +8,8 @@
     "pages/wish/index",
     "pages/mood/index",
     "pages/anniversary/index",
-    "pages/ledger/index"
+    "pages/ledger/index",
+    "pages/growth/index"
   ],
   "window": {
     "backgroundColor": "#FFFEF5",

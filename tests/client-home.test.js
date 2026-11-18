@@ -825,3 +825,49 @@ test('首页 wxml：便签卡与入口接线（M11 / 文档 9.3）', () => {
   assert.ok(wxml.includes('先停一下 · 给彼此一点时间'));
   assert.ok(wxml.includes('aria-role="alert"'), '便签变化要有可读提示');
 });
+
+// ── 成长卡（M11.4 / 文档 9.2 第 3.5 位）────────────────────────────────
+
+test('home: 成长卡点击进「一起变好」，未绑定点了只提示', async () => {
+  const { page, navs, toasts } = setup({
+    'home.get': () => baseHome({
+      growth: { inFlight: 1, firstActiveTitle: '一起背单词', awaitingConfirm: false, archivedCount: 2 },
+    }),
+  });
+  try {
+    await page.load();
+    assert.strictEqual(page.data.growthTitle, '一起背单词');
+    page.onTapGrowth();
+    assert.deepStrictEqual(navs, [{ kind: 'navigateTo', url: constants.ROUTES.growth }]);
+  } finally {
+    teardown(page);
+    restoreWx();
+  }
+
+  const unbound = setup({
+    'home.get': () => baseHome({ couple: null, bind: { state: 'unbound', pending: null }, growth: null }),
+  });
+  try {
+    await unbound.page.load();
+    assert.strictEqual(unbound.page.data.growthTitle, '', '未绑定不渲染成长卡');
+    unbound.page.onTapGrowth();
+    assert.strictEqual(unbound.navs.length, 0);
+    assert.ok(unbound.toasts.some((t) => t.title.indexOf('等 TA 住进来') !== -1));
+  } finally {
+    teardown(unbound.page);
+    restoreWx();
+  }
+});
+
+test('home wxml: 成长卡是条件卡且不进四宫格（M11.4 / 文档 9.2）', () => {
+  const path = require('node:path');
+  const wxml = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/home/index.wxml'), 'utf8');
+  assert.ok(wxml.includes('bindtap="onTapGrowth"'), '成长卡要接 onTapGrowth');
+  assert.ok(/wx:if="\{\{home\.couple && growthTitle\}\}"/.test(wxml), '成长卡必须是条件卡');
+  assert.ok(wxml.includes('一起变好'));
+  assert.ok(wxml.includes('待认领'), '待认领要有标记');
+  // 四宫格仍是 2×2（硬约束）：成长卡不在 grid 里，是 grid 之后独立一张卡
+  const gridStart = wxml.indexOf('<view class="grid"');
+  const gridEnd = wxml.indexOf('<!-- 3.5 成长卡');
+  assert.ok(gridStart > 0 && gridEnd > gridStart, '成长卡应排在四宫格之后');
+});

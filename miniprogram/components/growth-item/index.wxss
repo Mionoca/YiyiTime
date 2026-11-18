@@ -1,0 +1,152 @@
+/* 任务池条目（文档 8.4 / 8.7）：虚线卡 + 硬阴影，状态用 chip 区分 */
+.gi {
+  position: relative;
+  margin-bottom: 24rpx;
+  padding: 28rpx;
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 6rpx 6rpx 0 var(--shadow-card);
+}
+
+.gi--disabled {
+  opacity: 0.6;
+}
+
+.gi__head {
+  display: flex;
+  align-items: flex-start;
+}
+
+.gi__emoji {
+  margin-right: 12rpx;
+  font-size: 32rpx;
+  line-height: 1.4;
+}
+
+.gi__head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.gi__title {
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.gi__meta {
+  display: flex;
+  align-items: center;
+  margin-top: 8rpx;
+}
+
+.gi__chip {
+  padding: 2rpx 12rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: var(--ink);
+  background-color: var(--wall);
+  border-radius: var(--radius-sm);
+}
+
+/* 待认领用黄色提醒（等人的事最要紧），进行中用底色，写收获用红 */
+.gi__chip--confirming {
+  background-color: var(--marker-yellow);
+}
+
+.gi__chip--harvesting {
+  color: var(--ink);
+  background-color: var(--marker-red);
+}
+
+.gi__cat {
+  margin-left: 12rpx;
+  font-size: 20rpx;
+  color: var(--muted);
+}
+
+.gi__parts {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 2rpx dashed var(--line);
+}
+
+.gi__part {
+  display: flex;
+  align-items: baseline;
+  margin-top: 6rpx;
+}
+
+.gi__part-label {
+  flex: none;
+  width: 84rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.gi__part-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.gi__part-text.is-empty {
+  color: var(--ink-faint);
+}
+
+.gi__note {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.gi__hint {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: var(--marker-red);
+}
+
+.gi__ops {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 20rpx;
+}
+
+/* 热区 ≥88rpx（文档 8.9），视觉是小而扁的按钮 */
+.gi__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120rpx;
+  min-height: 72rpx;
+  margin: 8rpx 16rpx 0 0;
+  padding: 0 24rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--ink);
+  background-color: var(--bg);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.gi__btn--primary {
+  background-color: var(--marker-yellow);
+  border-style: solid;
+}
+
+.gi__btn--danger {
+  color: var(--marker-red);
+  border-color: var(--marker-red);
+}
+
+.gi__btn:active {
+  transform: translate(2rpx, 2rpx);
+}

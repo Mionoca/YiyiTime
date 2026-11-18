@@ -222,6 +222,7 @@ test('输入框 maxlength 全部走数据绑定，昵称不再硬编码 12', () 
     'miniprogram/pages/ledger/index.wxml': ['{{amountMaxLength}}', '{{noteMax}}'],
     'miniprogram/pages/anniversary/index.wxml': ['{{titleMax}}'],
     'miniprogram/components/mood-picker/index.wxml': ['{{noteMax}}'],
+    'miniprogram/pages/growth/index.wxml': ['{{noteMax}}', '{{partMax}}', '{{partMax}}', '{{textMax}}', '{{titleMax}}'],
   };
   assert.deepStrictEqual(Object.keys(byFile).sort(), Object.keys(expected).sort(), '出现未登记 / 缺少的含 maxlength 的 wxml：' + Object.keys(byFile).join(', '));
   Object.keys(expected).forEach((rel) => {

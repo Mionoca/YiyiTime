@@ -1,0 +1,209 @@
+/* 一起变好（文档 8.3.10 / 8.7）：涂鸦风，两分段 + 卡片列表 */
+.page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
+  background-color: var(--bg);
+}
+
+/* ---------- 页头：分段 + 一行统计 ---------- */
+.head {
+  margin-bottom: 20rpx;
+}
+
+.seg {
+  display: flex;
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.seg__item {
+  flex: 1;
+  min-height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  font-size: var(--font-md);
+  color: var(--muted);
+}
+
+.seg__item.is-on {
+  background-color: var(--marker-yellow);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.head__sub {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* 静默刷新失败：一行可点的细条，列表还在 */
+.list-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64rpx;
+  margin-bottom: 16rpx;
+  background-color: var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.list-bar__text {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.hint {
+  padding: 64rpx 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---------- 任务池底部的新增 ---------- */
+.add-bar {
+  margin-top: 8rpx;
+  padding-bottom: 24rpx;
+}
+
+.add-btn {
+  width: 100%;
+}
+
+.add-tip {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---------- 成长日志 ---------- */
+.month {
+  margin-bottom: 24rpx;
+}
+
+.month__head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+  padding-left: 4rpx;
+}
+
+.month__label {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.log-more,
+.log-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+  margin-top: 8rpx;
+}
+
+.log-more__text {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 2rpx dashed var(--ink-faint);
+}
+
+.log-end__text {
+  font-size: 22rpx;
+  color: var(--ink-faint);
+}
+
+/* ---------- 表单弹层 ---------- */
+.form {
+  padding-bottom: 8rpx;
+}
+
+.field {
+  margin-bottom: 24rpx;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 8rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.field__input {
+  width: 100%;
+  min-height: 88rpx;
+  padding: 0 20rpx;
+  font-size: var(--font-md);
+  color: var(--ink);
+  background-color: var(--bg);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+
+.field__area {
+  width: 100%;
+  min-height: 200rpx;
+  padding: 20rpx;
+  font-size: var(--font-md);
+  line-height: 1.6;
+  color: var(--ink);
+  background-color: var(--bg);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+
+.field__count {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72rpx;
+  margin: 0 16rpx 16rpx 0;
+  padding: 0 20rpx;
+  font-size: 24rpx;
+  color: var(--ink);
+  background-color: var(--bg);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.chip.is-on {
+  background-color: var(--marker-yellow);
+  border-style: solid;
+  font-weight: 800;
+}
+
+.form__submit {
+  width: 100%;
+  margin-top: 8rpx;
+}
+
+.form__tip {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}

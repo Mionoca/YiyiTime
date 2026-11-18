@@ -1,0 +1,27 @@
+<view wx:if="{{entry}}" class="gl" aria-role="listitem" aria-label="{{entry.a11y}}">
+  <view class="gl__head">
+    <text class="gl__emoji">{{entry.emoji}}</text>
+    <view class="gl__head-main">
+      <view class="gl__title">{{entry.title}}</view>
+      <view class="gl__meta">
+        <text class="gl__chip gl__chip--{{entry.archivedType}}">{{entry.chipText}}</text>
+        <text class="gl__date">{{entry.dateText}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="gl__body">
+    <view class="gl__section">
+      <text class="gl__who">我</text>
+      <text class="gl__text {{entry.myText ? '' : 'is-empty'}}">{{entry.myText || '还没写'}}</text>
+    </view>
+    <view class="gl__section">
+      <text class="gl__who">TA</text>
+      <text
+        wx:if="{{entry.partnerText}}"
+        class="gl__text"
+      >{{entry.partnerText}}</text>
+      <text wx:else class="gl__text is-empty">{{entry.partnerHint}}</text>
+    </view>
+  </view>
+</view>

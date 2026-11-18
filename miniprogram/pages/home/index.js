@@ -92,6 +92,10 @@ Page({
     pauseByName: '',
     pauseRemainText: '',
     pauseSaving: false,
+    // 一起变好（M11.4 / 文档 9.2 第 3.5 位）：条件卡，未绑定或无数据时不渲染
+    growthTitle: '',
+    growthSub: '',
+    growthAwaiting: false,
   },
 
   onLoad() {
@@ -210,6 +214,14 @@ Page({
     const pausePatch = pauseDataOf(pauseView, nowMs);
     Object.assign(patch, pausePatch);
     this._pauseBase = pauseBaseOf(pauseView, nowMs);
+
+    // 一起变好（M11.4 / 文档 7.18）：未绑定、单块降级 null 都不渲染成长卡
+    const growth = home.couple ? (home.growth || null) : null;
+    patch.growthTitle = growth
+      ? (growth.firstActiveTitle || (growth.awaitingConfirm ? '有件事在等你认领' : '还没有一起在做的事'))
+      : '';
+    patch.growthSub = growthSubText(growth);
+    patch.growthAwaiting = !!(growth && growth.awaitingConfirm);
 
     const bindState = (home.bind && home.bind.state) || 'unbound';
     if (!home.couple) {
@@ -591,6 +603,11 @@ Page({
     this.openEntry(constants.ROUTES.wish);
   },
 
+  /** 成长卡 → 一起变好页（文档 8.3.10） */
+  onTapGrowth() {
+    this.openEntry(constants.ROUTES.growth);
+  },
+
   onTapSafety() {
     this.openEntry(constants.ROUTES.safety);
   },
@@ -702,6 +719,16 @@ function diarySubText(couple, diary) {
 function wishSubText(wish) {
   if (!wish || !wish.total) return '还没有愿望';
   return wish.done + '/' + wish.total + ' 完成';
+}
+
+/** 成长卡摘要（文档 7.18）：待认领最要紧，其次在档件数与日志条数 */
+function growthSubText(growth) {
+  if (!growth) return '';
+  const parts = [];
+  if (growth.awaitingConfirm) parts.push('有事等你认领');
+  if (growth.inFlight) parts.push(growth.inFlight + ' 件在档');
+  if (growth.archivedCount) parts.push('日志 ' + growth.archivedCount + ' 件');
+  return parts.length ? parts.join(' · ') : '起草第一件一起做的事';
 }
 
 /** 报平安摘要：对方今天报过就直说，否则给「多久之前」，从没报过才说没报 */

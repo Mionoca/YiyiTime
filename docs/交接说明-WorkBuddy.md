@@ -2,7 +2,7 @@
 
 > 更新时间：2026-11-18 22:40（Asia/Shanghai）
 > 仓库：`D:/大学/YiyiTime`　分支：`hjj`　最新提交见 `git log -1 --oneline`（每轮都已推送，核对 `git rev-parse HEAD` 与 `git ls-remote origin hjj` 一致）
-> 单测基线：719 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
+> 单测基线：741 pass / 0 fail / 0 skip；`release-check`：21 PASS + 7 TODO + 0 FAIL（工作区有未提交改动时多一条 WARN）；`check-secrets`：exit 0。
 
 ## 一、当前状态
 
@@ -46,7 +46,7 @@ node scripts/check-secrets.js
 ## 四、尚未完成的代码侧事项（按优先级）
 
 1. **等用户真机验收反馈**：F1–F12 + 14.4 的 A/B 14 步 + `docs/M6-真机验收与发布.md` 第 2–4 节。收到问题按 P0/P1 修。
-2. **M11 先停一下 + 一起变好（成长任务池）**：M11.0（主文档合并到 v0.1.6）、M11.1（`pause` 服务端）、M11.2（pause 客户端：首页便签 / 和好卡 / 入口）、M11.3（`growth` 服务端九 action + 订阅提醒）**已完成**；**只剩 M11.4 growth 客户端**（首页成长卡 + `pages/growth` 任务池 / 成长日志 + `growth-item` / `growth-log-item` 组件 + 授权时机：动作完成且 `subQuota < 2` 才弹）与 **M11.5 收尾回归**（`e2e-page` 扩展、真机 F13 / F14）。
+2. **M11 先停一下 + 一起变好（成长任务池）**：M11.0（主文档合并到 v0.1.7）、M11.1（`pause` 服务端）、M11.2（pause 客户端）、M11.3（`growth` 服务端九 action + 订阅提醒）、M11.4（`pages/growth` + 两个组件 + 首页成长卡 + 授权时机）**全部完成**；**只剩 M11.5 收尾回归**：`e2e-page` 扩展、真机 F13 / F14（`docs/M6-真机验收与发布.md` 的清单要补 F13 / F14 两段），以及 release-check 的真机项文案从 F1–F12 改成 F1–F14。
 3. 唯一还剩的 P1 功能是 `diary.calendar`（心情 / 日记日历，7.12 的预留项），属于「可做可不做」的视觉增强。
 4. 若继续做自动化加固（非阻塞）：`runTimer` 没有并发压测（同一分钟两个实例同时跑到同一个用户，靠 `reminderLastSentDate` 事后去重，理论上可能发两条）；`ledger.list` 的 `summary` 与按天分组由客户端算，「同一秒两条账」的排序稳定性没锁；解绑的并发边界靠事务重读兜住，没有压测。
 5. 已实现功能的边界说明、已知偏差与手动项都记在 `docs/开发进度.md`，改功能时同步更新。

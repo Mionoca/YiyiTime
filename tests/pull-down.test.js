@@ -49,6 +49,7 @@ test('pull-down: 非自定义导航的子页都开启了 enablePullDownRefresh�
     'pages/anniversary/index',
     'pages/bind/index',
     'pages/diary/index',
+    'pages/growth/index',
     'pages/home/index',
     'pages/ledger/index',
     'pages/mood/index',

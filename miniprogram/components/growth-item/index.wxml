@@ -1,0 +1,76 @@
+<view
+  wx:if="{{task}}"
+  class="gi gi--{{task.status}} {{disabled ? 'gi--disabled' : ''}}"
+  aria-role="listitem"
+  aria-label="{{task.a11y}}"
+>
+  <view class="gi__head">
+    <text class="gi__emoji">{{task.emoji}}</text>
+    <view class="gi__head-main">
+      <view class="gi__title">{{task.title}}</view>
+      <view class="gi__meta">
+        <text class="gi__chip gi__chip--{{task.status}}">{{task.statusText}}</text>
+        <text class="gi__cat">{{task.categoryLabel}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="gi__parts">
+    <view class="gi__part">
+      <text class="gi__part-label">我的</text>
+      <text class="gi__part-text {{task.myPart ? '' : 'is-empty'}}">{{task.myPart || '还没分工'}}</text>
+    </view>
+    <view class="gi__part">
+      <text class="gi__part-label">TA 的</text>
+      <text class="gi__part-text {{task.partnerPart ? '' : 'is-empty'}}">{{task.partnerPart || '还没分工'}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{task.note}}" class="gi__note">{{task.note}}</view>
+  <view wx:if="{{task.harvestHint}}" class="gi__hint">{{task.harvestHint}}</view>
+
+  <view class="gi__ops">
+    <view
+      wx:if="{{task.canConfirm}}"
+      class="gi__btn gi__btn--primary"
+      catchtap="onConfirm"
+      aria-role="button"
+      aria-label="一起认领这件事"
+    >一起认领</view>
+    <view
+      wx:if="{{task.canDone}}"
+      class="gi__btn gi__btn--primary"
+      catchtap="onDone"
+      aria-role="button"
+      aria-label="标记为完成了"
+    >完成了</view>
+    <view
+      wx:if="{{task.canHarvest}}"
+      class="gi__btn gi__btn--primary"
+      catchtap="onHarvest"
+      aria-role="button"
+      aria-label="写一句收获"
+    >写收获</view>
+    <view
+      wx:if="{{task.canReview}}"
+      class="gi__btn"
+      catchtap="onReview"
+      aria-role="button"
+      aria-label="复盘收尾"
+    >复盘</view>
+    <view
+      wx:if="{{task.canEdit}}"
+      class="gi__btn"
+      catchtap="onEdit"
+      aria-role="button"
+      aria-label="改这件事"
+    >改</view>
+    <view
+      wx:if="{{task.canRemove}}"
+      class="gi__btn gi__btn--danger"
+      catchtap="onRemove"
+      aria-role="button"
+      aria-label="删掉这件事"
+    >删</view>
+  </view>
+</view>

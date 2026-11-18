@@ -34,10 +34,12 @@ YiyiTime/
 │  │  ├─ wish/                      # 下次见面想做的事
 │  │  ├─ mood/                      # 心情记录（两人按天倒序，只读时间线）
 │  │  ├─ anniversary/               # 纪念日管理（添加 / 修改 / 删除自定义纪念日）
-│  │  └─ ledger/                    # 记账本（tab 页：我的 / TA 的，按天分组 + 合计）
+│  │  ├─ ledger/                    # 记账本（tab 页：我的 / TA 的，按天分组 + 合计）
+│  │  └─ growth/                    # 一起变好（任务池 / 成长日志）
 │  ├─ custom-tab-bar/               # 自定义 tabBar（三项：今天 / 记账本 / 我的）
 │  ├─ components/                   # avatar-bubble / mood-picker / anniversary-stack / bottom-sheet /
-│  │                                # timeline-item / diary-card / wish-item / empty-state / privacy-guard
+│  │                                # timeline-item / diary-card / wish-item / growth-item / growth-log-item /
+│  │                                # empty-state / privacy-guard
 │  ├─ utils/                        # api（唯一云函数入口）、constants、tabbar、time、format（含元/分换算）、me、upload、haptics、privacy
 │  ├─ styles/tokens.wxss            # 手绘涂鸦风设计变量（颜色 / 描边 / 硬阴影 / 间距 / 字号）
 │  ├─ config/env.example.js         # 环境 ID 模板（env.js 不入库）
@@ -85,7 +87,7 @@ YiyiTime/
 ## 测试
 
 ```bash
-node --test tests/*.test.js       # 自动发现 tests/*.test.js（Node 22 实测 719 个用例）
+node --test tests/*.test.js       # 自动发现 tests/*.test.js（Node 22 实测 741 个用例）
 # 或只跑一个文件：node tests/anniversary.test.js
 ```
 

@@ -177,6 +177,25 @@
       </view>
     </view>
 
+    <!-- 3.5 成长卡（M11.4 / 文档 9.2）：第一条进行中 + 待认领红点 + 日志条数 -->
+    <view
+      class="dk-card growth-card card-gap"
+      wx:if="{{home.couple && growthTitle}}"
+      bindtap="onTapGrowth"
+      aria-role="button"
+      aria-label="一起变好：{{growthTitle}} {{growthSub}}"
+    >
+      <view class="card-head">
+        <text class="dk-label">一起变好</text>
+        <view class="dk-link">全部 ›</view>
+      </view>
+      <view class="growth-main">
+        <text class="growth-title">{{growthTitle}}</text>
+        <view class="growth-dot" wx:if="{{growthAwaiting}}">待认领</view>
+      </view>
+      <text class="growth-sub">{{growthSub}}</text>
+    </view>
+
   </block>
 
   <!-- 我们的日子浮层 -->

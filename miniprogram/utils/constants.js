@@ -17,6 +17,7 @@ const ROUTES = {
   mood: '/pages/mood/index',
   anniversary: '/pages/anniversary/index',
   ledger: '/pages/ledger/index',
+  growth: '/pages/growth/index',
 };
 
 /**
@@ -49,6 +50,13 @@ const LIMITS = {
   ledgerAmountMin: 1,
   ledgerAmountMax: 1000000,
   ledgerMonthCount: 60,
+  // 一起变好（文档 5.3.11 / 6.5）：标题 ≤30 字、分工 ≤50 字、备注 ≤100 字、
+  // 收获 / 复盘共用 100 字、在档（未归档）最多 10 件
+  growthTitle: 30,
+  growthPart: 50,
+  growthNote: 100,
+  growthText: 100,
+  growthInFlight: 10,
 };
 
 /**
@@ -64,6 +72,20 @@ const LEDGER_CATEGORIES = [
   { key: 'other', label: '其他', emoji: '📦' },
 ];
 
+/**
+ * 成长任务分类（文档 8.5 / 7.18）：key 与云函数 CATEGORIES 必须一致，
+ * emoji 只做辅助、文字一定同时出现（8.9）。
+ */
+const GROWTH_CATEGORIES = [
+  { key: 'learn', label: '学一件东西', emoji: '📖' },
+  { key: 'sport', label: '一起运动', emoji: '🏃' },
+  { key: 'money', label: '一起存钱', emoji: '🐷' },
+  { key: 'habit', label: '改掉坏习惯', emoji: '✂️' },
+  { key: 'other', label: '其他', emoji: '📦' },
+];
+
 const DEFAULT_AVATAR = '/images/avatars/default.png';
 
-module.exports = { MOODS, ROUTES, TAB_ROUTES, isTabRoute, LIMITS, LEDGER_CATEGORIES, DEFAULT_AVATAR };
+module.exports = {
+  MOODS, ROUTES, TAB_ROUTES, isTabRoute, LIMITS, LEDGER_CATEGORIES, GROWTH_CATEGORIES, DEFAULT_AVATAR,
+};

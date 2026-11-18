@@ -352,10 +352,12 @@ async function list(payload, ctx) {
       awaitingConfirm: docs.filter((doc) => doc.status === 'confirming').length,
       archivedCount: (archivedRes && archivedRes.total) || 0,
     },
-    // 订阅授权时机由客户端决定（文档 8.3.10）：额度低于 2 才弹，所以这里带上自己的额度
+    // 订阅授权时机由客户端决定（文档 8.3.10）：额度低于 2 才弹，所以这里带上自己的额度。
+    // templateId 不是秘密（requestSubscribeMessage 本来就要传），客户端不必再存一份
     subConfigured: growthSub.configured(),
     subQuota: growthSub.quotaOf(ctx.user),
     subQuotaMax: growthSub.QUOTA_MAX,
+    subTemplateId: growthSub.templateId(),
   };
 }
 

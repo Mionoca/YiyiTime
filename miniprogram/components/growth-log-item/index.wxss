@@ -1,0 +1,88 @@
+/* 成长日志条目（文档 8.4 / 8.7）：牛皮纸底，像一页写过的日记 */
+.gl {
+  margin-bottom: 16rpx;
+  padding: 24rpx;
+  background-color: var(--wall);
+  border-radius: var(--radius-md);
+}
+
+.gl__head {
+  display: flex;
+  align-items: flex-start;
+}
+
+.gl__emoji {
+  margin-right: 12rpx;
+  font-size: 28rpx;
+  line-height: 1.4;
+}
+
+.gl__head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.gl__title {
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.gl__meta {
+  display: flex;
+  align-items: center;
+  margin-top: 6rpx;
+}
+
+.gl__chip {
+  padding: 2rpx 12rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: var(--ink);
+  background-color: var(--marker-yellow);
+  border-radius: var(--radius-sm);
+}
+
+.gl__chip--reviewed {
+  color: #FFFFFF;
+  background-color: var(--thunder);
+}
+
+.gl__date {
+  margin-left: 12rpx;
+  font-size: 20rpx;
+  color: var(--muted);
+}
+
+.gl__body {
+  margin-top: 12rpx;
+}
+
+.gl__section {
+  display: flex;
+  align-items: baseline;
+  margin-top: 8rpx;
+}
+
+.gl__who {
+  flex: none;
+  width: 48rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.gl__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.gl__text.is-empty {
+  color: var(--ink-faint);
+}

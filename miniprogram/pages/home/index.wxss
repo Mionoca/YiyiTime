@@ -303,6 +303,49 @@
   white-space: nowrap;
 }
 
+/* ── 成长卡（M11.4 / 文档 9.2 第 3.5 位）───────────────────── */
+/* 走卡片流、不进四宫格（四宫格 2×2 是硬约束）；不旋转不贴胶带 */
+.growth-card {
+  display: block;
+}
+
+.growth-main {
+  display: flex;
+  align-items: center;
+  margin-top: 8rpx;
+}
+
+.growth-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 待认领：小红标，不做数字角标（文档 9.3） */
+.growth-dot {
+  flex: none;
+  margin-left: 12rpx;
+  padding: 2rpx 12rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background-color: var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.growth-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
 /* ── 浮层（我们的日子 / TA 的心情）───────────────────────────── */
 .sheet-mask {
   position: fixed;

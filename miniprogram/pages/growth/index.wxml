@@ -1,0 +1,222 @@
+<view class="page">
+
+  <view class="head">
+    <!-- 两分段：任务池 / 成长日志（文档 8.3.10，同账本页先例） -->
+    <view class="seg" aria-role="tablist" aria-label="切换任务池与成长日志">
+      <view
+        class="seg__item {{seg === 'pool' ? 'is-on' : ''}}"
+        data-seg="pool"
+        bindtap="onSwitchSeg"
+        aria-role="tab"
+        aria-selected="{{seg === 'pool'}}"
+      >任务池</view>
+      <view
+        class="seg__item {{seg === 'log' ? 'is-on' : ''}}"
+        data-seg="log"
+        bindtap="onSwitchSeg"
+        aria-role="tab"
+        aria-selected="{{seg === 'log'}}"
+      >成长日志</view>
+    </view>
+    <view class="head__sub" wx:if="{{seg === 'pool' && stats.inFlight > 0}}">
+      在档 {{stats.inFlight}} / {{inFlightMax}} 件<text wx:if="{{stats.awaitingConfirm > 0}}">，{{stats.awaitingConfirm}} 件等认领</text>
+    </view>
+    <view class="head__sub" wx:elif="{{seg === 'log' && stats.archivedCount > 0}}">
+      已经一起收了 {{stats.archivedCount}} 件
+    </view>
+  </view>
+
+  <!-- 静默刷新失败的细条：保留旧列表，给一个恢复入口（文档 12.9） -->
+  <view class="list-bar" wx:if="{{seg === 'pool' && listError}}" bindtap="onRetryList" aria-role="button" aria-label="{{listError}}">
+    <text class="list-bar__text">{{listError}}</text>
+  </view>
+
+  <!-- ── 任务池 ───────────────────────────────────────────────── -->
+  <block wx:if="{{seg === 'pool'}}">
+    <view wx:if="{{loading}}" class="hint">正在翻开你们的事…</view>
+
+    <empty-state
+      wx:elif="{{error}}"
+      title="{{error}}"
+      action-text="再试一次"
+      bind:action="onRetry"
+    />
+
+    <block wx:else>
+      <empty-state
+        wx:if="{{!items.length}}"
+        icon="🌱"
+        title="还没有一起在做的事"
+        desc="起草第一件小事，让 TA 来认领"
+        action-text="起草第一件"
+        bind:action="onAdd"
+      />
+
+      <block wx:else>
+        <view aria-role="list" aria-label="任务池共 {{items.length}} 件">
+          <growth-item
+            wx:for="{{items}}"
+            wx:key="taskId"
+            task="{{item}}"
+            disabled="{{saving}}"
+            bind:confirm="onConfirm"
+            bind:done="onDone"
+            bind:harvest="onHarvest"
+            bind:review="onReview"
+            bind:edit="onEdit"
+            bind:remove="onRemove"
+          />
+        </view>
+        <view class="add-bar">
+          <button class="btn-primary add-btn" bindtap="onAdd" disabled="{{saving}}">起草一件一起做的事</button>
+          <text class="add-tip">做完各自写一句收获，就会自动收进成长日志</text>
+        </view>
+      </block>
+    </block>
+  </block>
+
+  <!-- ── 成长日志 ─────────────────────────────────────────────── -->
+  <block wx:else>
+    <view wx:if="{{logLoading && !logLoaded}}" class="hint">正在翻成长日志…</view>
+
+    <empty-state
+      wx:elif="{{logError && !logLoaded}}"
+      title="{{logError}}"
+      action-text="再试一次"
+      bind:action="onRetryLog"
+    />
+
+    <block wx:else>
+      <empty-state
+        wx:if="{{logLoaded && !logGroups.length}}"
+        icon="📖"
+        title="这里还空着"
+        desc="完成的每件事，都会收进这里"
+      />
+
+      <block wx:else>
+        <view
+          class="month"
+          wx:for="{{logGroups}}"
+          wx:for-item="group"
+          wx:key="month"
+          aria-role="list"
+          aria-label="{{group.label}}"
+        >
+          <view class="month__head">
+            <text class="month__label">{{group.label}}</text>
+          </view>
+          <growth-log-item wx:for="{{group.items}}" wx:key="taskId" entry="{{item}}" />
+        </view>
+
+        <view class="log-more" wx:if="{{hasMore}}" bindtap="onLoadMore" aria-role="button" aria-label="加载更多">
+          <text class="log-more__text">{{logLoading ? '正在翻…' : '看更早的'}}</text>
+        </view>
+        <view class="log-more" wx:elif="{{logLoading}}">
+          <text class="log-more__text">正在翻…</text>
+        </view>
+        <view class="log-end" wx:elif="{{logGroups.length}}">
+          <text class="log-end__text">总共就这些了</text>
+        </view>
+      </block>
+    </block>
+  </block>
+
+  <!-- 起草 / 编辑（文档 8.3.10：共用同一个弹层） -->
+  <bottom-sheet show="{{formOpen}}" title="{{editing ? '改这件事' : '起草一件小事'}}" bind:close="onFormClose">
+    <view class="form">
+      <view class="field">
+        <text class="field__label">做什么</text>
+        <input
+          class="field__input"
+          value="{{form.title}}"
+          maxlength="{{titleMax}}"
+          placeholder="比如：一起背完六级词汇"
+          data-field="title"
+          bindinput="onFormInput"
+        />
+      </view>
+
+      <view class="field">
+        <text class="field__label">分类</text>
+        <view class="chips">
+          <view
+            class="chip {{form.category === item.key ? 'is-on' : ''}}"
+            wx:for="{{categories}}"
+            wx:key="key"
+            data-key="{{item.key}}"
+            bindtap="onPickCategory"
+            aria-role="radio"
+            aria-checked="{{form.category === item.key}}"
+          >{{item.emoji}} {{item.label}}</view>
+        </view>
+      </view>
+
+      <view class="field">
+        <text class="field__label">我的部分</text>
+        <input
+          class="field__input"
+          value="{{form.myPart}}"
+          maxlength="{{partMax}}"
+          placeholder="我负责什么（可不填）"
+          data-field="myPart"
+          bindinput="onFormInput"
+        />
+      </view>
+
+      <view class="field">
+        <text class="field__label">TA 的部分</text>
+        <input
+          class="field__input"
+          value="{{form.partnerPart}}"
+          maxlength="{{partMax}}"
+          placeholder="TA 负责什么（可不填）"
+          data-field="partnerPart"
+          bindinput="onFormInput"
+        />
+      </view>
+
+      <view class="field">
+        <text class="field__label">备注</text>
+        <input
+          class="field__input"
+          value="{{form.note}}"
+          maxlength="{{noteMax}}"
+          placeholder="还有什么想说的（可不填）"
+          data-field="note"
+          bindinput="onFormInput"
+        />
+      </view>
+
+      <button class="btn-primary form__submit" bindtap="onSubmit" disabled="{{saving}}">
+        {{saving ? '保存中…' : (editing ? '保存' : '起草')}}
+      </button>
+      <view class="form__tip">起草后要等 TA 认领，两个人都算数了才开始</view>
+    </view>
+  </bottom-sheet>
+
+  <!-- 写收获 / 写复盘（同一个弹层，文案跟着 mode 变） -->
+  <bottom-sheet
+    show="{{textOpen}}"
+    title="{{textMode === 'review' ? '复盘收尾' : '写一句收获'}}"
+    bind:close="onTextClose"
+  >
+    <view class="form">
+      <textarea
+        class="field__area"
+        value="{{text}}"
+        maxlength="{{textMax}}"
+        placeholder="{{textMode === 'review' ? '这件事想怎么收尾？写一句就好' : '你们做到了什么？写一句就好'}}"
+        bindinput="onTextInput"
+        auto-height
+      />
+      <view class="field__count">{{text.length}}/{{textMax}}</view>
+      <button class="btn-primary form__submit" bindtap="onSubmitText" disabled="{{textSaving}}">
+        {{textSaving ? '保存中…' : '写好了'}}
+      </button>
+      <view class="form__tip" wx:if="{{textMode === 'review'}}">复盘不需要对方同意，也不扣分——写一句就算体面收尾</view>
+      <view class="form__tip" wx:else>你写完就能看到 TA 那句；两个人都写了会自动收进成长日志</view>
+    </view>
+  </bottom-sheet>
+
+</view>

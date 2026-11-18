@@ -431,3 +431,43 @@ test('derive: 剩余不到 1 分钟说「马上就到点了」，未知状态不
   }));
   assert.strictEqual(unbound.pauseState, '');
 });
+
+// ── 成长卡（M11.4 / 文档 7.18 / 9.2 第 3.5 位）─────────────────────────
+
+test('derive: 成长卡优先显示进行中标题，待认领单独标记', () => {
+  const page = instantiate(config);
+  const patch = page.derive(baseHome({
+    growth: { inFlight: 2, firstActiveTitle: '一起背完六级词汇', awaitingConfirm: true, archivedCount: 5 },
+  }));
+  assert.strictEqual(patch.growthTitle, '一起背完六级词汇');
+  assert.strictEqual(patch.growthAwaiting, true);
+  assert.strictEqual(patch.growthSub, '有事等你认领 · 2 件在档 · 日志 5 件');
+});
+
+test('derive: 没有进行中但有认领中、完全空、未绑定三种情况', () => {
+  const page = instantiate(config);
+
+  const onlyConfirm = page.derive(baseHome({
+    growth: { inFlight: 1, firstActiveTitle: null, awaitingConfirm: true, archivedCount: 0 },
+  }));
+  assert.strictEqual(onlyConfirm.growthTitle, '有件事在等你认领');
+  assert.strictEqual(onlyConfirm.growthSub, '有事等你认领 · 1 件在档');
+
+  const empty = page.derive(baseHome({
+    growth: { inFlight: 0, firstActiveTitle: null, awaitingConfirm: false, archivedCount: 3 },
+  }));
+  assert.strictEqual(empty.growthTitle, '还没有一起在做的事');
+  assert.strictEqual(empty.growthSub, '日志 3 件');
+
+  // 单块读失败降级 null：整张卡不渲染（growthTitle 为空即 wx:if 不成立）
+  const broken = page.derive(baseHome({ growth: null }));
+  assert.strictEqual(broken.growthTitle, '');
+  assert.strictEqual(broken.growthSub, '');
+
+  // 未绑定：即使服务端误带 growth 也不显示
+  const unbound = page.derive(baseHome({
+    couple: null,
+    growth: { inFlight: 1, firstActiveTitle: '不应该出现', awaitingConfirm: false, archivedCount: 0 },
+  }));
+  assert.strictEqual(unbound.growthTitle, '');
+});
