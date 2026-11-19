@@ -412,7 +412,7 @@ test('隐私守卫：同意按钮同时绑 open-type 与 bindtap，卡片不得�
   // 根因是 open-type="agreePrivacyAuthorization" 只在基础库 ≥ 2.32.3 且公众平台配好
   // 《用户隐私保护指引》时才回调；没有 bindtap 兜底时，点击连「关闭弹窗」都不会发生。
   const wxml = fs.readFileSync(path.join(ROOT, 'miniprogram/components/privacy-guard/index.wxml'), 'utf8');
-  const button = /<button[^>]*class="privacy__agree"[^>]*>/.exec(wxml);
+  const button = /<button[^>]*class="privacy__agree[^"]*"[^>]*>/.exec(wxml);
   assert.ok(button, '找不到同意按钮');
   assert.match(button[0], /open-type="agreePrivacyAuthorization"/, '保留平台授权 open-type');
   assert.match(button[0], /bindagreeprivacyauthorization="onAgree"/, '保留平台回调');
@@ -484,29 +484,61 @@ test('隐私守卫：open-type 正常回调时不重复兜底，也不会广播�
   }
 });
 
-test('隐私守卫：原生授权也失败时，弹窗保持打开并给出可执行的说明', (t) => {
-  const calls = { toast: [], agree: 0 };
+test('隐私守卫：原生授权失败也要收尾，不能把用户锁在弹窗里', (t) => {
+  // 真机反馈：设置完指引后点「同意并继续」仍然没反应。
+  // 上一版在原生授权失败时「保持弹窗打开」，等于把用户停在一个按不动的按钮前——
+  // 平台这条路走不通时，站内弹窗本身就是同意记录，必须放行。
+  const calls = { agree: 0 };
   installWx({
     getStorageSync: () => '',
     setStorageSync: () => {},
     removeStorageSync: () => {},
-    showToast: (opts) => calls.toast.push(opts && opts.title),
+    showToast: () => {},
     getPrivacySetting: (opts) => opts.success({ needAuthorization: true }),
     requirePrivacyAuthorize: (opts) => opts.fail({ errMsg: 'requirePrivacyAuthorize:fail' }),
   });
   t.mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const comp = h.instantiateComponent(h.loadComponent('miniprogram/components/privacy-guard/index.js'));
-    comp.triggerEvent = () => { calls.agree += 1; };
+    comp.triggerEvent = (name) => { if (name === 'agree') calls.agree += 1; };
     comp.check();
     assert.strictEqual(comp.data.show, true, '需要授权时应显示弹窗');
 
     comp.onAgreeTap();
+    assert.strictEqual(comp.data.busy, true, '点击后必须立刻有反馈（按钮进入「正在打开授权…」）');
     t.mock.timers.tick(300);
-    assert.strictEqual(comp.data.show, true, '授权失败不能假装成功，弹窗要保持打开');
-    assert.strictEqual(calls.agree, 0, '没同意就不能广播 agree');
-    assert.strictEqual(calls.toast.length, 1, '必须给出提示，不能静默');
-    assert.match(calls.toast[0], /隐私保护指引/, '提示要指向真正的原因（平台侧配置）');
+    assert.strictEqual(comp.data.show, false, '原生授权失败也必须收起弹窗，不能停在按不动的按钮上');
+    assert.strictEqual(comp.data.busy, false, '收尾后要复位 busy');
+    assert.strictEqual(calls.agree, 1, '放行后要通知页面继续刚才的动作');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('隐私守卫：平台完全不回调时，5 秒兜底仍然收尾', (t) => {
+  const calls = { agree: 0, authorize: 0 };
+  installWx({
+    getStorageSync: () => '',
+    setStorageSync: () => {},
+    removeStorageSync: () => {},
+    showToast: () => {},
+    getPrivacySetting: (opts) => opts.success({ needAuthorization: true }),
+    // 既不 success 也不 fail：模拟接口异常不回调
+    requirePrivacyAuthorize: () => { calls.authorize += 1; },
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const comp = h.instantiateComponent(h.loadComponent('miniprogram/components/privacy-guard/index.js'));
+    comp.triggerEvent = (name) => { if (name === 'agree') calls.agree += 1; };
+    comp.check();
+
+    comp.onAgreeTap();
+    t.mock.timers.tick(300);
+    assert.strictEqual(calls.authorize, 1, '300ms 后应已发起原生授权');
+    assert.strictEqual(comp.data.show, true, '还在等用户回答，弹窗先留着');
+    t.mock.timers.tick(5000);
+    assert.strictEqual(comp.data.show, false, '接口不回调时也必须由兜底收尾');
+    assert.strictEqual(calls.agree, 1);
   } finally {
     restoreWx();
   }

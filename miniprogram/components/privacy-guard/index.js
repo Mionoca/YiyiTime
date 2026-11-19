@@ -11,6 +11,12 @@ const SKIP_MS = 24 * 60 * 60 * 1000;
 const AGREE_FALLBACK_MS = 300;
 
 /**
+ * 原生授权接口的兜底上限。正常情况下它一定会回调（用户点同意或拒绝）；
+ * 这里只是保证「极端情况下接口不回调」时，按钮也会在 5 秒内收尾，不把用户锁在弹窗里。
+ */
+const AUTHORIZE_GUARD_MS = 5000;
+
+/**
  * 隐私授权弹窗（文档 9.6 / 13.8 / 8.9）。
  * 只在微信要求授权时出现（wx.getPrivacySetting.needAuthorization），
  * 低版本基础库没有该 API 时直接交给微信原生弹窗，避免双重弹窗。
@@ -18,6 +24,7 @@ const AGREE_FALLBACK_MS = 300;
 Component({
   data: {
     show: false,
+    busy: false,
   },
 
   lifetimes: {
@@ -26,6 +33,7 @@ Component({
     },
     detached() {
       this.clearAgreeTimer();
+      this.clearAuthorizeGuard();
     },
   },
 
@@ -53,12 +61,13 @@ Component({
      */
     open() {
       this.clearAgreeTimer();
+      this.clearAuthorizeGuard();
       try {
         wx.removeStorageSync(SKIP_KEY);
       } catch (err) {
         // 存储不可用不影响弹出
       }
-      this.setData({ show: true });
+      this.setData({ show: true, busy: false });
     },
 
     /**
@@ -72,27 +81,45 @@ Component({
      * 没生效，改用 wx.requirePrivacyAuthorize 拉起微信原生授权弹窗，保证按钮永远有反应。
      */
     onAgreeTap() {
+      if (!this.data.show) return;
+      if (this.data.busy) return; // 连点只算一次
       this.clearAgreeTimer();
+      // 立刻给视觉反馈：按钮变成「正在打开授权…」，避免「点了没反应」的观感
+      this.setData({ busy: true });
       this._agreeTimer = setTimeout(() => {
         this._agreeTimer = null;
-        this.authorizeNatively();
+        this.settleAgree();
       }, AGREE_FALLBACK_MS);
     },
 
-    /** 原生授权兜底：open-type 不通时，让微信自己弹一次授权框 */
-    authorizeNatively() {
+    /**
+     * 收尾：先让微信记一次同意（原生授权），无论它成功、失败还是不回调，
+     * 最终都由 onAgree 关掉弹窗。
+     *
+     * 这里刻意**不把失败当成卡住**：平台侧没配好指引、基础库异常、接口不回调，
+     * 都不该让用户停在一个按不动的按钮前面。用户已经在弹窗里看过说明并明确点了同意，
+     * 站内弹窗本身即同意记录；真正的功能限制由后续接口的失败提示来说明。
+     */
+    settleAgree() {
       if (!this.data.show) return;
       if (typeof wx.requirePrivacyAuthorize !== 'function') {
-        this.toast('微信版本过低，请在「微信 → 我 → 设置 → 隐私」里同意后重试');
+        this.onAgree();
         return;
       }
-      wx.requirePrivacyAuthorize({
-        success: () => this.onAgree(),
-        fail: () => {
-          // 弹窗保持打开：用户还能点「查看指引」或「先逛逛」，而不是卡在一个假按钮上
-          this.toast('微信这边还没开放授权，多半是《用户隐私保护指引》还没配置好');
-        },
-      });
+      const self = this;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        self.clearAuthorizeGuard();
+        self.onAgree();
+      };
+      this._authorizeGuard = setTimeout(finish, AUTHORIZE_GUARD_MS);
+      try {
+        wx.requirePrivacyAuthorize({ success: finish, fail: finish });
+      } catch (err) {
+        finish();
+      }
     },
 
     /**
@@ -102,18 +129,20 @@ Component({
     onAgree() {
       if (!this.data.show) return;
       this.clearAgreeTimer();
+      this.clearAuthorizeGuard();
       try {
         wx.removeStorageSync(SKIP_KEY);
       } catch (err) {
         // 存储不可用不影响结果
       }
-      this.setData({ show: false });
+      this.setData({ show: false, busy: false });
       this.triggerEvent('agree');
     },
 
     onClose() {
       this.clearAgreeTimer();
-      this.setData({ show: false });
+      this.clearAuthorizeGuard();
+      this.setData({ show: false, busy: false });
       try {
         wx.setStorageSync(SKIP_KEY, Date.now());
       } catch (err) {
@@ -135,6 +164,13 @@ Component({
       if (this._agreeTimer) {
         clearTimeout(this._agreeTimer);
         this._agreeTimer = null;
+      }
+    },
+
+    clearAuthorizeGuard() {
+      if (this._authorizeGuard) {
+        clearTimeout(this._authorizeGuard);
+        this._authorizeGuard = null;
       }
     },
 

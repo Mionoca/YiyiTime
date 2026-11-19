@@ -88,6 +88,11 @@
   border: none;
 }
 
+/* 点击后立刻给反馈：按钮进入「正在打开授权…」态，避免「点了没反应」的观感 */
+.privacy__agree--busy {
+  opacity: 0.72;
+}
+
 .privacy__skip {
   display: flex;
   align-items: center;

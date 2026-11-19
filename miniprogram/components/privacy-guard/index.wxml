@@ -14,14 +14,15 @@
       弹窗像冻住一样（真机反馈）。因此额外绑 bindtap 兜底，见 onAgreeTap。
     -->
     <button
-      class="privacy__agree"
+      class="privacy__agree {{busy ? 'privacy__agree--busy' : ''}}"
       open-type="agreePrivacyAuthorization"
       bindagreeprivacyauthorization="onAgree"
       bindtap="onAgreeTap"
       aria-role="button"
+      aria-busy="{{busy}}"
       aria-label="同意隐私保护指引并继续"
     >
-      同意并继续
+      {{busy ? '正在打开授权…' : '同意并继续'}}
     </button>
     <view class="privacy__skip" bindtap="onClose" aria-role="button">先逛逛，之后再说</view>
   </view>
