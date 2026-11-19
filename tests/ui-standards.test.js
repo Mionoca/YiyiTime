@@ -185,20 +185,22 @@ test('8.8 所有 image 用 aspectFill，且 wxml / wxss 不用网络图片', () 
   }
 });
 
-test('8.8 列表头像（timeline-item）开启 lazy-load', () => {
-  const file = path.join(ROOT, 'components', 'timeline-item', 'index.wxml');
+test('8.8 头像（avatar-bubble，M14 起唯一头像渲染器）开启 lazy-load', () => {
+  // M14 下线报平安后 timeline-item 一起删了，头像只剩 avatar-bubble 一处渲染点
+  const file = path.join(ROOT, 'components', 'avatar-bubble', 'index.wxml');
   const list = tags(stripComments(read(file)), 'image');
-  assert.ok(list.length >= 1, '列表组件应有头像 image');
+  assert.ok(list.length >= 1, 'avatar-bubble 应有头像 image');
   for (const tag of list) {
-    assert.match(tag, /lazy-load/, '列表头像必须 lazy-load');
-    assert.match(tag, /aria-label/, '列表头像需要 aria-label（8.9）');
+    assert.match(tag, /lazy-load/, '头像必须 lazy-load');
   }
+  const text = stripComments(read(file));
+  assert.match(text, /aria-label=/, '头像组件需要 aria-label（8.9 可访问性）');
 });
 
 test('8.9 页面集合与滚动配置：全部可滚动、可下拉刷新', () => {
   const app = JSON.parse(read(path.join(ROOT, 'app.json')));
   const pages = app.pages.map((p) => p.replace(/^pages\//, '').replace(/\/index$/, ''));
-  assert.deepStrictEqual(pages.slice().sort(), ['anniversary', 'bind', 'diary', 'growth', 'home', 'ledger', 'mood', 'profile', 'safety', 'wish'], '页面集合变了，请同步本测试与发布文档');
+  assert.deepStrictEqual(pages.slice().sort(), ['anniversary', 'bind', 'diary', 'growth', 'home', 'ledger', 'mood', 'profile', 'wish'], '页面集合变了，请同步本测试与发布文档');
   for (const page of pages) {
     const json = JSON.parse(read(path.join(ROOT, 'pages', page, 'index.json')));
     assert.strictEqual(json.enablePullDownRefresh, true, page + ' 页应支持下拉刷新');
@@ -296,7 +298,8 @@ test('8.9 子页列表分页 10–20 条，onPageScroll 里不得 setData', () =
     assert.ok(m, page + ' 页应有 PAGE_SIZE 常量');
     return Number(m[1]);
   };
-  for (const page of ['diary', 'safety']) {
+  // M14 下线报平安后，带分页列表的子页只剩日记（成长池是固定窗口，不算列表分页）
+  for (const page of ['diary']) {
     const size = pageSize(page);
     assert.ok(size >= 10 && size <= 20, page + ' 页分页大小 ' + size + ' 不在 10–20（8.9）');
   }

@@ -11,6 +11,7 @@ const constants = require('../../utils/constants');
 const timeUtil = require('../../utils/time');
 const format = require('../../utils/format');
 const tabbar = require('../../utils/tabbar');
+const permissionCache = require('../../utils/permission-cache');
 
 const LIMITS = constants.LIMITS;
 /**
@@ -54,6 +55,8 @@ Page({
     summaryCount: 0,
     // 账本查看授权（M13，文档 7.19 / 8.3.8）：默认互不可见，申请 + 主人批准后才有 permission
     access: null,          // { status, scope, expiresAt, requestedAt }
+    // 权限三态的可信度：false = 还没拿到任何可信来源（快照或服务端），此时画骨架、不画锁（17.3）
+    accessKnown: false,
     accessBusy: false,
     incoming: [],          // 我是主人、待我处理的申请
     outgoing: [],          // 我是申请人、等对方处理
@@ -73,6 +76,8 @@ Page({
 
   onLoad() {
     this._firstShow = true;
+    // 先进快照再请求：已授权用户的首帧就是账本或骨架，不会闪回「申请查看」（17.3）
+    this.restoreAccessSnapshot();
     this.load();
   },
 
@@ -85,6 +90,7 @@ Page({
       return;
     }
     if (this._loaded) {
+      if (this.data.who === 'partner' && !this.data.accessKnown) this.restoreAccessSnapshot();
       this.load(true);
       this.loadAccess();
     }
@@ -186,6 +192,8 @@ Page({
         // M13：partner 视角带 permission（none/pending/approved/expired），me 视角恒为 null
         const access = res && res.permission ? res.permission : null;
         this._loaded = true;
+        // 服务端已给出答案：不管是「有权」还是「没申请过」，都算确知，并且写进快照
+        if (this.data.who === 'partner' && bound) this.persistAccess(access);
         this.setData({
           loading: false,
           error: '',
@@ -194,6 +202,7 @@ Page({
           maxDate: todayKey,
           bound,
           access,
+          accessKnown: this.data.who === 'partner' ? bound : this.data.accessKnown,
           who: bound ? this.data.who : 'me',
           month,
           monthText: timeUtil.formatMonthCN(month),
@@ -260,10 +269,13 @@ Page({
       summaryCount: 0,
       summaryLabel: who === 'me' ? '我这个月花了' : this.data.partnerName + '这个月花了',
       listError: '',
-      access: null,
+      // 不把 access 打回 null：那会让已授权用户先看到锁（17.3）。
+      // 先用同一个人的快照顶上；没有快照就是 unknown，wxml 画骨架。
+      accessKnown: false,
       formOpen: false,
       editing: false,
     });
+    if (who === 'partner') this.restoreAccessSnapshot();
     this.load(false, true);
     this.loadAccess();
   },
@@ -478,6 +490,21 @@ Page({
 
   // ── 账本查看授权（M13，文档 7.19 / 8.3.8）────────────────────
   /** 一次拿全双方视角：待我处理 / 我等对方 / 我已授权 / 我能看谁 */
+  /** 用本地快照先把权限态画出来（17.3）：命中即 granted / locked；未命中保持 unknown 等请求 */
+  restoreAccessSnapshot() {
+    const snap = permissionCache.read();
+    if (!snap) {
+      this.setData({ accessKnown: false });
+      return;
+    }
+    this.setData({ access: snap, accessKnown: true });
+  },
+
+  /** 服务端结果写快照；失败静默（只影响下一次首帧） */
+  persistAccess(permission) {
+    permissionCache.write(permission);
+  },
+
   async loadAccess() {
     if (!this.data.bound) {
       this.setData({ incoming: [], outgoing: [], granted: [], canViewPartner: false });

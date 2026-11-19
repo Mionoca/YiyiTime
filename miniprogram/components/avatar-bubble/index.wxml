@@ -9,6 +9,6 @@
     <view class="bubble__tail"></view>
   </view>
   <view class="avatar-wrap">
-    <image class="avatar" src="{{avatar}}" mode="aspectFill" />
+    <image class="avatar" src="{{avatar}}" mode="aspectFill" lazy-load />
   </view>
 </view>

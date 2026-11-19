@@ -68,7 +68,12 @@
           aria-role="button"
           aria-label="添加配图"
         >＋</view>
-        <view wx:if="{{uploadingCount}}" class="editor__add editor__add--busy">…</view>
+        <view
+          wx:if="{{uploadingCount}}"
+          class="editor__add editor__add--busy"
+          aria-role="status"
+          aria-label="正在上传第 {{uploadingTotal - uploadingCount + 1}} 张，共 {{uploadingTotal}} 张"
+        >{{uploadingTotal - uploadingCount + 1}}/{{uploadingTotal}}</view>
       </view>
 
       <view class="editor__row">
@@ -202,4 +207,8 @@
   </block>
 
   <canvas type="2d" id="poster" class="poster-canvas" style="width:{{posterWidth}}px;height:{{posterHeight}}px"></canvas>
+
+  <!-- 隐私授权（文档 9.6 / 13.8 / 17.2）：选图、保存相册都属于隐私接口，
+       没有这个守卫时 wx.chooseMedia 会被平台直接拦下，用户看到的是「点了没反应」 -->
+  <privacy-guard />
 </view>

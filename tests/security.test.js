@@ -167,15 +167,19 @@ test('内容安全：昵称走 scene=1（资料），愿望标题走 scene=3（�
   assert.deepStrictEqual(calls.map((c) => c.args.content), ['去看海', '夏天之前']);
 });
 
-test('内容安全：日记 / 报平安 / 记账备注都会被审', async () => {
+test('内容安全：日记 / 一起变好 / 记账备注都会被审（M14 起报平安不再送审）', async () => {
   const h = setup();
   await h.callAs(A, 'diary.save', { content: '今天也很喜欢你' });
-  await h.callAs(A, 'safety.checkin', { note: '加班，晚点回' });
+  await h.callAs(A, 'growth.add', { title: '周末去看展', category: 'other', note: '加班，晚点回' });
   await h.callAs(A, 'ledger.add', { amount: 1250, category: 'food', note: '午饭' });
 
   const contents = callsOf(h, 'security.msgSecCheck').map((c) => c.args.content);
-  assert.deepStrictEqual(contents, ['今天也很喜欢你', '加班，晚点回', '午饭']);
+  assert.deepStrictEqual(contents, ['今天也很喜欢你', '周末去看展', '加班，晚点回', '午饭']);
   contents.forEach((c) => assert.ok(c.length > 0));
+
+  // 报平安 action 已下线：调用直接是 UNKNOWN_ACTION，走不到内容安全
+  const gone = await h.callAs(A, 'safety.checkin', { note: '到家啦' });
+  assert.strictEqual(gone.code, 'UNKNOWN_ACTION');
 });
 
 test('内容安全：愿望与记账的「修改」分支同样要审，不能只审新增', async () => {

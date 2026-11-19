@@ -5,7 +5,7 @@
  * 每个 tab 页要在 onShow 里报一次自己的下标。三处都要判空：
  * - 单测里页面实例没有 getTabBar；
  * - 首次渲染时 getTabBar() 可能返回 null；
- * - 非 tab 页（bind / safety）根本没有 tabBar。
+ * - 非 tab 页（bind / diary / growth 等）根本没有 tabBar。
  */
 const ROUTES = require('./constants').ROUTES;
 

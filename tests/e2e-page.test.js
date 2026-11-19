@@ -30,7 +30,6 @@ const START = '2024-05-20';
 
 const HOME = 'miniprogram/pages/home/index.js';
 const BIND = 'miniprogram/pages/bind/index.js';
-const SAFETY = 'miniprogram/pages/safety/index.js';
 const DIARY = 'miniprogram/pages/diary/index.js';
 const WISH = 'miniprogram/pages/wish/index.js';
 const MOOD = 'miniprogram/pages/mood/index.js';
@@ -194,13 +193,13 @@ test('绑定页 ↔ 云函数：A 生成邀请码、B 预览并申请、A 确认
   const couple = h.fake().get('couples', userA.coupleId);
   assert.deepStrictEqual(couple.memberOpenids, [A, B]);
   assert.strictEqual(couple.startDate, pageA.data.startDate);
-  assert.strictEqual(vibrated, 0, '绑定流程不应触发振动（文档 8.9 只用于抱抱/报平安）');
+  assert.strictEqual(vibrated, 0, '绑定流程不应触发振动（文档 8.9 只在关键动作上给一次反馈）');
 
   pageA.onUnload();
   pageB.onUnload();
 });
 
-test('首页 ↔ 云函数：绑定后展示服务端聚合的天数、纪念日与门灯', async () => {
+test('首页 ↔ 云函数：绑定后展示服务端聚合的天数、纪念日与各卡摘要', async () => {
   setup();
   await seedBound();
   const page = await openHome(A);
@@ -223,7 +222,7 @@ test('首页 ↔ 云函数：绑定后展示服务端聚合的天数、纪念日
     + ' · 还有 ' + server.couple.anniversary.daysLeft + ' 天';
   assert.strictEqual(page.data.anniversaryText, expectedAnniversary);
   // 其它区块：还没人打卡/进房间
-  assert.strictEqual(page.data.safetySub, '还没报平安');
+  assert.strictEqual(page.data.growthSub, '起草第一件一起做的事', '一起变好还没有任务');
   assert.strictEqual(page.data.diarySub, '今天还没写');
   assert.strictEqual(page.data.wishSub, '还没有愿望');
   assert.strictEqual(page.data.moodMine, null);
@@ -347,44 +346,6 @@ test('纪念日：A 在管理页添加后，双方首页堆叠多一张卡', asy
   pageA.onUnload();
   pageB.onUnload();
   manageB.onUnload();
-});
-
-test('报平安：A 报平安后 B 的首页门灯亮、门牌显示 TA 到家了', async () => {
-  setup();
-  await seedBound();
-  const pageA = await openHome(A);
-
-  currentOpenid = A;
-  const safety = openPage(SAFETY);
-  safety.onLoad();
-  await waitFor(() => !safety.data.loading && safety.data.todayKey, '报平安页加载完成');
-  const serverHome = await ok(A, 'home.get');
-  assert.strictEqual(safety.data.todayKey, serverHome.todayKey, '页面日期必须是服务端今天');
-
-  safety.onNoteInput({ detail: { value: '  刚到家  ' } });
-  await safety.onCheckin();
-  assert.strictEqual(safety.data.checking, false);
-  assert.strictEqual(safety.data.note, '', '成功后应清空备注');
-  assert.strictEqual(toasts[toasts.length - 1], '我到家了', '实际 toasts：' + JSON.stringify(toasts));
-  assert.strictEqual(vibrated, 1, '报平安应轻振动一次');
-  assert.strictEqual(safety.data.items.length, 1);
-  assert.strictEqual(safety.data.items[0].note, '刚到家');
-  assert.ok(safety.data.items[0].checkinId);
-
-  const pageB = await openHome(B);
-  assert.strictEqual(pageB.data.safetySub, 'TA 到家了');
-
-  // B 的报平安页能看到 A 的记录（时间线走真实 safety.list）
-  currentOpenid = B;
-  meUtil.clearMe(); // 同一进程模拟两个账号，清掉单账号会话缓存
-  const safetyB = openPage(SAFETY);
-  safetyB.onLoad();
-  await waitFor(() => !safetyB.data.loading && safetyB.data.items.length === 1, 'B 看到 A 的报平安');
-  assert.strictEqual(safetyB.data.items[0].openid, A);
-  assert.strictEqual(safetyB.data.items[0].note, '刚到家');
-
-  pageA.onUnload();
-  pageB.onUnload();
 });
 
 test('日记：默认私密双方互不可见，手动开启「这篇给他看」后对方才读到正文', async () => {
@@ -543,33 +504,6 @@ test('愿望：A 新增愿望后，B 的首页统计与愿望页都能看到，�
   pageA.onUnload();
   pageB.onUnload();
 });
-test('报平安：10 分钟内重复点击走 deduped 分支，不新增记录也不重复振动', async () => {
-  setup();
-  await seedBound();
-  currentOpenid = A;
-  const page = openPage(SAFETY);
-  page.onLoad();
-  await waitFor(() => !page.data.loading && page.data.todayKey, '报平安页加载完成');
-
-  page.onNoteInput({ detail: { value: '第一次' } });
-  await page.onCheckin();
-  assert.strictEqual(page.data.items.length, 1);
-  const firstId = page.data.items[0].checkinId;
-  const vibratedOnce = vibrated;
-
-  page.onNoteInput({ detail: { value: '第二次' } });
-  await page.onCheckin();
-  assert.strictEqual(toasts[toasts.length - 1], '刚刚已经报过平安', '实际 toasts：' + JSON.stringify(toasts));
-  assert.strictEqual(page.data.note, '', '去重也要清空备注');
-  assert.strictEqual(page.data.items.length, 1, '去重不能新增记录');
-  assert.strictEqual(page.data.items[0].checkinId, firstId);
-  assert.strictEqual(vibrated, vibratedOnce, '去重不应再振动');
-
-  const list = await ok(A, 'safety.list', { limit: 10 });
-  assert.strictEqual(list.items.length, 1, '云函数侧也只应有一条');
-  assert.strictEqual(list.items[0].note, '第一次', '重复点击不能覆盖原备注');
-});
-
 test('纪念日：B 删掉 A 正在看的那张后，A 刷新时堆叠回到第一张', async () => {
   setup();
   await seedBound();
@@ -730,52 +664,17 @@ test('解绑：A 在我的页申请，B 首页出现提示，B 确认后双方�
   profileB.onUnload();
 });
 
-// ── M11：先停一下（F13）与一起变好（F14）跨层校验 ─────────────────────────
+// ── M11 一起变好（F14）跨层校验；M14 起同段的「先停一下」（F13）已下线 ──────────
 
 /**
  * 页面方法里的 api.call 走的是全局 currentOpenid，所以**每次操作前都要显式切换身份**
- * （否则 A 的页面会以 B 的身份发请求，pause.end 会拿到 PAUSE_NOT_OWNER）。
+ * （否则 A 的页面会以 B 的身份发请求，growth.confirm 会拿到 GROWTH_STATE_INVALID）。
  * 页面注册到 t.after 里统一 onUnload，避免失败时首页倒计时定时器把进程挂住。
  */
 function trackPage(t, page) {
   t.after(() => { try { page.onUnload(); } catch (err) { /* 只为清理定时器 */ } });
   return page;
 }
-
-test('先停一下：A 按暂停后双方首页都出现便签，A 提前结束后 B 选和好话，卡片消失', async (t) => {
-  setup();
-  await seedBound();
-
-  // A 按 30 分钟（页面入口是 ActionSheet，这里直接调 startPause，等价于选完 30 分钟）
-  currentOpenid = A;
-  const pageA = trackPage(t, await openHome(A));
-  await pageA.startPause(30);
-  await waitFor(() => pageA.data.pauseState === 'active', 'A 首页出现便签');
-  assert.strictEqual(pageA.data.pauseByMe, true, '发起方看到「我缓好了」');
-
-  // B 打开首页：同一条暂停，视角是「TA 按的」
-  const pageB = trackPage(t, await openHome(B));
-  assert.strictEqual(pageB.data.pauseState, 'active');
-  assert.strictEqual(pageB.data.pauseByMe, false);
-  assert.strictEqual(pageB.data.pauseByName, '小怡');
-  assert.ok(/还有 \d+ 分钟/.test(pageB.data.pauseRemainText), '要有倒计时文案');
-
-  // A 提前结束 → 翻面成和好卡（切回 A 的身份再操作）
-  currentOpenid = A;
-  await pageA.onTapPauseEnd();
-  assert.strictEqual(pageA.data.pauseState, 'ended', '发起方结束后立刻翻面');
-
-  const pageB2 = trackPage(t, await openHome(B));
-  assert.strictEqual(pageB2.data.pauseState, 'ended', '双方都看到和好卡');
-
-  // B 选一句 → 双方便签消失
-  currentOpenid = B;
-  await pageB2.onTapPauseChoose({ currentTarget: { dataset: { choice: 'later' } } });
-  assert.strictEqual(pageB2.data.pauseState, '', '选完本端立刻收起');
-
-  const pageA2 = trackPage(t, await openHome(A));
-  assert.strictEqual(pageA2.data.pauseState, '', 'closed 之后对方也看不到了（等于不存在）');
-});
 
 test('一起变好：A 起草 → B 认领 → A 标记完成 → 双方写收获后自动进成长日志', async (t) => {
   setup();

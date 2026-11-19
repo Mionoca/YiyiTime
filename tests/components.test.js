@@ -2,6 +2,8 @@
 
 // 组件级单测：直接执行各组件目录下的 index.js 逻辑（observers / methods / lifetimes）。
 // 不渲染 WXML、不模拟样式，只锁组件对外行为：属性映射、一次性动画、事件载荷、防重。
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert');
 const h = require('./helpers/client-page');
@@ -386,34 +388,19 @@ test('privacy-guard：needAuthorization 才弹、24h 内不再打扰、同意/�
   assert.ok(toasts.filter((t) => t.title.indexOf('微信 - 设置 - 隐私') >= 0).length >= 2);
 });
 
-test('timeline-item：自己/对方文案与头像缺省、时间用页面传的服务端 todayKey', () => {
-  installWx();
-  const config = h.loadComponent('miniprogram/components/timeline-item/index.js');
-  const comp = h.instantiateComponent(config);
-  const now = new Date('2026-11-16T06:30:00.000Z');
-  const todayKey = timeUtil.dateKeyOf(now);
-
-  comp.setProps({ item: { openid: 'oA', createdAt: now, nickname: '', avatarFileID: '', note: '', date: todayKey }, isMine: true, todayKey });
-  assert.strictEqual(comp.data.avatar, constants.DEFAULT_AVATAR);
-  assert.strictEqual(comp.data.nickname, '我');
-  assert.strictEqual(comp.data.emptyText, '我到家了');
-  assert.strictEqual(comp.data.note, '');
-  assert.ok(/今天 \d{2}:\d{2}/.test(comp.data.timeText), '今天的时间显示「今天 HH:mm」，实际：' + comp.data.timeText);
-
-  comp.setProps({ item: { openid: 'oB', createdAt: now, nickname: '小怡', avatarFileID: 'cloud://env/a.png', note: '路上买点水果', date: todayKey }, isMine: false, todayKey });
-  assert.strictEqual(comp.data.avatar, 'cloud://env/a.png');
-  assert.strictEqual(comp.data.nickname, '小怡');
-  assert.strictEqual(comp.data.note, '路上买点水果');
-  assert.strictEqual(comp.data.emptyText, 'TA 到家了');
-
-  // 没有服务端 todayKey 时：这条 2026-11-16 的记录不能被当成「今天」（用固定日期验证展示层只依赖传入值）
-  const past = new Date('2026-11-12T02:00:00.000Z');
-  comp.setProps({ item: { createdAt: past, note: '前天' }, isMine: false, todayKey: '2026-11-16' });
-  assert.ok(!comp.data.timeText.startsWith('今天'), '非今天的记录不能显示「今天」：' + comp.data.timeText);
-
-  comp.setProps({ item: null });
-  assert.strictEqual(comp.data.nickname, '');
-  assert.strictEqual(comp.data.timeText, '');
+test('M14 下线：timeline-item 组件已删除，头像只由 avatar-bubble 渲染', () => {
+  const root = path.join(__dirname, '..', 'miniprogram', 'components');
+  assert.strictEqual(fs.existsSync(path.join(root, 'timeline-item')), false, 'timeline-item 应随报平安一起删除');
+  assert.strictEqual(fs.existsSync(path.join(root, 'avatar-bubble', 'index.js')), true, 'avatar-bubble 仍保留');
+  // 全仓库不得再有组件引用已删除的 timeline-item
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+    const p = path.join(dir, d.name);
+    return d.isDirectory() ? walk(p) : [p];
+  });
+  const offenders = walk(path.join(__dirname, '..', 'miniprogram'))
+    .filter((f) => /\.(json|wxml)$/.test(f))
+    .filter((f) => fs.readFileSync(f, 'utf8').includes('timeline-item'));
+  assert.deepStrictEqual(offenders, [], '还有文件引用已删除的 timeline-item：' + offenders.join(', '));
 });
 
 test('wish-item：首次不弹、完成→弹跳一次、事件载荷与 disabled 防重', async () => {

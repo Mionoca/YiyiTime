@@ -32,6 +32,14 @@
   }
 }
 
+/* tab 页（今天 / 记账本 / 我的）里弹层要让开 custom-tab-bar 的高度：
+   只加 padding 不动定位——弹层仍贴底，内容整体上移，tab 栏在留白区可见可点（17.6） */
+.mp-sheet--above {
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom) + 100rpx);
+  max-height: calc(70vh - 100rpx - env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
 .mp-handle {
   width: 64rpx;
   height: 8rpx;

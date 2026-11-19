@@ -7,7 +7,8 @@
  * 每个 test 对应一个 F 项，断言直接抄文档 2.5 的验收条目；不能自动化的部分在注释里写明：
  * - F1 的双人真机流程（两台手机两个微信号）：本文件覆盖绑定契约，真机流程仍需手动；
  * - F3 的场景视觉/热区：home-layout.test.js + 真机四档机型；
- * - F4 的心情气泡、F6 的门灯/时间线滚动、F7 的解锁时点、F8 的打勾动画：客户端单测 + 真机；
+ * - F4 的心情气泡、F7 的解锁时点、F8 的打勾动画：客户端单测 + 真机；
+ * - F6 报平安已在 M14 下线，本文件只做「action 不再注册 + 首页不再聚合」的回归；
  * - 14.4 步骤 12 断网恢复：client-api.test.js / client-*.test.js 覆盖客户端提示，真机断网仍要手动；
  * - 14.4 步骤 13 拒绝头像授权：本文件 F1 从「只起昵称、没有头像」开始绑定，等价覆盖；
  * - 14.4 步骤 14 四档机型：home-layout.test.js + 真机。
@@ -16,6 +17,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
 
 const { createHarness } = require('./helpers/cloud-entry');
 const time = require('../cloudfunctions/api/lib/time');
@@ -239,13 +241,13 @@ test('F3 场景化首页三状态：未绑定空房 / 邀请中 / 已绑定聚�
   h.reset({});
   await callAs(A, 'user.updateProfile', { nickname: '小怡' });
 
-  // 未绑定：空房间，五个双人区块全 null，不能进入双人功能（服务端 requireBound）
+  // 未绑定：空房间，四个双人区块全 null，不能进入双人功能（服务端 requireBound）
   const unbound = await callAs(A, 'home.get', {});
   assert.strictEqual(unbound.bind.state, 'unbound');
   assert.strictEqual(unbound.bind.pending, null);
   assert.deepStrictEqual(unbound.couple, null);
   assert.deepStrictEqual(unbound.partner, null);
-  for (const key of ['mood', 'anniversary', 'safety', 'diary', 'wish']) {
+  for (const key of ['mood', 'anniversary', 'diary', 'wish']) {
     assert.strictEqual(unbound[key], null, '未绑定 ' + key + ' 必须为 null');
   }
   assert.deepStrictEqual(Object.keys(unbound.user).sort(), ['avatarFileID', 'nickname', 'openid', 'profileComplete']);
@@ -269,7 +271,7 @@ test('F3 场景化首页三状态：未绑定空房 / 邀请中 / 已绑定聚�
   assert.strictEqual(pendingB.bind.state, 'applied_by_me');
   assert.strictEqual(pendingB.bind.pending.other.nickname, '小怡');
 
-  // 已绑定：双方头像/昵称、天数、纪念日、五个区块对象都在（空数据是空对象不是 null）
+  // 已绑定：双方头像/昵称、天数、纪念日、四个区块对象都在（空数据是空对象不是 null）
   await callAs(A, 'bind.confirm', { code: created.code });
   const boundA = await callAs(A, 'home.get', {});
   const boundB = await callAs(B, 'home.get', {});
@@ -280,12 +282,11 @@ test('F3 场景化首页三状态：未绑定空房 / 邀请中 / 已绑定聚�
   assert.strictEqual(boundA.user.openid, A);
   assert.strictEqual(boundA.couple.daysTogether, time.daysTogether(START, boundA.todayKey));
   assert.ok(boundA.couple.anniversary && boundA.couple.anniversary.date);
-  for (const key of ['mood', 'anniversary', 'safety', 'diary', 'wish']) {
+  for (const key of ['mood', 'anniversary', 'diary', 'wish']) {
     assert.notStrictEqual(boundA[key], null, '已绑定 ' + key + ' 应为聚合对象');
   }
   assert.deepStrictEqual(boundA.mood, { mine: null, partner: null });
   assert.deepStrictEqual(boundA.anniversary, { items: [] });
-  assert.deepStrictEqual(boundA.safety, { mineToday: false, partnerToday: false, partnerLastAt: null });
   assert.deepStrictEqual(boundA.wish, { total: 0, done: 0, previewTitle: null });
   assert.deepStrictEqual(boundA.diary, {
     mineWritten: false,
@@ -450,127 +451,24 @@ test('F2 纪念日：添加 / 双方可见 / 修改同步 / 上限 8 条 / 删�
   }, 'INVALID_INPUT');
 });
 
-// ---------------------------------------------------------------- F6 报平安
-test('F6 报平安：一键 / 10 分钟去重 / 双方今日状态 / 时间线倒序分页 / 50 字备注', async () => {
+// ---------------------------------------------------------------- F6 报平安（M14 下线）
+test('F6 报平安已下线（M14）：action 不再注册，首页不再聚合 safety 区块', async () => {
   seedBound();
-  const home0 = await callAs(A, 'home.get', {});
-  const todayKey = home0.todayKey;
-  const yesterdayKey = time.addDays(todayKey, -1);
-  const now = Date.now();
+  const home = await callAs(A, 'home.get', {});
 
-  const checkin = await callAs(A, 'safety.checkin', { note: '到家啦' });
-  assert.strictEqual(checkin.deduped, false);
-  assert.strictEqual(checkin.entry.date, todayKey);
-  assert.strictEqual(checkin.entry.note, '到家啦');
-  const dup = await callAs(A, 'safety.checkin', { note: '又点一次' });
-  assert.strictEqual(dup.deduped, true, '10 分钟内重复点击不新增');
-  assert.strictEqual(dup.entry.checkinId, checkin.entry.checkinId);
-  assert.strictEqual(h.fake().all('safety_checkins').length, 1);
-  assert.strictEqual(dup.entry.createdAt, checkin.entry.createdAt, '去重不能改创建时间');
+  // 文档 17.3：safety.checkin / safety.list 连同 safety_checkins 集合一起下线
+  await expectFail(A, 'safety.checkin', { note: '到家啦' }, 'UNKNOWN_ACTION');
+  await expectFail(A, 'safety.list', { limit: 5 }, 'UNKNOWN_ACTION');
+  assert.strictEqual(home.safety, undefined, '首页不得再返回 safety 区块');
+  assert.strictEqual(home.pause, undefined, '首页不得再返回 pause 区块');
 
-  // 去重窗口是 10 分钟：9 分钟前同一天算重复且不覆盖原备注，满 10 分钟就算新记录（审查 P2-3）
-  h.reset({
-    users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
-    couples: [coupleDoc(COUPLE_ID)],
-    safety_checkins: [{
-      _id: 's_9min', coupleId: COUPLE_ID, openid: A, note: '九分钟前', date: todayKey,
-      createdAt: new Date(now - 9 * 60 * 1000),
-    }],
-  });
-  const nine = await callAs(A, 'safety.checkin', { note: '又点一次' });
-  assert.strictEqual(nine.deduped, true, '9 分钟前同一天算重复');
-  assert.strictEqual(nine.entry.checkinId, 's_9min');
-  assert.strictEqual(nine.entry.note, '九分钟前', '去重不能覆盖原记录备注');
-  assert.strictEqual(h.fake().all('safety_checkins').length, 1);
-
-  h.reset({
-    users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
-    couples: [coupleDoc(COUPLE_ID)],
-    safety_checkins: [{
-      _id: 's_10min', coupleId: COUPLE_ID, openid: A, note: '十分钟前', date: todayKey,
-      createdAt: new Date(now - 10 * 60 * 1000),
-    }],
-  });
-  const ten = await callAs(A, 'safety.checkin', { note: '十分钟后' });
-  assert.strictEqual(ten.deduped, false, '满 10 分钟算新记录（窗口是严格小于）');
-  assert.strictEqual(ten.entry.date, todayKey);
-  assert.strictEqual(h.fake().all('safety_checkins').length, 2);
-
-  // 跨天边界：23:58 报过、次日 00:02 再点应算新的一天。
-  // safety.js 的 last.date === todayKey 分支是全仓库唯一入口（审查 P1-1：删掉它其余用例全绿）
-  h.reset({
-    users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
-    couples: [coupleDoc(COUPLE_ID)],
-    safety_checkins: [{
-      _id: 's_before_midnight', coupleId: COUPLE_ID, openid: A, note: '昨天睡前', date: yesterdayKey,
-      createdAt: new Date(now - 2 * 60 * 1000),
-    }],
-  });
-  const crossDay = await callAs(A, 'safety.checkin', { note: '零点后' });
-  assert.strictEqual(crossDay.deduped, false, '跨天即使 2 分钟前报过也不去重');
-  assert.strictEqual(crossDay.entry.date, todayKey);
-  assert.notStrictEqual(crossDay.entry.checkinId, 's_before_midnight');
-  assert.strictEqual(crossDay.entry.note, '零点后', '新一天要写新备注');
-  assert.strictEqual(h.fake().all('safety_checkins').length, 2);
-
-  // 对照：昨天 11 分钟前（窗口外）同样不参与今天的去重
-  h.reset({
-    users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
-    couples: [coupleDoc(COUPLE_ID)],
-    safety_checkins: [{
-      _id: 's_yesterday_old', coupleId: COUPLE_ID, openid: A, note: '昨天', date: yesterdayKey,
-      createdAt: new Date(now - 11 * 60 * 1000),
-    }],
-  });
-  const crossDayOld = await callAs(A, 'safety.checkin', { note: '今天第一次' });
-  assert.strictEqual(crossDayOld.deduped, false);
-
-  await expectFail(A, 'safety.checkin', { note: '字'.repeat(51) }, 'TEXT_TOO_LONG');
-  await callAs(B, 'safety.checkin', { note: '字'.repeat(50) });
-
-  // 首页双方今日状态
-  const homeA = await callAs(A, 'home.get', {});
-  assert.strictEqual(homeA.safety.mineToday, true);
-  assert.strictEqual(homeA.safety.partnerToday, true);
-  assert.strictEqual(homeA.safety.partnerLastAt, h.fake().all('safety_checkins').find((d) => d.openid === B).createdAt.toISOString());
-
-  // 时间线：双方混排、时间倒序、分页不重不漏
-  h.reset({
-    users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
-    couples: [coupleDoc(COUPLE_ID)],
-    safety_checkins: [
-      { _id: 's1', coupleId: COUPLE_ID, openid: A, note: '1', date: todayKey, createdAt: new Date(now - 5000) },
-      { _id: 's2', coupleId: COUPLE_ID, openid: B, note: '2', date: todayKey, createdAt: new Date(now - 4000) },
-      { _id: 's3', coupleId: COUPLE_ID, openid: A, note: '3', date: todayKey, createdAt: new Date(now - 3000) },
-      { _id: 's4', coupleId: COUPLE_ID, openid: B, note: '4', date: todayKey, createdAt: new Date(now - 2000) },
-      { _id: 's5', coupleId: COUPLE_ID, openid: A, note: '5', date: todayKey, createdAt: new Date(now - 1000) },
-    ],
-  });
-  const page1 = await callAs(A, 'safety.list', { limit: 2 });
-  assert.deepStrictEqual(page1.items.map((item) => item.nickname), ['小怡', '阿安']);
-  assert.deepStrictEqual(page1.items.map((item) => item.note), ['5', '4']);
-  assert.ok(page1.nextCursor);
-  const page2 = await callAs(A, 'safety.list', { limit: 2, cursor: page1.nextCursor });
-  assert.deepStrictEqual(page2.items.map((item) => item.note), ['3', '2']);
-  const page3 = await callAs(A, 'safety.list', { limit: 2, cursor: page2.nextCursor });
-  assert.deepStrictEqual(page3.items.map((item) => item.note), ['1']);
-  assert.strictEqual(page3.nextCursor, null);
-  const seen = new Set(page1.items.concat(page2.items, page3.items).map((item) => item.checkinId));
-  assert.strictEqual(seen.size, 5, '分页不重不漏');
-  assert.ok(page1.items[0].nickname && page1.items[0].nickname.length > 0, '时间线带昵称');
-
-  // 昨天报的平安不算今天；对方未报时 partnerLastAt 是最近一次时间
-  const yesterday = time.addDays(todayKey, -1);
-  const old = new Date(now - 24 * 3600 * 1000);
-  h.reset({
-    users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
-    couples: [coupleDoc(COUPLE_ID)],
-    safety_checkins: [{ _id: 's_old', coupleId: COUPLE_ID, openid: B, note: '', date: yesterday, createdAt: old }],
-  });
-  const homeOld = await callAs(A, 'home.get', {});
-  assert.strictEqual(homeOld.safety.mineToday, false);
-  assert.strictEqual(homeOld.safety.partnerToday, false);
-  assert.strictEqual(homeOld.safety.partnerLastAt, old.toISOString());
+  // 客户端入口同步消失：四宫格第三格改为「一起变好」，报平安页与时间线组件已删
+  const app = JSON.parse(fs.readFileSync('miniprogram/app.json', 'utf8'));
+  assert.ok(!app.pages.includes('pages/safety/index'), '报平安页已从 app.json 移除');
+  assert.ok(!fs.existsSync('miniprogram/components/timeline-item'), '时间线组件已删除');
+  const homeWxml = fs.readFileSync('miniprogram/pages/home/index.wxml', 'utf8');
+  assert.ok(!homeWxml.includes('onTapSafety'), '首页不得再有报平安入口');
+  assert.ok(homeWxml.includes('一起变好'), '四宫格第三格改为一起变好');
 });
 
 // ---------------------------------------------------------------- F7 日记（M13 手帐）

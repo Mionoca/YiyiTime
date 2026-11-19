@@ -8,10 +8,7 @@ const MOODS = constants.MOODS;
 // 卡片入场 300ms（文档 9.7），多留 20ms 再摘 class
 const CARD_ENTER_MS = 320;
 /** 先停一下（M11）：三档时长与和好卡文案（与服务端 DURATIONS / CHOICES 同源，见 7.17） */
-const PAUSE_DURATIONS = [10, 30, 60];
-const PAUSE_CHOICE_TEXT = { hurry: '我刚才有点急', later: '晚点再说', hug: '抱一下' };
 /** 便签倒计时本地每分钟重算一次（文档 9.3：不轮询服务端，只用来展示） */
-const PAUSE_TICK_MS = 60 * 1000;
 
 /** 未绑定 / 邀请中的文案（文档 9.12） */
 const BIND_TEXT = {
@@ -78,7 +75,6 @@ Page({
     // 四个入口的状态摘要（文档 9.2）
     diarySub: '今天还没写',
     wishSub: '还没有愿望',
-    safetySub: '还没报平安',
     // 未绑定 / 邀请中
     bindTitle: UNBOUND_TEXT.title,
     bindSub: UNBOUND_TEXT.sub,
@@ -89,13 +85,7 @@ Page({
     // 账本申请提示条（M13 / 文档 9.2 第 0.6 位、7.19）：TA 申请看我的账本且待处理时出现
     ledgerNotice: false,
     ledgerNoticeText: '',
-    // 先停一下（M11 / 文档 9.2 第 0.5 位、9.3、7.17）：条件卡，无暂停时整块不存在
-    pauseState: '',            // '' | active | ended
-    pauseByMe: false,
-    pauseByName: '',
-    pauseRemainText: '',
-    pauseSaving: false,
-    // 一起变好（M11.4 / 文档 9.2 第 3.5 位）：条件卡，未绑定或无数据时不渲染
+    // 一起变好（M11.4；M14 起从独立卡片改为四宫格第三格，17.4）
     growthTitle: '',
     growthSub: '',
     growthAwaiting: false,
@@ -119,15 +109,12 @@ Page({
   },
 
   onHide() {
-    // 离开首页就不再走倒计时（回来时 onShow 全量对齐服务端）
-    this.stopPauseTicker();
   },
 
   onUnload() {
     // 页面已卸载：之后的定时器 / nextTick 回调不再 setData（微信会告警）
     this._unloaded = true;
     clearTimeout(this._enterTimer);
-    this.stopPauseTicker();
   },
 
   onPullDownRefresh() {
@@ -157,7 +144,6 @@ Page({
         this.loadingPromise = null;
         const firstHome = !this.data.home;
         this.setData(Object.assign({ loading: false, error: '', refreshError: '', home }, this.derive(home)));
-        this.startPauseTicker();
         if (firstHome) this.playCardEnter();
       })
       .catch((err) => {
@@ -181,8 +167,7 @@ Page({
     const user = home.user || {};
     const partner = home.partner;
     const mood = home.mood || {};
-    // 三个区块可能是 null（查询失败降级，文档 10.3），这里按「没有数据」渲染
-    const safety = home.safety || null;
+    // 区块可能是 null（查询失败降级，文档 10.3），这里按「没有数据」渲染
     const diary = home.diary || null;
     const wish = home.wish || null;
     const nowMs = Date.parse(home.serverNow || '') || Date.now();
@@ -203,7 +188,6 @@ Page({
       shareCode: (home.bind && home.bind.state === 'code_created' && home.bind.pending && home.bind.pending.code) || '',
       diarySub: diarySubText(home.couple, diary),
       wishSub: wishSubText(wish),
-      safetySub: safetySubText(home.couple, safety, nowMs),
     };
 
     // 解绑提示条：只有「对方发起」才提示（自己发起的去「我的」撤回，首页不重复打扰）。
@@ -221,13 +205,7 @@ Page({
       ? (pendingIncoming > 1 ? 'TA 想看看你的账本（' + pendingIncoming + ' 条待处理）' : 'TA 想看看你的账本')
       : '';
 
-    // 先停一下（M11 / 文档 7.17）：未绑定、没有暂停、单块读失败降级 null 三种情况都不渲染便签
-    const pauseView = home.couple ? (home.pause || null) : null;
-    const pausePatch = pauseDataOf(pauseView, nowMs);
-    Object.assign(patch, pausePatch);
-    this._pauseBase = pauseBaseOf(pauseView, nowMs);
-
-    // 一起变好（M11.4 / 文档 7.18）：未绑定、单块降级 null 都不渲染成长卡
+    // 一起变好（M11.4 / 文档 7.18）：未绑定、单块降级 null 都按「没有任务」处理
     const growth = home.couple ? (home.growth || null) : null;
     patch.growthTitle = growth
       ? (growth.firstActiveTitle || (growth.awaitingConfirm ? '有件事在等你认领' : '还没有一起在做的事'))
@@ -349,123 +327,6 @@ Page({
 
   onTapBind() {
     wx.navigateTo({ url: constants.ROUTES.bind });
-  },
-
-  /**
-   * 「先停一下」入口（文档 9.3）：心情卡下方一行文字链，三档时长走 ActionSheet，
-   * 全 app 只放这一处入口（不在「我的」重复）。
-   */
-  onTapPauseStart() {
-    const home = this.data.home;
-    if (!home || !home.couple) {
-      this.toast('等 TA 住进来，再一起按暂停');
-      return;
-    }
-    if (this.data.pauseSaving) return;
-    if (this.data.pauseState) {
-      // 已经在暂停里（便签在顶上），入口不再重复触发
-      this.toast(this.data.pauseState === 'active' ? '先缓一缓，到点了会提醒你们' : '可以选一句和好的话');
-      return;
-    }
-    wx.showActionSheet({
-      itemList: PAUSE_DURATIONS.map((min) => min + ' 分钟'),
-      success: (res) => {
-        const durationMin = PAUSE_DURATIONS[res.tapIndex];
-        if (durationMin) this.startPause(durationMin);
-      },
-      fail: () => {}, // 用户取消，什么都不做
-    });
-  },
-
-  /** 发起暂停：成功后先本地渲染便签再看服务端（刷新失败也看得到） */
-  async startPause(durationMin) {
-    if (this.data.pauseSaving) return;
-    this.setData({ pauseSaving: true });
-    try {
-      const res = await api.call('pause.start', { durationMin });
-      this.setData({ pauseSaving: false });
-      this.applyPause(res.pause);
-      this.toast(res.existing ? '已经在暂停里了' : '先停 ' + durationMin + ' 分钟');
-      await this.load(true, true);
-    } catch (err) {
-      this.setData({ pauseSaving: false });
-      api.showError(err);
-    }
-  },
-
-  /** 发起方提前结束（「我缓好了」）：幂等，重复点不会报错 */
-  async onTapPauseEnd() {
-    if (this.data.pauseSaving) return;
-    this.setData({ pauseSaving: true });
-    try {
-      const res = await api.call('pause.end');
-      this.setData({ pauseSaving: false });
-      this.applyPause(res.pause);
-      this.toast('好，等 TA 也缓缓');
-      await this.load(true, true);
-    } catch (err) {
-      this.setData({ pauseSaving: false });
-      api.showError(err);
-    }
-  },
-
-  /** 和好卡三选一：先选者定，选完卡片消失（closed 之后服务端不再返回） */
-  async onTapPauseChoose(e) {
-    if (this.data.pauseSaving) return;
-    const choice = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.choice) || '';
-    if (!choice) return;
-    this.setData({ pauseSaving: true });
-    try {
-      await api.call('pause.choose', { choice });
-      // 本地先收起：closed 等于不存在，下一次 load 也拿不到它
-      this.setData({
-        pauseSaving: false, pauseState: '', pauseByMe: false, pauseByName: '', pauseRemainText: '',
-      });
-      this.stopPauseTicker();
-      this._pauseBase = null;
-      this.toast('记下了');
-      await this.load(true, true);
-    } catch (err) {
-      this.setData({ pauseSaving: false });
-      api.showError(err);
-    }
-  },
-
-  /** 写操作后先本地渲染：服务端视图 → data 片段，再静默对齐（失败也不影响已渲染结果） */
-  applyPause(pauseView) {
-    const nowMs = serverNowOf(this.data.home);
-    this.setData(pauseDataOf(pauseView, nowMs));
-    this._pauseBase = pauseBaseOf(pauseView, nowMs);
-    if (this.data.pauseState === 'active') this.startPauseTicker();
-    else this.stopPauseTicker();
-  },
-
-  /**
-   * 便签倒计时（文档 9.3）：本地每分钟重算剩余分钟，**不轮询服务端**。
-   * 以「服务端给的剩余毫秒 + 本地流逝」推算，设备时钟偏移不影响差值。
-   * 到点后先本地翻面（服务端在下一次读取时惰性写回 ended），再静默对齐一次。
-   */
-  startPauseTicker() {
-    this.stopPauseTicker();
-    const base = this._pauseBase;
-    if (!base || this.data.pauseState !== 'active') return;
-    this._pauseTimer = setInterval(() => {
-      if (this._unloaded) return;
-      const remainMs = base.remainMs - (Date.now() - base.at);
-      if (remainMs > 0) {
-        const text = pauseRemainText(remainMs);
-        if (text !== this.data.pauseRemainText) this.setData({ pauseRemainText: text });
-        return;
-      }
-      this.stopPauseTicker();
-      this.setData({ pauseState: 'ended', pauseRemainText: '' });
-      this.load(true, true);
-    }, PAUSE_TICK_MS);
-  },
-
-  stopPauseTicker() {
-    if (this._pauseTimer) clearInterval(this._pauseTimer);
-    this._pauseTimer = null;
   },
 
   /** 解绑提示条（文档 9.2）：「我的」是 tab 页，只能 switchTab */
@@ -625,10 +486,6 @@ Page({
     this.openEntry(constants.ROUTES.growth);
   },
 
-  onTapSafety() {
-    this.openEntry(constants.ROUTES.safety);
-  },
-
   onTapMoodHistory() {
     this.openEntry(constants.ROUTES.mood);
   },
@@ -640,39 +497,6 @@ Page({
 function serverNowOf(home) {
   const ms = Date.parse((home && home.serverNow) || '');
   return Number.isFinite(ms) ? ms : Date.now();
-}
-
-/** 剩余毫秒 → 便签文案：向上取整到分钟（还剩 23.2 分钟就说「还有 24 分钟」），到点说「马上就到点了」 */
-function pauseRemainText(remainMs) {
-  if (!Number.isFinite(remainMs) || remainMs <= 0) return '马上就到点了';
-  return '还有 ' + Math.ceil(remainMs / 60000) + ' 分钟';
-}
-
-/**
- * 服务端 pause 视图 → 首页 data 片段（纯函数）。
- * null / 未知状态一律清空：未绑定、没有暂停、可选区块降级 null 三种情况客户端表现一致——
- * 便签根本不渲染，也不留占位。
- */
-function pauseDataOf(pauseView, nowMs) {
-  const blank = { pauseState: '', pauseByMe: false, pauseByName: '', pauseRemainText: '' };
-  if (!pauseView || (pauseView.status !== 'active' && pauseView.status !== 'ended')) return blank;
-  const ended = pauseView.status === 'ended';
-  const endsMs = Date.parse(pauseView.endsAt || '');
-  const remainMs = Number.isFinite(endsMs) ? endsMs - nowMs : NaN;
-  return {
-    pauseState: ended ? 'ended' : 'active',
-    pauseByMe: !!pauseView.byMe,
-    pauseByName: pauseView.byName || 'TA',
-    pauseRemainText: ended ? '' : pauseRemainText(remainMs),
-  };
-}
-
-/** 倒计时本地基准：只有进行中的暂停才有（到点 / 已翻面都不需要） */
-function pauseBaseOf(pauseView, nowMs) {
-  if (!pauseView || pauseView.status !== 'active') return null;
-  const endsMs = Date.parse(pauseView.endsAt || '');
-  if (!Number.isFinite(endsMs)) return null;
-  return { remainMs: Math.max(0, endsMs - nowMs), at: Date.now() };
 }
 
 /**
@@ -746,13 +570,4 @@ function growthSubText(growth) {
   if (growth.inFlight) parts.push(growth.inFlight + ' 件在档');
   if (growth.archivedCount) parts.push('日志 ' + growth.archivedCount + ' 件');
   return parts.length ? parts.join(' · ') : '起草第一件一起做的事';
-}
-
-/** 报平安摘要：对方今天报过就直说，否则给「多久之前」，从没报过才说没报 */
-function safetySubText(couple, safety, nowMs) {
-  if (!couple) return '等 TA 住进来';
-  if (!safety) return '还没报平安';
-  if (safety.partnerToday) return 'TA 到家了';
-  if (safety.partnerLastAt) return 'TA ' + timeUtil.formatAgo(safety.partnerLastAt, nowMs);
-  return '还没报平安';
 }

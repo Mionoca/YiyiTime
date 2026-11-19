@@ -79,8 +79,14 @@
       </view>
     </view>
 
-    <!-- 「TA 的」默认是一把锁（M13）：没有授权前不渲染任何账目 -->
-    <view wx:if="{{who === 'partner' && (!access || access.status !== 'approved')}}" class="lock">
+    <!-- 权限三态（M14 / 17.3）：未知画骨架，确知没授权画锁，已授权画内容。
+         把「未知」当成「没权限」是首帧闪「申请查看」的根因；注意 wx:if / wx:elif 之间不能夹注释 -->
+    <view wx:if="{{who === 'partner' && !accessKnown}}" class="lock lock--loading" aria-role="status">
+      <view class="lock__title">正在确认权限…</view>
+      <view class="lock__skeleton"></view>
+      <view class="lock__skeleton lock__skeleton--short"></view>
+    </view>
+    <view wx:elif="{{who === 'partner' && (!access || access.status !== 'approved')}}" class="lock">
       <view class="lock__icon" aria-hidden="true">🔒</view>
       <view class="lock__title">TA 的账本是 TA 的隐私</view>
       <view wx:if="{{access.status === 'pending'}}" class="lock__text">已经跟 TA 申请了，等 TA 同意</view>
@@ -201,6 +207,7 @@
     show="{{formOpen}}"
     title="{{editing ? '改这一笔' : '记一笔'}}"
     mask-closable="{{!saving}}"
+    above-tab-bar="{{true}}"
     bind:close="onCloseForm"
   >
     <view class="form">

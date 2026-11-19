@@ -9,6 +9,8 @@ const { MOODS, LIMITS } = require('../../utils/constants');
 Component({
   properties: {
     show: { type: Boolean, value: false },
+    // tab 页使用时要让开自定义 tabBar（100rpx），否则底部按钮会被 tab 栏压住（17.6）
+    aboveTabBar: { type: Boolean, value: false },
     value: { type: Object, value: null },
     saving: { type: Boolean, value: false }, // 请求中禁用确认，防双击（文档 8.6）
   },

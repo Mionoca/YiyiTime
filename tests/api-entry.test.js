@@ -16,13 +16,12 @@ const h = createHarness();
 const handlers = h.handlers;
 
 const EXPECTED_ACTIONS = [
-  'system.ping', 'user.get', 'user.updateProfile',
+  'system.ping', 'user.get', 'user.updateProfile', 'user.deleteAccount',
   'bind.create', 'bind.preview', 'bind.apply', 'bind.confirm', 'bind.cancel', 'bind.status',
   'couple.updateStartDate',
   'couple.requestUnbind', 'couple.cancelUnbind', 'couple.confirmUnbind',
   'mood.set', 'mood.list',
   'anniversary.add', 'anniversary.update', 'anniversary.remove', 'anniversary.list',
-  'safety.checkin', 'safety.list',
   'diary.save', 'diary.list', 'diary.calendar', 'diary.archive',
   'wish.add', 'wish.update', 'wish.setDone', 'wish.remove', 'wish.list',
   'ledger.add', 'ledger.update', 'ledger.remove', 'ledger.list',
@@ -30,7 +29,6 @@ const EXPECTED_ACTIONS = [
   'ledger.revokeView', 'ledger.cancelView',
   'home.get',
   'reminder.get', 'reminder.set', 'reminder.grant',
-  'pause.start', 'pause.status', 'pause.end', 'pause.choose',
   'growth.add', 'growth.confirm', 'growth.update', 'growth.remove',
   'growth.done', 'growth.harvest', 'growth.review', 'growth.list', 'growth.log',
 ];

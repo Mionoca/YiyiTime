@@ -304,7 +304,7 @@ test('home: 未绑定时点对方头像与四个入口只提示，不跳转', as
     assert.ok(toasts.some((t) => t.title === '等 TA 住进来吧'));
     page.onTapDiary();
     page.onTapWish();
-    page.onTapSafety();
+    page.onTapGrowth();
     page.onTapMoodHistory();
     assert.ok(toasts.some((t) => t.title === '等 TA 住进来，这里就开门啦'));
     assert.strictEqual(navs.length, 0, '未绑定不该跳进空页面');
@@ -321,12 +321,12 @@ test('home: 四个入口都走 navigateTo（它们都是普通页，文档 8.2�
     page.onTapDiary();
     page.onTapWish();
     page.onTapMoodHistory();
-    page.onTapSafety();
+    page.onTapGrowth();
     assert.deepStrictEqual(navs, [
       { kind: 'navigateTo', url: constants.ROUTES.diary },
       { kind: 'navigateTo', url: constants.ROUTES.wish },
       { kind: 'navigateTo', url: constants.ROUTES.mood },
-      { kind: 'navigateTo', url: constants.ROUTES.safety },
+      { kind: 'navigateTo', url: constants.ROUTES.growth },
     ]);
     // 只有 2 个 tab，跳这四个入口时不该出现 switchTab
     assert.strictEqual(
@@ -650,184 +650,6 @@ const ACTIVE_PAUSE = {
   startedAt: '2026-11-16T06:10:00.000Z', endsAt: '2026-11-16T06:40:00.000Z', endChoice: null,
 };
 
-test('首页：先停一下入口 → ActionSheet 三档 → pause.start，便签随刷新出现', async () => {
-  let mode = 'before';
-  const sheets = [];
-  const { page, calls, toasts } = setup({
-    'home.get': () => (mode === 'before' ? baseHome() : baseHome({ pause: ACTIVE_PAUSE })),
-    'pause.start': () => {
-      mode = 'after';
-      return { pause: ACTIVE_PAUSE, existing: false };
-    },
-  }, {
-    showActionSheet: (opts) => {
-      sheets.push(opts.itemList);
-      opts.success({ tapIndex: 1 });
-    },
-  });
-  try {
-    await page.load();
-    assert.strictEqual(page.data.pauseState, '', '没有暂停时不渲染便签');
-    page.onTapPauseStart();
-    await new Promise((r) => setTimeout(r, 30));
-
-    assert.deepStrictEqual(sheets[0], ['10 分钟', '30 分钟', '60 分钟']);
-    const start = calls.find((c) => c.action === 'pause.start');
-    assert.deepStrictEqual(start.payload, { durationMin: 30 });
-    assert.strictEqual(page.data.pauseState, 'active');
-    assert.strictEqual(page.data.pauseByName, 'TA');
-    assert.strictEqual(page.data.pauseRemainText, '还有 10 分钟');
-    assert.ok(toasts.some((t) => t.title.indexOf('先停 30 分钟') !== -1));
-  } finally {
-    teardown(page);
-    restoreWx();
-  }
-});
-
-test('首页：ActionSheet 取消不发请求', async () => {
-  const { page, calls } = setup({ 'home.get': () => baseHome() }, {
-    showActionSheet: (opts) => opts.fail && opts.fail({ errMsg: 'cancel' }),
-  });
-  try {
-    await page.load();
-    page.onTapPauseStart();
-    await new Promise((r) => setTimeout(r, 10));
-    assert.strictEqual(calls.filter((c) => c.action === 'pause.start').length, 0);
-  } finally {
-    teardown(page);
-    restoreWx();
-  }
-});
-
-test('首页：已经在暂停里再点入口只提示，不重复发起', async () => {
-  const { page, calls, toasts } = setup({ 'home.get': () => baseHome({ pause: ACTIVE_PAUSE }) }, {
-    showActionSheet: () => { throw new Error('暂停中不该再弹 ActionSheet'); },
-  });
-  try {
-    await page.load();
-    page.onTapPauseStart();
-    assert.strictEqual(calls.filter((c) => c.action === 'pause.start').length, 0);
-    assert.ok(toasts.length >= 1);
-  } finally {
-    teardown(page);
-    restoreWx();
-  }
-});
-
-test('首页：未绑定点「先停一下」只提示不发请求', async () => {
-  const { page, calls, toasts } = setup({
-    'home.get': () => baseHome({ couple: null, bind: { state: 'unbound', pending: null } }),
-  });
-  try {
-    await page.load();
-    page.onTapPauseStart();
-    assert.strictEqual(calls.filter((c) => c.action === 'pause.start').length, 0);
-    assert.ok(toasts.some((t) => t.title.indexOf('等 TA 住进来') !== -1));
-  } finally {
-    teardown(page);
-    restoreWx();
-  }
-});
-
-test('首页：发起方点「我缓好了」→ pause.end，便签翻面成和好卡', async () => {
-  const mine = Object.assign({}, ACTIVE_PAUSE, { byMe: true, byName: '小怡' });
-  const ended = Object.assign({}, mine, { status: 'ended' });
-  let endedNow = false;
-  const { page, calls } = setup({
-    'home.get': () => baseHome({ pause: endedNow ? ended : mine }),
-    'pause.end': () => {
-      endedNow = true;
-      return { pause: ended };
-    },
-  });
-  try {
-    await page.load();
-    assert.strictEqual(page.data.pauseByMe, true, '发起方才有「我缓好了」');
-    await page.onTapPauseEnd();
-    assert.deepStrictEqual(calls.find((c) => c.action === 'pause.end').payload, undefined);
-    assert.strictEqual(page.data.pauseState, 'ended');
-    assert.strictEqual(page.data.pauseRemainText, '', '翻面后不再倒计时');
-  } finally {
-    teardown(page);
-    restoreWx();
-  }
-});
-
-test('首页：和好卡三选一 → pause.choose，选完便签收起（closed 等于不存在）', async () => {
-  const ended = Object.assign({}, ACTIVE_PAUSE, { status: 'ended' });
-  let mode = 'ended';
-  const { page, calls, toasts } = setup({
-    'home.get': () => (mode === 'ended' ? baseHome({ pause: ended }) : baseHome()),
-    'pause.choose': (payload) => {
-      mode = 'closed';
-      return { pause: Object.assign({}, ended, { status: 'closed', endChoice: payload.choice }) };
-    },
-  });
-  try {
-    await page.load();
-    assert.strictEqual(page.data.pauseState, 'ended');
-    await page.onTapPauseChoose({ currentTarget: { dataset: { choice: 'later' } } });
-    assert.deepStrictEqual(calls.find((c) => c.action === 'pause.choose').payload, { choice: 'later' });
-    assert.strictEqual(page.data.pauseState, '');
-    assert.ok(toasts.some((t) => t.title === '记下了'));
-  } finally {
-    teardown(page);
-    restoreWx();
-  }
-});
-
-test('首页：和好卡点在没有 choice 的元素上不发请求', async () => {
-  const ended = Object.assign({}, ACTIVE_PAUSE, { status: 'ended' });
-  const { page, calls } = setup({ 'home.get': () => baseHome({ pause: ended }) });
-  try {
-    await page.load();
-    await page.onTapPauseChoose({ currentTarget: { dataset: {} } });
-    assert.strictEqual(calls.filter((c) => c.action === 'pause.choose').length, 0);
-  } finally {
-    teardown(page);
-    restoreWx();
-  }
-});
-
-test('首页：暂停写失败只提示，不炸整页且可再点', async () => {
-  const { page, errors } = setup({
-    'home.get': () => baseHome(),
-    'pause.start': () => { throw new Error('down'); },
-  }, {
-    showActionSheet: (opts) => opts.success({ tapIndex: 0 }),
-  });
-  try {
-    await page.load();
-    page.onTapPauseStart();
-    await new Promise((r) => setTimeout(r, 30));
-    assert.strictEqual(errors.length, 1);
-    assert.strictEqual(page.data.pauseSaving, false, '失败后按钮要能再点');
-    assert.ok(page.data.home, '首页数据保留，不整页报错');
-    assert.strictEqual(page.data.pauseState, '');
-  } finally {
-    teardown(page);
-    restoreWx();
-  }
-});
-
-test('首页 wxml：便签卡与入口接线（M11 / 文档 9.3）', () => {
-  const path = require('node:path');
-  const wxml = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/home/index.wxml'), 'utf8');
-  assert.ok(wxml.includes('bindtap="onTapPauseStart"'), '入口要接 onTapPauseStart');
-  assert.ok(wxml.includes('bindtap="onTapPauseEnd"'), '「我缓好了」要接 onTapPauseEnd');
-  assert.ok(wxml.includes('bindtap="onTapPauseChoose"'), '和好卡要接 onTapPauseChoose');
-  ['hurry', 'later', 'hug'].forEach((choice) => {
-    assert.ok(wxml.includes('data-choice="' + choice + '"'), '缺 choice: ' + choice);
-  });
-  assert.ok(/wx:if="\{\{home\.couple && pauseState\}\}"/.test(wxml), '便签必须是条件卡');
-  assert.ok(/wx:if="\{\{home\.couple && !pauseState\}\}"/.test(wxml), '暂停中不重复显示入口');
-  assert.ok(wxml.includes('我缓好了'));
-  assert.ok(wxml.includes('先停一下 · 给彼此一点时间'));
-  assert.ok(wxml.includes('aria-role="alert"'), '便签变化要有可读提示');
-});
-
-// ── 成长卡（M11.4 / 文档 9.2 第 3.5 位）────────────────────────────────
-
 test('home: 成长卡点击进「一起变好」，未绑定点了只提示', async () => {
   const { page, navs, toasts } = setup({
     'home.get': () => baseHome({
@@ -859,17 +681,19 @@ test('home: 成长卡点击进「一起变好」，未绑定点了只提示', as
   }
 });
 
-test('home wxml: 成长卡是条件卡且不进四宫格（M11.4 / 文档 9.2）', () => {
+test('home wxml: 「一起变好」在四宫格内且带待认领角标（M14 / 17.4）', () => {
   const path = require('node:path');
   const wxml = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/home/index.wxml'), 'utf8');
-  assert.ok(wxml.includes('bindtap="onTapGrowth"'), '成长卡要接 onTapGrowth');
-  assert.ok(/wx:if="\{\{home\.couple && growthTitle\}\}"/.test(wxml), '成长卡必须是条件卡');
+  assert.ok(wxml.includes('bindtap="onTapGrowth"'), '四宫格第三格要接 onTapGrowth');
   assert.ok(wxml.includes('一起变好'));
-  assert.ok(wxml.includes('待认领'), '待认领要有标记');
-  // 四宫格仍是 2×2（硬约束）：成长卡不在 grid 里，是 grid 之后独立一张卡
+  assert.ok(wxml.includes('grid__badge'), '待认领要有角标');
+  // 四宫格仍是 2×2（硬约束）：成长入口在 grid 内，不再有独立的 3.5 成长卡
   const gridStart = wxml.indexOf('<view class="grid"');
-  const gridEnd = wxml.indexOf('<!-- 3.5 成长卡');
-  assert.ok(gridStart > 0 && gridEnd > gridStart, '成长卡应排在四宫格之后');
+  const gridEnd = wxml.indexOf('</view>', wxml.lastIndexOf('grid__badge'));
+  const growthAt = wxml.indexOf('bindtap="onTapGrowth"');
+  assert.ok(gridStart > 0 && growthAt > gridStart && growthAt < gridEnd, '成长入口必须落在四宫格里');
+  assert.strictEqual(wxml.indexOf('growth-card'), -1, '独立的成长卡应已删除');
+  assert.strictEqual(wxml.indexOf('onTapSafety'), -1, '报平安入口应已删除');
 });
 
 /* M13 账本申请提示条（文档 9.2 第 0.6 位 / 7.19）：TA 申请看我的账本，点了去「记账本」 */

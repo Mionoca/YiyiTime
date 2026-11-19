@@ -85,99 +85,6 @@ test('loadAnniversary: 一个都没加时返回空数组（不是 null，页面�
   assert.deepStrictEqual(res, { items: [] });
 });
 
-test('loadSafety: 今日两人是否报平安 + 伴侣最近一次时间，剔除别的 couple', async () => {
-  const yesterday = new Date('2026-11-15T10:00:00.000Z');
-  const { ctx } = makeCtx({
-    safety_checkins: [
-      {
-        _id: 'sc_a', coupleId: 'c_1', openid: 'oA', note: '', date: TODAY, createdAt: new Date(NOW.getTime() - 3600 * 1000),
-      },
-      {
-        _id: 'sc_b_old', coupleId: 'c_1', openid: 'oB', note: '', date: '2026-11-15', createdAt: yesterday,
-      },
-      {
-        _id: 'sc_x', coupleId: 'c_2', openid: 'oB', note: '', date: TODAY, createdAt: NOW,
-      },
-    ],
-  });
-  const res = await loadSafety(ctx, 'c_1', TODAY, 'oB');
-  assert.deepStrictEqual(res, {
-    mineToday: true,
-    partnerToday: false,
-    partnerLastAt: yesterday.toISOString(),
-  });
-});
-
-test('loadSafety: 一天多条时按 openid 判断，不会因为条数被截断（B1 回归）', async () => {
-  const { ctx } = makeCtx({
-    safety_checkins: [
-      // 故意把 oA 的两条排在前面：旧实现 limit(2) 会截掉后面 oB 的记录
-      { _id: 'a1', coupleId: 'c_1', openid: 'oA', note: '', date: TODAY, createdAt: new Date(NOW.getTime() - 3 * 3600 * 1000) },
-      { _id: 'a2', coupleId: 'c_1', openid: 'oA', note: '', date: TODAY, createdAt: new Date(NOW.getTime() - 2 * 3600 * 1000) },
-      { _id: 'b1', coupleId: 'c_1', openid: 'oB', note: '', date: TODAY, createdAt: new Date(NOW.getTime() - 3600 * 1000) },
-    ],
-  });
-  const res = await loadSafety(ctx, 'c_1', TODAY, 'oB');
-  assert.deepStrictEqual(res, {
-    mineToday: true,
-    partnerToday: true,
-    partnerLastAt: new Date(NOW.getTime() - 3600 * 1000).toISOString(),
-  });
-});
-
-test('loadSafety: 同一天超过 100 条时门灯仍按 openid 判断（单次 get 上限回归）', async () => {
-  // 云函数单次 get 上限 100 条：旧实现整取今日记录再按 openid 找，条数超限时
-  // 后插入的伴侣记录会被截掉，门灯漏亮。现在两人各按 openid 精确查询。
-  const nowMs = NOW.getTime();
-  const rows = [];
-  for (let i = 0; i < 101; i += 1) {
-    rows.push({
-      _id: 'many_' + i, coupleId: 'c_1', openid: 'oA', note: '', date: TODAY, createdAt: new Date(nowMs - (200 - i) * 1000),
-    });
-  }
-  const partnerAt = new Date(nowMs - 1000);
-  rows.push({
-    _id: 'partner_today', coupleId: 'c_1', openid: 'oB', note: '', date: TODAY, createdAt: partnerAt,
-  });
-  const { ctx } = makeCtx({ safety_checkins: rows });
-  const res = await loadSafety(ctx, 'c_1', TODAY, 'oB');
-  assert.deepStrictEqual(res, {
-    mineToday: true,
-    partnerToday: true,
-    partnerLastAt: partnerAt.toISOString(),
-  });
-});
-
-test('loadSafety: 对方超过 100 条时也不会把我的今日记录截断（对称回归）', async () => {
-  // 旧实现整取今日记录，前 100 条全是对方的记录时，我的记录被截断 → mineToday 漏，
-  // 首页会出现「对方报平安了但我没报」的错觉。新实现按 openid 各查，互不影响。
-  const nowMs = NOW.getTime();
-  const rows = [];
-  for (let i = 0; i < 100; i += 1) {
-    rows.push({
-      _id: 'partner_many_' + i, coupleId: 'c_1', openid: 'oB', note: '', date: TODAY, createdAt: new Date(nowMs - (300 - i) * 1000),
-    });
-  }
-  const mineAt = new Date(nowMs - 1000);
-  rows.push({
-    _id: 'mine_today', coupleId: 'c_1', openid: 'oA', note: '我到家了', date: TODAY, createdAt: mineAt,
-  });
-  const partnerLast = new Date(nowMs - 201 * 1000);
-  const { ctx } = makeCtx({ safety_checkins: rows });
-  const res = await loadSafety(ctx, 'c_1', TODAY, 'oB');
-  assert.deepStrictEqual(res, {
-    mineToday: true,
-    partnerToday: true,
-    partnerLastAt: partnerLast.toISOString(),
-  });
-});
-
-test('loadSafety: 伴侣从没报过平安时 partnerLastAt 为 null', async () => {
-  const { ctx } = makeCtx();
-  const res = await loadSafety(ctx, 'c_1', TODAY, 'oB');
-  assert.deepStrictEqual(res, { mineToday: false, partnerToday: false, partnerLastAt: null });
-});
-
 test('loadDiary: 只有已分享的日记才算「TA 写了」+ 解锁时刻（当天 partnerUnlocked 恒为 false）', async () => {
   const { ctx } = makeCtx({
     diaries: [
@@ -253,7 +160,7 @@ test('loadWish: 没有愿望时 previewTitle 为 null', async () => {
   assert.deepStrictEqual(res, { total: 0, done: 0, previewTitle: null });
 });
 
-test('home.get: 已绑定返回 mood/anniversary/safety/diary/wish 真实聚合', async () => {
+test('home.get: 已绑定返回 mood/anniversary/diary/wish 真实聚合', async () => {
   const { ctx } = makeCtx({
     users: [{ _id: 'oA', coupleId: 'c_1' }, { _id: 'oB', nickname: '小怡' }],
     couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
@@ -264,17 +171,6 @@ test('home.get: 已绑定返回 mood/anniversary/safety/diary/wish 真实聚合'
     anniversaries: [
       { _id: 'a_one', coupleId: 'c_1', title: '第一次见面', date: '2023-11-20', createdAt: NOW },
       { _id: 'a_other', coupleId: 'c_2', title: '别人的', date: '2020-01-01', createdAt: NOW },
-    ],
-    safety_checkins: [
-      {
-        _id: 'sc_a', coupleId: 'c_1', openid: 'oA', note: '', date: TODAY, createdAt: new Date(NOW.getTime() - 1200 * 1000),
-      },
-      {
-        _id: 'sc_b', coupleId: 'c_1', openid: 'oB', note: '午饭吃过了', date: '2026-11-15', createdAt: new Date(NOW.getTime() - 26 * 3600 * 1000),
-      },
-      {
-        _id: 'sc_b_today', coupleId: 'c_1', openid: 'oB', note: '到公司了', date: TODAY, createdAt: new Date(NOW.getTime() - 1800 * 1000),
-      },
     ],
     diaries: [
       {
@@ -322,11 +218,6 @@ test('home.get: 已绑定返回 mood/anniversary/safety/diary/wish 真实聚合'
       createdAt: NOW.toISOString(),
     }],
   });
-  assert.deepStrictEqual(res.safety, {
-    mineToday: true,
-    partnerToday: true,
-    partnerLastAt: new Date(NOW.getTime() - 1800 * 1000).toISOString(),
-  });
   assert.deepStrictEqual(res.diary, {
     mineWritten: true,
     partnerWritten: false,
@@ -334,43 +225,6 @@ test('home.get: 已绑定返回 mood/anniversary/safety/diary/wish 真实聚合'
     unlockAt: '2026-11-16T16:00:00.000Z',
   });
   assert.deepStrictEqual(res.wish, { total: 3, done: 1, previewTitle: '去看海' });
-});
-
-test('home.get: 报平安区块查询失败只让 safety 为 null，日记/愿望照常返回（文档 10.3）', async () => {
-  const { ctx, fake } = makeCtx({
-    users: [{ _id: 'oA', coupleId: 'c_1' }],
-    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
-    diaries: [
-      {
-        _id: 'oA_' + TODAY, coupleId: 'c_1', authorOpenid: 'oA', date: TODAY, content: 'x',
-        unlockAt: new Date('2026-11-16T16:00:00.000Z'), createdAt: NOW, updatedAt: NOW,
-      },
-    ],
-    wishes: [
-      { _id: 'w_1', coupleId: 'c_1', title: '去看海', done: false, createdAt: NOW },
-    ],
-  });
-  const realDb = fake.db;
-  ctx.db = {
-    collection(name) {
-      if (name === 'safety_checkins') throw new Error('mock safety down');
-      return realDb.collection(name);
-    },
-  };
-  ctx.user = { _id: 'oA', coupleId: 'c_1' };
-  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
-  ctx.partner = { _id: 'oB' };
-
-  const originalError = console.error;
-  console.error = () => {};
-  try {
-    const res = await homeHandler.get({}, ctx);
-    assert.strictEqual(res.safety, null);
-    assert.strictEqual(res.diary.mineWritten, true);
-    assert.strictEqual(res.wish.total, 1);
-  } finally {
-    console.error = originalError;
-  }
 });
 
 test('home.get: 心情区块查询失败只让 mood 为 null，纪念日照常返回（文档 10.3）', async () => {
@@ -405,7 +259,7 @@ test('home.get: 心情区块查询失败只让 mood 为 null，纪念日照常�
   }
 });
 
-test('home.get: 未绑定返回 3 个区块 null，并按 bind 状态机返回', async () => {
+test('home.get: 未绑定返回各业务区块 null，并按 bind 状态机返回', async () => {
   const { ctx } = makeCtx({
     users: [{ _id: 'oA', coupleId: null }],
   });
@@ -418,7 +272,6 @@ test('home.get: 未绑定返回 3 个区块 null，并按 bind 状态机返回',
   assert.strictEqual(res.partner, null);
   assert.strictEqual(res.mood, null);
   assert.strictEqual(res.anniversary, null);
-  assert.strictEqual(res.safety, null);
   assert.strictEqual(res.diary, null);
   assert.strictEqual(res.wish, null);
   assert.strictEqual(res.bind.state, 'unbound');
@@ -597,91 +450,6 @@ test('home.get: couple.startDate 缺失或非法时降级为 null，不整页失
     }
   }
 });
-
-test('home.get: pause 区块聚合 active 视图（M11，文档 7.8 / 7.17）', async () => {
-  const { ctx } = makeCtx({
-    users: [{ _id: 'oA', coupleId: 'c_1' }],
-    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
-    pauses: [{
-      _id: 'p_home1', coupleId: 'c_1', byOpenid: 'oB', durationMin: 30, status: 'active',
-      startedAt: new Date(NOW.getTime() - 5 * 60 * 1000),
-      endsAt: new Date(NOW.getTime() + 25 * 60 * 1000),
-      endedAt: null, endChoice: null, endChoiceBy: null,
-      createdAt: NOW, updatedAt: NOW,
-    }],
-  });
-  ctx.user = { _id: 'oA', coupleId: 'c_1', nickname: '小怡' };
-  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
-  ctx.partner = { _id: 'oB', nickname: '小安' };
-
-  const res = await homeHandler.get({}, ctx);
-  assert.strictEqual(res.pause.byMe, false, '是对方按的暂停');
-  assert.strictEqual(res.pause.byName, '小安');
-  assert.strictEqual(res.pause.status, 'active');
-  assert.strictEqual(res.pause.durationMin, 30);
-  assert.ok(JSON.stringify(res.pause).indexOf('oB') === -1, '不泄漏 openid');
-});
-
-test('home.get: pause 到点惰性 ended 在首页生效；closed 后区块为 null', async () => {
-  const { ctx, fake } = makeCtx({
-    users: [{ _id: 'oA', coupleId: 'c_1' }],
-    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
-    pauses: [{
-      _id: 'p_home2', coupleId: 'c_1', byOpenid: 'oA', durationMin: 30, status: 'active',
-      startedAt: new Date(NOW.getTime() - 31 * 60 * 1000),
-      endsAt: new Date(NOW.getTime() - 60 * 1000),
-      endedAt: null, endChoice: null, endChoiceBy: null,
-      createdAt: NOW, updatedAt: NOW,
-    }],
-  });
-  ctx.user = { _id: 'oA', coupleId: 'c_1', nickname: '小怡' };
-  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
-  ctx.partner = { _id: 'oB', nickname: '小安' };
-
-  const res = await homeHandler.get({}, ctx);
-  assert.strictEqual(res.pause.status, 'ended', '到点即翻面成和好卡');
-  assert.strictEqual(fake.get('pauses', 'p_home2').status, 'ended', '惰性写回已落库');
-
-  // closed 之后：区块回到 null（便签消失，首页恢复卡片流）
-  fake.get('pauses', 'p_home2').status = 'closed';
-  fake.get('pauses', 'p_home2').endChoice = 'later';
-  fake.get('pauses', 'p_home2').endChoiceBy = 'oB';
-  const after = await homeHandler.get({}, ctx);
-  assert.strictEqual(after.pause, null);
-});
-
-test('home.get: pause 区块读库失败只降级自己，其余区块照常（文档 10.3）', async () => {
-  const { ctx, fake } = makeCtx({
-    users: [{ _id: 'oA', coupleId: 'c_1' }],
-    couples: [{ _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' }],
-    moods: [
-      { _id: 'oA_' + TODAY, coupleId: 'c_1', openid: 'oA', date: TODAY, mood: 'sunny', note: '', updatedAt: NOW },
-    ],
-  });
-  const realDb = fake.db;
-  ctx.db = {
-    collection(name) {
-      if (name === 'pauses') throw new Error('mock pauses down');
-      return realDb.collection(name);
-    },
-  };
-  ctx.user = { _id: 'oA', coupleId: 'c_1' };
-  ctx.couple = { _id: 'c_1', status: 'active', memberOpenids: ['oA', 'oB'], startDate: '2026-11-10' };
-  ctx.partner = { _id: 'oB' };
-
-  const originalError = console.error;
-  console.error = () => {};
-  try {
-    const res = await homeHandler.get({}, ctx);
-    assert.strictEqual(res.pause, null, 'pause 块失败降级 null');
-    assert.strictEqual(res.mood.mine.mood, 'sunny', '心情块不受影响');
-    assert.strictEqual(res.couple.coupleId, 'c_1');
-  } finally {
-    console.error = originalError;
-  }
-});
-
-// ── 成长卡（M11.3 / 文档 7.8 / 7.18）──────────────────────────────────────
 
 test('home.get: growth 区块聚合在档数与待认领红点（M11.3）', async () => {
   const { ctx } = makeCtx({

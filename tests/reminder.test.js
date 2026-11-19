@@ -84,10 +84,11 @@ test('reminder.get：默认关闭，返回默认时间与额度上限，未配�
   assert.strictEqual(res2.data.configured, true);
 });
 
-test('reminder.get：今天报过平安时 checkedInToday=true，未绑定时恒为 false', async () => {
+test('reminder.get：今天写过日记时 checkedInToday=true（M14 语义），未绑定时恒为 false', async () => {
   const h = setup({
-    safety_checkins: [{
-      _id: 's1', coupleId: COUPLE, openid: A, note: '', date: LIVE_TODAY, createdAt: NOW,
+    diaries: [{
+      _id: 'd1', coupleId: COUPLE, authorOpenid: A, date: LIVE_TODAY, content: '', visibility: 'private',
+      images: [], createdAt: NOW, updatedAt: NOW,
     }],
   });
   const res = await h.callAs(A, 'reminder.get');
@@ -130,17 +131,30 @@ test('reminder.set：时间归一化与非法值', async () => {
   assert.strictEqual(notBool.code, 'INVALID_INPUT');
 });
 
-test('reminder.grant：攒额度 +1，最多 7 条；到上限后不报错', async () => {
+test('reminder.grant：缺省攒的是每日「写日记」提醒额度 +1，最多 7 条；到上限后不报错', async () => {
   const h = setup();
   let res = await h.callAs(A, 'reminder.grant');
+  assert.strictEqual(res.ok, true, JSON.stringify(res));
   assert.strictEqual(res.data.quota, 4, '原有 3 条 + 1');
+  assert.strictEqual(userRow(h, A).reminderQuota, 4);
+  assert.strictEqual(userRow(h, A).growthSubQuota, undefined, '任务额度不该被每日提醒授权改动');
 
   for (let i = 0; i < 5; i += 1) res = await h.callAs(A, 'reminder.grant');
   assert.strictEqual(res.data.quota, 7);
   assert.strictEqual(userRow(h, A).reminderQuota, 7);
+
+  // 显式传 'diary' 与缺省等价
+  h.reset({ users: [armedUser(A, { reminderQuota: 0 })], couples: [coupleDoc()] });
+  const explicit = await h.callAs(A, 'reminder.grant', { template: 'diary' });
+  assert.strictEqual(explicit.data.quota, 1);
+
+  // 老客户端还可能传 'safety'：必须显式拒绝，而不是「接受了却没加」
+  const stale = await h.callAs(A, 'reminder.grant', { template: 'safety' });
+  assert.strictEqual(stale.ok, false);
+  assert.strictEqual(stale.code, 'INVALID_INPUT');
 });
 
-test('定时任务：到点、没报平安、有额度 → 发一条，扣额度并记日期', async (t) => {
+test('定时任务：到点、没写日记、有额度 → 发一条，扣额度并记日期', async (t) => {
   withTemplate(t);
   const h = setup();
 
@@ -153,8 +167,8 @@ test('定时任务：到点、没报平安、有额度 → 发一条，扣额度
   assert.strictEqual(calls.length, 2);
   const toA = calls.find((c) => c.args.touser === A);
   assert.strictEqual(toA.args.templateId, 'tpl_test');
-  assert.strictEqual(toA.args.page, 'pages/safety/index');
-  assert.strictEqual(toA.args.data.thing1.value, '今天还没给 TA 报平安');
+  assert.strictEqual(toA.args.page, 'pages/diary/index');
+  assert.strictEqual(toA.args.data.thing1.value, '今天还没写日记');
   assert.strictEqual(toA.args.data.time2.value, '21:00');
 
   assert.strictEqual(userRow(h, A).reminderQuota, 2);
@@ -169,11 +183,14 @@ test('定时任务：还没到点不发（22:00 的人在 21:05 不该被叫）'
   assert.strictEqual(sentCalls(h).length, 0);
 });
 
-test('定时任务：今天已经报过平安就不打扰', async (t) => {
+test('定时任务：今天已经写过日记就不打扰', async (t) => {
   withTemplate(t);
   const h = setup({
     users: [armedUser(A)],
-    safety_checkins: [{ _id: 's1', coupleId: COUPLE, openid: A, note: '', date: TODAY, createdAt: NOW }],
+    diaries: [{
+      _id: 'd1', coupleId: COUPLE, authorOpenid: A, date: TODAY, content: '', visibility: 'private',
+      images: [], createdAt: NOW, updatedAt: NOW,
+    }],
   });
   const res = await reminder.runTimer({ now: NOW });
   assert.strictEqual(res.sent, 0);
@@ -342,7 +359,7 @@ test('reminder.set / grant 只写自己的 users 文档，改不到对方', asyn
   await h.callAs(A, 'reminder.grant');
 
   assert.strictEqual(userRow(h, A).reminderAt, '22:15');
-  assert.strictEqual(userRow(h, A).reminderQuota, 4);
+  assert.strictEqual(userRow(h, A).reminderQuota, 4, 'grant 只加自己的每日提醒额度');
   assert.strictEqual(userRow(h, B).reminderAt, '21:00', 'B 的提醒时间不受影响');
   assert.strictEqual(userRow(h, B).reminderQuota, 3, 'B 的额度不受影响');
 });

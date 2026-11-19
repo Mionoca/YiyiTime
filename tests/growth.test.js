@@ -513,25 +513,6 @@ test('订阅提醒：模板未配 / 对方没额度 / 当天已 3 条 都不发�
   assert.strictEqual(h.fake().get('users', B).growthSubQuota, 3);
 });
 
-test('订阅提醒：暂停进行中静音，额度不扣', async (t) => {
-  withGrowthTemplate(t);
-  const h = setup({
-    users: [userDoc(A), userDoc(B, { growthSubQuota: 3 })],
-    pauses: [{
-      _id: 'p_1', coupleId: COUPLE, byOpenid: A, durationMin: 30, status: 'active',
-      startedAt: new Date(Date.now() - 5 * 60 * 1000),
-      endsAt: new Date(Date.now() + 25 * 60 * 1000),
-      endedAt: null, endChoice: null, endChoiceBy: null,
-      createdAt: new Date(), updatedAt: new Date(),
-    }],
-  });
-
-  const res = await h.callAs(A, 'growth.add', { title: '一起跑步', category: 'sport' });
-  assert.strictEqual(res.ok, true);
-  assert.strictEqual(sentCalls(h).length, 0, '吵架期间别弹「来认领任务」');
-  assert.strictEqual(h.fake().get('users', B).growthSubQuota, 3);
-});
-
 test('订阅提醒：43101 拒收清零，其它错误把额度还回去，日志不含任务标题', async (t) => {
   withGrowthTemplate(t);
   const errors = captureConsoleError(t);
@@ -558,22 +539,22 @@ test('订阅提醒：43101 拒收清零，其它错误把额度还回去，日�
   assert.strictEqual(JSON.stringify(errors).indexOf('悄悄话标题'), -1, '日志不能打任务标题');
 });
 
-test('reminder.grant：template=task 攒任务额度，与报平安额度互不串', async (t) => {
+test('reminder.grant：只攒任务额度，日记提醒额度互不串（M14 起没有报平安档）', async (t) => {
   withGrowthTemplate(t);
   const h = setup({ users: [userDoc(A, { reminderQuota: 1, growthSubQuota: 0 })] });
 
   const res = await h.callAs(A, 'reminder.grant', { template: 'task' });
   assert.strictEqual(res.ok, true, JSON.stringify(res));
   assert.strictEqual(h.fake().get('users', A).growthSubQuota, 1);
-  assert.strictEqual(h.fake().get('users', A).reminderQuota, 1, '报平安额度不能动');
+  assert.strictEqual(h.fake().get('users', A).reminderQuota, 1, '日记提醒额度不能动');
   assert.strictEqual(res.data.taskQuota, 1);
   assert.strictEqual(res.data.taskQuotaMax, 7);
   assert.strictEqual(res.data.taskConfigured, true);
 
-  // 缺省仍然是 safety（老的客户端不改也能用）
+  // 缺省（不传 template）攒的是每日「写日记」提醒额度（M14 起 safety 档下线）
   const legacy = await h.callAs(A, 'reminder.grant');
-  assert.strictEqual(h.fake().get('users', A).reminderQuota, 2);
-  assert.strictEqual(h.fake().get('users', A).growthSubQuota, 1);
+  assert.strictEqual(h.fake().get('users', A).reminderQuota, 2, '缺省走 diary 档');
+  assert.strictEqual(h.fake().get('users', A).growthSubQuota, 1, '任务额度不能被缺省档改动');
 
   // 封顶 7
   h.fake().get('users', A).growthSubQuota = 7;
@@ -582,6 +563,11 @@ test('reminder.grant：template=task 攒任务额度，与报平安额度互不�
 
   const bad = await h.callAs(A, 'reminder.grant', { template: 'growth' });
   assert.strictEqual(bad.code, 'INVALID_INPUT');
+
+  // 老客户端仍可能传 'safety'：必须显式拒绝，不能静默成功
+  const stale = await h.callAs(A, 'reminder.grant', { template: 'safety' });
+  assert.strictEqual(stale.code, 'INVALID_INPUT');
+  assert.strictEqual(h.fake().get('users', A).growthSubQuota, 7, '被拒的请求不能加额度');
 });
 
 test('growth 常量：分类与状态在 handler 与文档之间同源', () => {

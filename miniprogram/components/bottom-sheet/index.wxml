@@ -1,7 +1,7 @@
 <view wx:if="{{show}}" class="bs">
   <!-- 只在遮罩上阻止滚动，弹层内部仍可滚动（review 建议） -->
   <view class="bs__mask" catchtap="onMaskTap" catchtouchmove="noop"></view>
-  <view class="bs__sheet" catchtap="onSheetTap">
+  <view class="bs__sheet {{aboveTabBar ? 'bs__sheet--above' : ''}}" catchtap="onSheetTap">
     <view class="bs__handle"></view>
     <view wx:if="{{title}}" class="bs__title">{{title}}</view>
     <view class="bs__body">

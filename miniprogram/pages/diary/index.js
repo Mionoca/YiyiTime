@@ -75,6 +75,7 @@ Page({
     moodScore: 0,
     images: [],
     uploadingCount: 0,
+    uploadingTotal: 0,
     shared: false,
     unlockMode: 'day',
     unlockOptions: constants.DIARY_UNLOCK_MODES,
@@ -166,7 +167,19 @@ Page({
 
   /** 选图 → 压缩 → 云存储：逐张上传，失败只跳过这一张，不阻塞写日记 */
   onChooseImage() {
-    if (this.data.uploadingCount > 0) return;
+    // 上传中再点一次会让同一批图重复上传，先挡住并说明原因（17.2）
+    if (this.data.uploadingCount > 0) {
+      wx.showToast({ title: '图片还在上传，等一秒', icon: 'none' });
+      return;
+    }
+    this.pickImages(false);
+  },
+
+  /**
+   * 打开选图面板。retried 用来标记「已经为隐私授权重试过一次」，
+   * 避免微信一直拒绝时无限递归（17.2）。
+   */
+  pickImages(retried) {
     const remain = IMAGES_MAX - this.data.images.length;
     if (remain <= 0) {
       wx.showToast({ title: '配图最多 3 张', icon: 'none' });
@@ -185,13 +198,52 @@ Page({
         const files = (res && res.tempFiles) || [];
         this.uploadFiles(files.map((file) => file && file.tempFilePath).filter(Boolean));
       },
-      fail: () => {},
+      // 原来这里是空的 fail：隐私未授权（errno 112）也被吞掉，表现就是「点了没反应」
+      fail: (err) => this.handlePickFail(err, retried),
     });
+  },
+
+  /** 选图失败的三类处理：取消静默 / 隐私拦截引导后重试 / 其它给可读原因 */
+  handlePickFail(err, retried) {
+    const msg = String((err && err.errMsg) || '');
+    if (/cancel/i.test(msg)) return;
+
+    const privacyBlocked = /privacy/i.test(msg) || (err && err.errno === 112);
+    if (privacyBlocked) {
+      if (retried) {
+        wx.showToast({ title: '先同意隐私说明，才能选图', icon: 'none' });
+        return;
+      }
+      this.askPrivacyThenRetry();
+      return;
+    }
+
+    wx.showToast({ title: this.pickErrorText(err), icon: 'none' });
+  },
+
+  /** 主动拉起隐私授权；成功后自动重试一次选图（基础库没有该 API 时给文案兜底） */
+  askPrivacyThenRetry() {
+    if (typeof wx.requirePrivacyAuthorize !== 'function') {
+      wx.showToast({ title: '先同意隐私说明，才能选图', icon: 'none' });
+      return;
+    }
+    wx.requirePrivacyAuthorize({
+      success: () => this.pickImages(true),
+      fail: () => wx.showToast({ title: '先同意隐私说明，才能选图', icon: 'none' }),
+    });
+  },
+
+  /** errMsg 形如「chooseMedia:fail xxx」，只取冒号后的部分并截断，不把整串抛给用户 */
+  pickErrorText(err) {
+    const raw = String((err && err.errMsg) || '');
+    const tail = raw.split(':').slice(-1)[0].replace(/^fail\s*/i, '').trim();
+    return tail ? '选图失败：' + tail.slice(0, 20) : '选图失败，再试一次';
   },
 
   async uploadFiles(paths) {
     if (!paths.length) return;
-    this.setData({ uploadingCount: paths.length });
+    const total = paths.length;
+    this.setData({ uploadingCount: total, uploadingTotal: total });
     let coupleId = '';
     try {
       const me = await meUtil.getMe();
@@ -200,6 +252,7 @@ Page({
       coupleId = '';
     }
     const added = [];
+    let firstError = '';
     for (let i = 0; i < paths.length; i += 1) {
       try {
         const fileID = await upload.uploadDiaryImage(paths[i], {
@@ -208,12 +261,22 @@ Page({
         });
         added.push(fileID);
       } catch (err) {
-        wx.showToast({ title: (err && err.message) || '图片上传失败', icon: 'none' });
+        if (!firstError) firstError = (err && err.message) || '图片上传失败';
+      } finally {
+        // 无论成功失败都减一：原来只在成功路径减，失败会留下永久的「…」按钮（17.2）
+        this.setData({ uploadingCount: Math.max(0, this.data.uploadingCount - 1) });
       }
-      this.setData({ uploadingCount: this.data.uploadingCount - 1 });
     }
+    this.setData({ uploadingCount: 0, uploadingTotal: 0 });
     if (added.length) {
       this.setData({ images: this.data.images.concat(added).slice(0, IMAGES_MAX) });
+    }
+    if (firstError) {
+      // 全失败给具体原因；部分失败说清「还差几张」，别让人以为全丢或全成
+      const title = added.length
+        ? '有 ' + (total - added.length) + ' 张没传上，再试一次'
+        : firstError;
+      wx.showToast({ title, icon: 'none' });
     }
   },
 

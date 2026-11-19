@@ -104,84 +104,6 @@
   color: var(--accent-ink);
 }
 
-/* ── 先停一下（M11 / 文档 4.2 / 9.2）：牛皮纸便签，不用胶带不旋转 ── */
-/* 存在感靠底色 + 红硬阴影（普通卡片是黄阴影），与解绑条同属「第 0 位条件元素」 */
-.pause-note {
-  position: relative;
-  padding: 32rpx;
-  background-color: var(--wall);
-  border: 3rpx dashed var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: 8rpx 8rpx 0 var(--marker-red);
-}
-
-.pause-note__title {
-  display: block;
-  margin-top: 12rpx;
-  font-size: 36rpx;
-  font-weight: 800;
-  line-height: 1.25;
-  color: var(--ink);
-}
-
-/* 剩余分钟数等宽，倒计时跳动时文字不左右晃 */
-.pause-note__meta {
-  display: block;
-  margin-top: 8rpx;
-  font-size: 24rpx;
-  line-height: 1.6;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.pause-note__action {
-  margin-top: 8rpx;
-}
-
-/* 和好卡三选一：横向等分，热区 ≥88rpx（文档 8.9），不用主按钮以免抢「记一笔」 */
-.pause-choices {
-  display: flex;
-  gap: 16rpx;
-  margin-top: 20rpx;
-}
-
-.pause-choice {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 88rpx;
-  padding: 8rpx 12rpx;
-  font-size: 24rpx;
-  font-weight: 700;
-  line-height: 1.4;
-  color: var(--ink);
-  text-align: center;
-  background-color: var(--card);
-  border: 3rpx dashed var(--line);
-  border-radius: var(--radius-md);
-}
-
-.pause-choice:active {
-  transform: translate(2rpx, 2rpx);
-}
-
-/* 入口：一行文字链（文档 9.3），热区撑到 88rpx；负上边距吃掉心情卡的 24rpx 间距 */
-.pause-entry {
-  display: flex;
-  align-items: center;
-  min-height: 88rpx;
-  margin: -8rpx 0 16rpx;
-  padding: 0 8rpx;
-}
-
-.pause-entry__text {
-  font-size: 24rpx;
-  font-weight: 700;
-  color: var(--muted);
-  border-bottom: 2rpx dashed var(--ink-faint);
-}
-
 /* ── 首屏失败 ───────────────────────────────────────────────── */.error-card {
   margin-top: 48rpx;
   padding: 48rpx 32rpx;
@@ -322,49 +244,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* ── 成长卡（M11.4 / 文档 9.2 第 3.5 位）───────────────────── */
-/* 走卡片流、不进四宫格（四宫格 2×2 是硬约束）；不旋转不贴胶带 */
-.growth-card {
-  display: block;
-}
-
-.growth-main {
-  display: flex;
-  align-items: center;
-  margin-top: 8rpx;
-}
-
-.growth-title {
-  flex: 1;
-  min-width: 0;
-  font-size: 30rpx;
-  font-weight: 800;
-  line-height: 1.4;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 待认领：小红标，不做数字角标（文档 9.3） */
-.growth-dot {
-  flex: none;
-  margin-left: 12rpx;
-  padding: 2rpx 12rpx;
-  font-size: 20rpx;
-  font-weight: 700;
-  color: var(--accent-ink);
-  background-color: var(--accent-soft);
-  border-radius: var(--radius-sm);
-}
-
-.growth-sub {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 22rpx;
-  color: var(--muted);
 }
 
 /* ── 浮层（我们的日子 / TA 的心情）───────────────────────────── */
@@ -589,4 +468,26 @@
 .stack-slot .dk-tape {
   top: 34rpx;
   z-index: 4;
+}
+
+/* ── 四宫格「一起变好」待认领角标（M14 / 17.4）────────────── */
+/* 只做视觉角标，整格仍是同一个点击热区；不只靠颜色，配 ! 字符 */
+.grid__item--growth {
+  position: relative;
+}
+
+.grid__badge {
+  position: absolute;
+  top: 12rpx;
+  right: 12rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 8rpx;
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 32rpx;
+  text-align: center;
+  color: var(--card);
+  background-color: var(--danger);
+  border-radius: 16rpx;
 }

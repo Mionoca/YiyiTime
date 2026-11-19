@@ -10,7 +10,8 @@
   <block wx:if="{{home}}">
     <!-- 资料卡 -->
     <view class="card profile-card">
-      <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" aria-label="点头像换一张">
+      <!-- M14（17.7）：不再用 chooseAvatar（只能取微信头像/拍照），改为相册选图 + 1:1 裁剪 -->
+      <button class="avatar-btn" bindtap="onChooseAvatarTap" aria-label="从相册换一张头像">
         <image class="avatar-img" src="{{avatarPreview}}" mode="aspectFill" />
         <view class="avatar-tip">换头像</view>
       </button>
@@ -129,12 +130,30 @@
     </view>
 
     <!-- 文档 11.6：数据与隐私说明（体验版阶段以此为准，正式上线前补完整协议） -->
-    <bottom-sheet show="{{privacySheet}}" title="数据与隐私" bind:close="onCloseDataPrivacy">
+    <bottom-sheet show="{{privacySheet}}" title="数据与隐私" above-tab-bar="{{true}}" bind:close="onCloseDataPrivacy">
       <view class="privacy-section" wx:for="{{privacySections}}" wx:key="title">
         <view class="privacy-section__title">{{item.title}}</view>
         <view class="privacy-section__text">{{item.text}}</view>
       </view>
       <view class="privacy-sheet__footer">{{privacyFooter}}</view>
+
+      <!-- 自助注销（M14 / 17.8）：入口只放在这里，避免误触；点了先讲清删什么、留什么 -->
+      <view class="danger-zone">
+        <view class="danger-zone__title">危险操作</view>
+        <view
+          class="danger-zone__row"
+          bindtap="onTapDeleteAccount"
+          aria-role="button"
+          aria-label="注销账号，删除我的日记、心情、账本和资料"
+        >
+          <view class="danger-zone__main">
+            <text class="danger-zone__label">注销账号</text>
+            <text class="danger-zone__desc">删掉我的日记、心情、账本和账号资料</text>
+          </view>
+          <text class="danger-zone__arrow">›</text>
+        </view>
+      </view>
+
       <view class="privacy-sheet__close" bindtap="onCloseDataPrivacy" aria-role="button">知道啦</view>
     </bottom-sheet>
 

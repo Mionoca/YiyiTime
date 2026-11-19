@@ -157,7 +157,6 @@ test('文档 6.5 长度限制表与客户端 LIMITS 一致', () => {
   const expected = [
     ['昵称', 'nickname', 1],
     ['心情备注', 'moodNote', 0],
-    ['报平安备注', 'safetyNote', 0],
     ['日记正文', 'diary', 1],
     ['愿望标题', 'wishTitle', 1],
     ['愿望备注', 'wishNote', 0],
@@ -177,7 +176,6 @@ test('文档 6.5 长度限制表与客户端 LIMITS 一致', () => {
 
 test('服务端 handler 的长度上限常量与客户端 LIMITS 一致', () => {
   assert.strictEqual(constantIn(HANDLERS + 'mood.js', 'NOTE_MAX'), LIMITS.moodNote, 'mood.NOTE_MAX');
-  assert.strictEqual(constantIn(HANDLERS + 'safety.js', 'NOTE_MAX'), LIMITS.safetyNote, 'safety.NOTE_MAX');
   assert.strictEqual(constantIn(HANDLERS + 'diary.js', 'CONTENT_MAX'), LIMITS.diary, 'diary.CONTENT_MAX');
   assert.strictEqual(constantIn(HANDLERS + 'wish.js', 'TITLE_MAX'), LIMITS.wishTitle, 'wish.TITLE_MAX');
   assert.strictEqual(constantIn(HANDLERS + 'wish.js', 'NOTE_MAX'), LIMITS.wishNote, 'wish.NOTE_MAX');
@@ -217,7 +215,6 @@ test('输入框 maxlength 全部走数据绑定，昵称不再硬编码 12', () 
     'miniprogram/pages/profile/index.wxml': ['{{nicknameMax}}'],
     'miniprogram/pages/bind/index.wxml': ['6', '{{nicknameMax}}'],
     'miniprogram/pages/diary/index.wxml': ['{{contentMax}}'],
-    'miniprogram/pages/safety/index.wxml': ['{{noteMax}}'],
     'miniprogram/pages/wish/index.wxml': ['{{noteMax}}', '{{titleMax}}'],
     'miniprogram/pages/ledger/index.wxml': ['{{amountMaxLength}}', '{{noteMax}}'],
     'miniprogram/pages/anniversary/index.wxml': ['{{titleMax}}'],
@@ -238,7 +235,6 @@ test('输入框 maxlength 全部走数据绑定，昵称不再硬编码 12', () 
     const bind = loadPage('miniprogram/pages/bind/index.js');
     assert.strictEqual(bind.data.nicknameMax, LIMITS.nickname, 'bind 页 nicknameMax 与 LIMITS.nickname 不一致');
     assert.strictEqual(loadPage('miniprogram/pages/diary/index.js').data.contentMax, LIMITS.diary);
-    assert.strictEqual(loadPage('miniprogram/pages/safety/index.js').data.noteMax, LIMITS.safetyNote);
     const wish = loadPage('miniprogram/pages/wish/index.js');
     assert.strictEqual(wish.data.titleMax, LIMITS.wishTitle);
     assert.strictEqual(wish.data.noteMax, LIMITS.wishNote);
@@ -282,13 +278,10 @@ test('分页默认值与上限：文档 7.9 / 7.10 / 11.4 与服务端、客户�
     return { max, def: Number(digits) };
   };
 
-  const safetyRule = parseLimitRule(section('### 7.9 报平安', '### 7.10 日记'), '7.9');
+  // 7.9 报平安在 M14 下线，只留历史契约（没有 handler 可对），分页一致性只看日记
   const diaryRule = parseLimitRule(section('### 7.10 日记', '### 7.11 愿望'), '7.10');
-  assert.deepStrictEqual(safetyRule, { max: 50, def: 20 });
   assert.deepStrictEqual(diaryRule, { max: 30, def: 10 });
 
-  assert.strictEqual(constantIn(HANDLERS + 'safety.js', 'LIMIT_MAX'), safetyRule.max);
-  assert.strictEqual(constantIn(HANDLERS + 'safety.js', 'LIMIT_DEFAULT'), safetyRule.def);
   assert.strictEqual(constantIn(HANDLERS + 'diary.js', 'LIMIT_MAX'), diaryRule.max);
   assert.strictEqual(constantIn(HANDLERS + 'diary.js', 'LIMIT_DEFAULT'), diaryRule.def);
 
@@ -298,7 +291,6 @@ test('分页默认值与上限：文档 7.9 / 7.10 / 11.4 与服务端、客户�
     assert.ok(match, rel + ' 里找不到整数 PAGE_SIZE');
     return Number(match[1]);
   };
-  assert.strictEqual(pageSizeOf('miniprogram/pages/safety/index.js'), safetyRule.def, 'safety 页每页条数应等于接口默认值（8.9 列表 10–20 条）');
   assert.strictEqual(pageSizeOf('miniprogram/pages/diary/index.js'), diaryRule.def, 'diary 页每页条数应等于接口默认值');
 
   // 6.5 / 11.4 两处口述都要写明一般 1–50 与日记 1–30；用数字边界匹配，避免 1–500 / 1–300 也算通过

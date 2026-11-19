@@ -46,6 +46,8 @@ const ERROR_SITE = /AppError\(|ApiError\(|failWith\(|emptyCode\s*[:=]|\bcode\s*[
 const END_SERVER = '服务端';
 const END_CLIENT = '客户端';
 const END_RESERVED = '服务端（预留）';
+// M14 起功能下线、代码不再抛的码：仍留在表里（客户端可能收到历史码），但不要求实现
+const END_RETIRED = '已下线';
 
 function readDoc() {
   return fs.readFileSync(DOC_PATH, 'utf8');
@@ -127,10 +129,15 @@ function stripComments(text) {
 function classifyEnd(raw) {
   const value = String(raw || '').trim();
   assert.ok(
-    [END_SERVER, END_CLIENT, END_RESERVED].indexOf(value) >= 0,
-    '16.2「端」列只能是「服务端 / 客户端 / 服务端（预留）」，实际：' + value
+    [END_SERVER, END_CLIENT, END_RESERVED, END_RETIRED].indexOf(value) >= 0,
+    '16.2「端」列只能是「服务端 / 客户端 / 服务端（预留） / 已下线」，实际：' + value
   );
-  return { value, client: value === END_CLIENT, reserved: value === END_RESERVED };
+  return {
+    value,
+    client: value === END_CLIENT,
+    reserved: value === END_RESERVED,
+    retired: value === END_RETIRED,
+  };
 }
 
 function errorTable() {
@@ -154,6 +161,7 @@ function errorTable() {
       end: end.value,
       client: end.client,
       reserved: end.reserved,
+      retired: end.retired,
     });
   }
   assert.ok(map.size >= 20, '错误码表只解析到 ' + map.size + ' 条，文档格式可能变了');
@@ -260,7 +268,7 @@ test('文档 16.2：表里的服务端错误码都有实现（预留与客户端
   const used = codeLiterals(CLOUD_DIR, { errorSitesOnly: true });
   const missing = [];
   for (const [code, info] of table) {
-    if (info.client || info.reserved) continue;
+    if (info.client || info.reserved || info.retired) continue;
     if (!used.has(code)) missing.push(code);
   }
   assert.deepStrictEqual(missing, [], '文档 16.2 写了但云函数没在错误位点用到（表与实现脱节）：' + missing.join('、'));
@@ -295,7 +303,7 @@ test('文档 16.2：端列分类与代码位置一致（服务端码在云函数
   const cloudSites = codeLiterals(CLOUD_DIR, { errorSitesOnly: true });
   const miniSites = codeLiterals(MINI_DIR, { errorSitesOnly: true });
   for (const [code, info] of table) {
-    if (info.reserved) continue; // 预留码允许暂时没有实现
+    if (info.reserved || info.retired) continue; // 预留码 / 已下线码允许暂时没有实现
     if (info.client) {
       assert.ok(miniSites.has(code), '16.2 标为客户端的 ' + code + ' 没有在小程序端错误位点出现');
       assert.ok(

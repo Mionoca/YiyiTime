@@ -366,7 +366,7 @@ function checkStructure(root, lines, warnings) {
   if (!badComponent && !badTag) lines.push({ level: 'PASS', msg: '自定义组件文件齐全且按页面/组件作用域注册（app.json 全局注册也放行）' });
 
   // 3) 云函数只访问预期集合（新增集合要先去控制台创建 + 配权限 + 建索引）
-  const expected = ['users', 'couples', 'bind_invites', 'moods', 'anniversaries', 'safety_checkins', 'diaries', 'wishes', 'ledger_entries', 'pauses', 'growth_tasks', 'ledger_view_grants'];
+  const expected = ['users', 'couples', 'bind_invites', 'moods', 'anniversaries', 'diaries', 'wishes', 'ledger_entries', 'growth_tasks', 'ledger_view_grants'];
   const used = new Set();
   let badCollection = 0;
   for (const rel of files) {
@@ -1066,14 +1066,14 @@ function runChecks(root) {
   checkSecrets(root, lines);
   checkGit(root, lines, warnings);
 
-  lines.push({ level: 'TODO', msg: '云开发控制台确认：12 个集合（M13 新增 ledger_view_grants）+ 权限「所有用户不可读写」+ 索引（见 docs/开发进度.md）' });
+  lines.push({ level: 'TODO', msg: '云开发控制台确认：10 个集合（M13 新增 ledger_view_grants；M14 下线 safety_checkins / pauses，历史集合即使留着也不再读写）+ 权限「所有用户不可读写」+ 索引（见 docs/开发进度.md）' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 已重新上传部署（最近一次改动之后）' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 超时 10s、内存 256MB（文档 16.6；默认超时可能只有 3s，冷启动会偶发失败）' });
   lines.push({ level: 'TODO', msg: '微信公众平台确认：用户隐私保护指引（头像/昵称）已声明' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 的定时触发器 reminder-tick 已生效（config.json 的 triggers 随部署上传）' });
   lines.push({ level: 'TODO', msg: '云函数环境变量确认：YIYI_REMINDER_TEMPLATE_ID 已配订阅消息模板 ID（未配时「我的」页提醒开关是禁用态）' });
   lines.push({ level: 'TODO', msg: '云函数环境变量确认：YIYI_GROWTH_TEMPLATE_ID 已配任务提醒模板 ID（可选；未配时成长任务提醒静默降级、页面不弹授权）' });
-  lines.push({ level: 'TODO', msg: '双人真机按 docs/M6-真机验收与发布.md 跑 F1–F14，并导出一次数据库备份' });
+  lines.push({ level: 'TODO', msg: '双人真机按 docs/M6-真机验收与发布.md 跑 F1–F15，并导出一次数据库备份' });
 
   const failed = lines.filter((l) => l.level === 'FAIL');
   return { ok: failed.length === 0, lines, warnings };

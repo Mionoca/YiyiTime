@@ -26,6 +26,7 @@ const UNBOUND_SAFE = {
   'system.ping': '健康检查，不读用户数据',
   'user.get': '读自己的资料，「我的」页未绑定也要能打开',
   'user.updateProfile': '改自己的昵称/头像，绑定前就要能设置资料',
+  'user.deleteAccount': '注销只删自己名下的数据；未绑定用户也必须能注销（文档 7.20）',
   'bind.create': '绑定流程本身在未绑定时使用',
   'bind.preview': '绑定流程本身在未绑定时使用',
   'bind.apply': '绑定流程本身在未绑定时使用',
@@ -66,8 +67,6 @@ const BOUND_REQUIRED = [
   'anniversary.update',
   'anniversary.remove',
   'anniversary.list',
-  'safety.checkin',
-  'safety.list',
   'diary.save',
   'diary.list',
   'diary.calendar',
@@ -77,10 +76,6 @@ const BOUND_REQUIRED = [
   'wish.setDone',
   'wish.remove',
   'wish.list',
-  'pause.start',
-  'pause.status',
-  'pause.end',
-  'pause.choose',
   'growth.add',
   'growth.confirm',
   'growth.update',
@@ -162,7 +157,7 @@ function requireBoundIndex(src) {
 
 test('双人 handler 必须调用 ctx.requireBound()（文档 11.9）', () => {
   const registered = Object.keys(handlers).sort();
-  assert.strictEqual(registered.length, 56, '登记的 action 数量变了，请同步分类');
+  assert.strictEqual(registered.length, 51, '登记的 action 数量变了，请同步分类');
   const classified = registered.filter((action) => (
     !Object.prototype.hasOwnProperty.call(UNBOUND_SAFE, action)
     && !Object.prototype.hasOwnProperty.call(CONDITIONAL_BOUND, action)

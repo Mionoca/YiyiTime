@@ -101,7 +101,7 @@ test('8.2 tab 页之间只走 switchTab：两个 tab 之外一律 navigateTo', (
   assert.strictEqual(constants.isTabRoute('/pages/home/index?from=share'), true);
   assert.strictEqual(constants.isTabRoute('/pages/profile/index'), true);
   assert.strictEqual(constants.isTabRoute('/pages/mood/index'), false);
-  assert.strictEqual(constants.isTabRoute('/pages/safety/index'), false);
+  assert.strictEqual(constants.isTabRoute('/pages/growth/index'), false);
 });
 
 test('8.2 只有 tab 页在 onShow 里同步选中态（getTabBar 判空）', () => {
@@ -115,7 +115,7 @@ test('8.2 只有 tab 页在 onShow 里同步选中态（getTabBar 判空）', ()
     assert.match(js, /onShow\s*\(\)\s*\{[\s\S]{0,200}tabbar\.sync/, page + ' 的 sync 要写在 onShow 里（每次切回都同步）');
   }
   // 普通页不该再引 tabBar：多引一次就多一个「看似是 tab」的误解
-  for (const page of ['diary', 'wish', 'mood', 'safety', 'bind']) {
+  for (const page of ['diary', 'wish', 'mood', 'growth', 'bind']) {
     const js = read('pages/' + page + '/index.js');
     assert.strictEqual(/utils\/tabbar/.test(js), false, page + ' 不是 tab 页，不该依赖 utils/tabbar');
   }
@@ -153,11 +153,12 @@ test('8.7 全局：只有虚线边、彩色硬阴影、极小圆角，不用渐�
   }
 });
 
-test('8.7 页面卡片换成便签：日记/愿望/报平安/我的都走虚线 + 硬阴影', () => {
+test('8.7 页面卡片换成便签：日记/愿望/成长/我的都走虚线 + 硬阴影', () => {
+  // M14 下线报平安后，便签卡片校验随之换成账本汇总卡
   const cases = [
     ['pages/diary/index.wxss', '.editor'],
     ['pages/wish/index.wxss', '.stats'],
-    ['pages/safety/index.wxss', '.checkin'],
+    ['pages/ledger/index.wxss', '.summary'],
     ['components/diary-card/index.wxss', '.dc'],
     ['components/wish-item/index.wxss', '.wi'],
   ];
@@ -172,7 +173,7 @@ test('8.7 页面卡片换成便签：日记/愿望/报平安/我的都走虚线 
   }
 });
 
-test('9.2 首页：纪念日堆叠 + 心情卡 + 四个入口，且不再有场景物件', () => {
+test('9.2 首页：纪念日堆叠 + 心情卡 + 四个入口（含「一起变好」），且不再有场景物件', () => {
   for (const gone of ['class="scene', 'class="lamp', 'class="fridge', 'class="sofa', 'class="door ', 'envelope']) {
     assert.strictEqual(HOME_WXML.includes(gone), false, '场景残留：' + gone + '（9.1 已废弃物件隐喻）');
   }
@@ -181,7 +182,7 @@ test('9.2 首页：纪念日堆叠 + 心情卡 + 四个入口，且不再有场�
     ['class="dk-card mood-card', '心情卡'],
     ['bindtap="onTapDiary"', '写日记入口'],
     ['bindtap="onTapWish"', '愿望清单入口'],
-    ['bindtap="onTapSafety"', '报平安入口'],
+    ['bindtap="onTapGrowth"', '一起变好入口'],
     ['bindtap="onTapMoodHistory"', '心情记录入口'],
   ];
   for (const [needle, label] of expects) {
@@ -190,7 +191,7 @@ test('9.2 首页：纪念日堆叠 + 心情卡 + 四个入口，且不再有场�
   // 入口必须写成「动词短语 + 一行状态」，不能只留图标
   assert.ok(HOME_WXML.includes('{{diarySub}}'), '日记入口缺状态摘要');
   assert.ok(HOME_WXML.includes('{{wishSub}}'), '愿望入口缺状态摘要');
-  assert.ok(HOME_WXML.includes('{{safetySub}}'), '报平安入口缺状态摘要');
+  assert.ok(HOME_WXML.includes('growthSub'), '一起变好入口缺状态摘要');
   // 抱抱卡与心形动画已经整块下线（M12 / 15.3）
   for (const gone of ['hug-card', 'hugHint', 'hug-heart', 'onTapHug']) {
     assert.strictEqual(HOME_WXML.includes(gone), false, '抱抱残留：' + gone);

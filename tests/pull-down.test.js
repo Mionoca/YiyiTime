@@ -54,7 +54,6 @@ test('pull-down: 非自定义导航的子页都开启了 enablePullDownRefresh�
     'pages/ledger/index',
     'pages/mood/index',
     'pages/profile/index',
-    'pages/safety/index',
     'pages/wish/index',
   ]);
   for (const page of subPages()) {

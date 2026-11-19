@@ -34,7 +34,7 @@ const START = '2024-05-20';
 const MARK = {
   nickname: 'MARK昵称9f3',
   moodNote: 'MARK心情7b2c',
-  safetyNote: 'MARK平安5d1e',
+  growthNote: 'MARK成长5d1e',
   diaryContent: 'MARK日记4d1e 今天很开心',
   wishTitle: 'MARK愿望6a2f',
   wishNote: 'MARK愿望备注8c1d',
@@ -115,14 +115,14 @@ test('日志不含用户正文，正文只留在数据库（11.8 / 11.9「日志
   const writes = [
     await h.callAs(A, 'user.updateProfile', { nickname: MARK.nickname, avatarFileID: MARK.avatar }),
     await h.callAs(A, 'mood.set', { mood: 'sunny', note: MARK.moodNote }),
-    await h.callAs(A, 'safety.checkin', { note: MARK.safetyNote }),
+    await h.callAs(A, 'growth.add', { title: MARK.growthNote, category: 'habit' }),
     await h.callAs(A, 'diary.save', { content: MARK.diaryContent }),
     await h.callAs(A, 'wish.add', { title: MARK.wishTitle, note: MARK.wishNote }),
   ];
   writes.forEach((res) => assert.strictEqual(res.ok, true, JSON.stringify(res)));
 
   // 正常读链路（首页聚合 + 三个列表）也不应把正文打进日志
-  for (const action of ['home.get', 'diary.list', 'safety.list', 'wish.list']) {
+  for (const action of ['home.get', 'diary.list', 'growth.list', 'wish.list']) {
     const res = await h.callAs(A, action, {});
     assert.strictEqual(res.ok, true, action);
   }
@@ -250,7 +250,7 @@ test('内部异常对客户端的响应不含集合名 / 堆栈 / 代码路径�
     couples: [coupleDoc(COUPLE_ID, { memberOpenids: [openid, B] })],
   }, openid);
   const logs = captureConsoleError(t);
-  const boom = new Error('collection diaries read failed: users/couples/moods/anniversaries/safety_checkins/wishes/bind_invites');
+  const boom = new Error('collection diaries read failed: users/couples/moods/anniversaries/growth_tasks/wishes/bind_invites');
   boom.stack = 'Error: collection diaries read failed\n    at loadDiary (cloudfunctions/api/lib/home-blocks.js:10:5)\n    at async home.get (cloudfunctions/api/handlers/home.js:20:3)';
   handlers['test.leak'] = () => { throw boom; };
   t.after(() => { delete handlers['test.leak']; });

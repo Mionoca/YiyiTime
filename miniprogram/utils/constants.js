@@ -35,7 +35,6 @@ const ROUTES = {
   home: '/pages/home/index',
   bind: '/pages/bind/index',
   profile: '/pages/profile/index',
-  safety: '/pages/safety/index',
   diary: '/pages/diary/index',
   wish: '/pages/wish/index',
   mood: '/pages/mood/index',
@@ -61,7 +60,7 @@ function isTabRoute(url) {
 const LIMITS = {
   nickname: 12,
   moodNote: 50,
-  safetyNote: 50,
+  // safetyNote 随报平安下线（M14）删除；历史数据里的 note 仍按 50 字读
   // 手帐日记（M13，文档 5.3.7 / 6.5）：正文 ≤500 字、配图 ≤3 张
   diary: 500,
   diaryImages: 3,

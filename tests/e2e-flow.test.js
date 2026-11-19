@@ -5,7 +5,7 @@
  *
  * 入口使用真实 new Date() 作为 ctx.now，因此天数和解锁时刻都按 time 库实时计算，
  * 不硬编码具体日期。覆盖：
- * 1) 双账号完整主链路（资料 → 绑定 → 首页聚合 → 心情 → 抱抱 → 报平安 → 日记 → 愿望 → 改开始日期）
+ * 1) 双账号完整主链路（资料 → 绑定 → 首页聚合 → 心情 → 一起变好 → 日记 → 愿望 → 改开始日期）
  * 2) 跨天日记解锁后能看到对方正文（直接种库）
  * 3) 过期抱抱在首页不展示，并惰性写回 expired
  * 4) user.coupleId 指向不存在的 couple 时 home.get 自愈回未绑定
@@ -96,7 +96,7 @@ async function bindTwoAccounts() {
   return { coupleId: confirmed.coupleId, code: created.code };
 }
 
-test('双账号端到端主链路：绑定 → 首页聚合 → 心情/纪念日/报平安/日记/愿望 → 改开始日期', async (t) => {
+test('双账号端到端主链路：绑定 → 首页聚合 → 心情/纪念日/一起变好/日记/愿望 → 改开始日期', async (t) => {
   captureConsoleError(t);
   const { coupleId } = await bindTwoAccounts();
   const todayKey = today();
@@ -111,7 +111,7 @@ test('双账号端到端主链路：绑定 → 首页聚合 → 心情/纪念日
   assert.strictEqual(couple.status, 'active');
   assert.strictEqual((await callAs(A, 'user.get', {})).user.coupleId, coupleId);
 
-  // 首页：已绑定 + 五个区块全空 + 天数/纪念日按 time 库实时算
+  // 首页：已绑定 + 四个区块全空 + 天数/纪念日按 time 库实时算
   const homeA = await callAs(A, 'home.get', {});
   assert.strictEqual(homeA.bind.state, 'bound');
   assert.strictEqual(homeA.bind.pending, null);
@@ -123,7 +123,7 @@ test('双账号端到端主链路：绑定 → 首页聚合 → 心情/纪念日
   assert.strictEqual(homeA.partner.openid, B);
   assert.deepStrictEqual(homeA.mood, { mine: null, partner: null });
   assert.deepStrictEqual(homeA.anniversary, { items: [] });
-  assert.deepStrictEqual(homeA.safety, { mineToday: false, partnerToday: false, partnerLastAt: null });
+  assert.deepStrictEqual(homeA.growth, { inFlight: 0, firstActiveTitle: null, awaitingConfirm: false, archivedCount: 0 });
   assert.deepStrictEqual(homeA.diary, {
     mineWritten: false,
     partnerWritten: false,
@@ -160,22 +160,24 @@ test('双账号端到端主链路：绑定 → 首页聚合 → 心情/纪念日
   const homeA2 = await callAs(A, 'home.get', {});
   assert.strictEqual(homeA2.anniversary.items[0].title, '初见');
 
-  // 报平安：10 分钟去重；时间线带昵称；对方首页 partnerToday 亮起
-  const checkin = await callAs(A, 'safety.checkin', { note: '到家啦' });
-  assert.strictEqual(checkin.deduped, false);
-  assert.strictEqual(checkin.entry.date, todayKey);
-  assert.strictEqual(checkin.entry.note, '到家啦');
-  const duplicate = await callAs(A, 'safety.checkin', { note: '又点一次' });
-  assert.strictEqual(duplicate.deduped, true);
-  assert.strictEqual(duplicate.entry.checkinId, checkin.entry.checkinId);
-  const timeline = await callAs(A, 'safety.list', {});
-  assert.strictEqual(timeline.items.length, 1);
-  assert.strictEqual(timeline.items[0].nickname, '小怡');
-  assert.strictEqual(timeline.items[0].checkinId, checkin.entry.checkinId);
+  // 一起变好（M14：报平安下线后，四宫格第三格接的是成长任务池）
+  const drafted = await callAs(A, 'growth.add', { title: '一起夜跑', category: 'sport' });
+  assert.strictEqual(drafted.task.title, '一起夜跑');
+  assert.strictEqual(drafted.task.status, 'confirming', '刚起草要等对方认领');
+  // 首页：对方观察到「有等人认领的事」，成长摘要也跟着变
   const homeB3 = await callAs(B, 'home.get', {});
-  assert.strictEqual(homeB3.safety.mineToday, false);
-  assert.strictEqual(homeB3.safety.partnerToday, true);
-  assert.strictEqual(homeB3.safety.partnerLastAt, checkin.entry.createdAt);
+  assert.strictEqual(homeB3.growth.inFlight, 1);
+  assert.strictEqual(homeB3.growth.awaitingConfirm, true);
+  assert.strictEqual(homeB3.growth.firstActiveTitle, null, '还没认领就不算在办');
+  const confirmB = await callAs(B, 'growth.confirm', { taskId: drafted.task.taskId });
+  assert.strictEqual(confirmB.task.status, 'active');
+  const homeA3growth = await callAs(A, 'home.get', {});
+  assert.strictEqual(homeA3growth.growth.awaitingConfirm, false);
+  assert.strictEqual(homeA3growth.growth.firstActiveTitle, '一起夜跑');
+  const pool = await callAs(A, 'growth.list', {});
+  assert.strictEqual(pool.items.length, 1);
+  assert.strictEqual(pool.items[0].title, '一起夜跑');
+  assert.strictEqual(pool.stats.inFlight, 1);
 
   // 日记（M13）：默认私密，双方互不可见；手动开启「这篇给他看」后对方才看到「写了」
   const unlockISO = time.nextUnlockAt(todayKey).toISOString();

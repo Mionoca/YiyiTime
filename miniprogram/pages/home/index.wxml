@@ -43,55 +43,6 @@
       <text class="unbind-bar__btn">去看看 ›</text>
     </view>
 
-    <!-- 0.5 暂停便签（M11 / 文档 9.2）：条件卡，平时不存在；牛皮纸底 + 红硬阴影，不用胶带也不旋转 -->
-    <view
-      class="pause-note card-gap {{pauseState === 'ended' ? 'pause-note--ended' : ''}}"
-      wx:if="{{home.couple && pauseState}}"
-      aria-role="alert"
-      aria-label="{{pauseState === 'active' ? '先停一下，' + pauseRemainText : '可以回来了'}}"
-    >
-      <text class="dk-label">{{pauseState === 'active' ? '今天先停一下' : '可以回来了'}}</text>
-      <text class="pause-note__title">{{pauseState === 'active' ? '我们先停一下' : '缓好了再说话'}}</text>
-
-      <block wx:if="{{pauseState === 'active'}}">
-        <text class="pause-note__meta">{{pauseByMe ? '你按的暂停' : pauseByName + ' 按的暂停'}} · {{pauseRemainText}}</text>
-        <view
-          class="dk-link pause-note__action"
-          wx:if="{{pauseByMe && !pauseSaving}}"
-          bindtap="onTapPauseEnd"
-          aria-role="button"
-          aria-label="我缓好了，提前结束暂停"
-        >我缓好了</view>
-      </block>
-
-      <block wx:else>
-        <text class="pause-note__meta">到点了。选一句，让这件事过去</text>
-        <view class="pause-choices">
-          <view
-            class="pause-choice"
-            data-choice="hurry"
-            bindtap="onTapPauseChoose"
-            aria-role="button"
-            aria-label="我刚才有点急"
-          >我刚才有点急</view>
-          <view
-            class="pause-choice"
-            data-choice="later"
-            bindtap="onTapPauseChoose"
-            aria-role="button"
-            aria-label="晚点再说"
-          >晚点再说</view>
-          <view
-            class="pause-choice"
-            data-choice="hug"
-            bindtap="onTapPauseChoose"
-            aria-role="button"
-            aria-label="抱一下"
-          >抱一下</view>
-        </view>
-      </block>
-    </view>
-
     <!-- 0.6 账本申请提示条（M13 / 文档 9.2 / 7.19）：TA 申请看我的账本且待处理时出现；
          与解绑条同构的细条，不参与卡片旋转；点了去「记账本」处理 -->
     <view
@@ -154,18 +105,6 @@
       </view>
     </view>
 
-    <!-- 先停一下入口（M11 / 文档 9.3）：心情卡下方一行文字链，全 app 唯一入口；
-         已经在暂停里（便签在顶上）时不再出现，避免同一件事两个入口 -->
-    <view
-      class="pause-entry"
-      wx:if="{{home.couple && !pauseState}}"
-      bindtap="onTapPauseStart"
-      aria-role="button"
-      aria-label="先停一下"
-    >
-      <text class="pause-entry__text">先停一下 · 给彼此一点时间</text>
-    </view>
-
     <!-- 4 四个入口（文档 9.2）：动词短语 + 一行状态，不做物件隐喻 -->
     <view class="grid" wx:if="{{home.couple}}">
       <view class="dk-card grid__item" bindtap="onTapDiary" aria-role="button" aria-label="写今天的日记">
@@ -178,35 +117,18 @@
         <text class="grid__title">愿望清单</text>
         <text class="grid__sub">{{wishSub}}</text>
       </view>
-      <view class="dk-card grid__item" bindtap="onTapSafety" aria-role="button" aria-label="报平安">
-        <text class="grid__icon">✓</text>
-        <text class="grid__title">报平安</text>
-        <text class="grid__sub">{{safetySub}}</text>
+      <!-- M14（17.4）：报平安下线，这一格改为「一起变好」；待认领用角标提示，不单独成点 -->
+      <view class="dk-card grid__item grid__item--growth" bindtap="onTapGrowth" aria-role="button" aria-label="一起变好{{growthAwaiting ? '，有事等你认领' : ''}}">
+        <text class="grid__icon">✦</text>
+        <text class="grid__title">一起变好</text>
+        <text class="grid__sub">{{growthSub || '起草第一件一起做的事'}}</text>
+        <view wx:if="{{growthAwaiting}}" class="grid__badge" aria-hidden="true">!</view>
       </view>
       <view class="dk-card grid__item" bindtap="onTapMoodHistory" aria-role="button" aria-label="心情记录">
         <text class="grid__icon">☀</text>
         <text class="grid__title">心情记录</text>
         <text class="grid__sub">按天翻看两人的心情</text>
       </view>
-    </view>
-
-    <!-- 3.5 成长卡（M11.4 / 文档 9.2）：第一条进行中 + 待认领红点 + 日志条数 -->
-    <view
-      class="dk-card growth-card card-gap"
-      wx:if="{{home.couple && growthTitle}}"
-      bindtap="onTapGrowth"
-      aria-role="button"
-      aria-label="一起变好：{{growthTitle}} {{growthSub}}"
-    >
-      <view class="card-head">
-        <text class="dk-label">一起变好</text>
-        <view class="dk-link">全部 ›</view>
-      </view>
-      <view class="growth-main">
-        <text class="growth-title">{{growthTitle}}</text>
-        <view class="growth-dot" wx:if="{{growthAwaiting}}">待认领</view>
-      </view>
-      <text class="growth-sub">{{growthSub}}</text>
     </view>
 
   </block>
@@ -268,6 +190,7 @@
     show="{{moodPickerShow}}"
     value="{{moodMine}}"
     saving="{{moodSaving}}"
+    above-tab-bar="{{true}}"
     bind:select="onMoodSelect"
     bind:close="onCloseMoodPicker"
   />

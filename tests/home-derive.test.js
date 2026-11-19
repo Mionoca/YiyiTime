@@ -34,7 +34,6 @@ function baseHome(overrides) {
         { anniversaryId: 'a_2', title: '她的生日', date: '2019-11-16', nextDate: '2026-11-16', daysLeft: 0, years: 7 },
       ],
     },
-    safety: { mineToday: true, partnerToday: true, partnerLastAt: NOW },
     diary: { mineWritten: true, partnerWritten: true, partnerUnlocked: false, unlockAt: '' },
     wish: { total: 3, done: 1, previewTitle: '去看海' },
   };
@@ -77,13 +76,12 @@ test('derive: 心情卡只给「一个字 + 备注」，没打卡是「还没说
   assert.strictEqual(dirty.moodPartnerText, '还没说');
 });
 
-test('derive: 四个入口的状态摘要（日记 / 愿望 / 报平安）（文档 9.2 / 9.10）', () => {
+test('derive: 入口的状态摘要（日记 / 愿望，M14 起报平安下线）', () => {
   const page = instantiate(config);
 
   const both = page.derive(baseHome());
   assert.strictEqual(both.diarySub, '你写了，TA 的还没解锁');
   assert.strictEqual(both.wishSub, '1/3 完成');
-  assert.strictEqual(both.safetySub, 'TA 到家了');
 
   const unlocked = page.derive(baseHome({
     diary: { mineWritten: true, partnerWritten: true, partnerUnlocked: true },
@@ -113,33 +111,9 @@ test('derive: 四个入口的状态摘要（日记 / 愿望 / 报平安）（文
   assert.strictEqual(neither.wishSub, '还没有愿望');
 });
 
-test('derive: 对方今天没报平安时摘要回退到最近一次，从没报过才说没报', () => {
+test('derive: 聚合块查询失败降级为 null 时不白屏（10.3）', () => {
   const page = instantiate(config);
-  const yesterday = new Date(Date.parse(NOW) - 26 * 3600 * 1000).toISOString();
-  let patch = page.derive(baseHome({ safety: { mineToday: true, partnerToday: false, partnerLastAt: yesterday } }));
-  assert.strictEqual(patch.safetySub, 'TA 昨天');
-
-  const older = new Date(Date.parse(NOW) - 4 * 86400 * 1000).toISOString();
-  patch = page.derive(baseHome({ safety: { mineToday: true, partnerToday: false, partnerLastAt: older } }));
-  assert.strictEqual(patch.safetySub, 'TA 11月12日');
-
-  patch = page.derive(baseHome({ safety: { mineToday: true, partnerToday: false, partnerLastAt: null } }));
-  assert.strictEqual(patch.safetySub, '还没报平安');
-
-  // 必须用服务端 serverNow 而不是本机 Date.now：把服务端时间拨后两天，同一条记录应显示具体日期。
-  // 若忽略 serverNow，运行当天恰好等于 NOW 时会得到「14 小时前」，换个日子又变成别的值（脆弱）。
-  const twoDaysLater = new Date(Date.parse(NOW) + 2 * 86400 * 1000).toISOString();
-  patch = page.derive(baseHome({
-    serverNow: twoDaysLater,
-    safety: { mineToday: false, partnerToday: false, partnerLastAt: NOW },
-  }));
-  assert.strictEqual(patch.safetySub, 'TA 11月16日');
-});
-
-test('derive: 三个聚合块查询失败降级为 null 时不白屏（10.3）', () => {
-  const page = instantiate(config);
-  const patch = page.derive(baseHome({ safety: null, diary: null, wish: null }));
-  assert.strictEqual(patch.safetySub, '还没报平安');
+  const patch = page.derive(baseHome({ diary: null, wish: null }));
   assert.strictEqual(patch.diarySub, '今天还没写');
   assert.strictEqual(patch.wishSub, '还没有愿望');
   assert.strictEqual(patch.moodMineText, '晴 · 今天很好', '心情区块不受影响');
@@ -156,7 +130,6 @@ test('derive: 未绑定只给邀请卡文案，不泄漏对方字段（文档 9.
     partner: null,
     mood: null,
     anniversary: null,
-    safety: null,
     diary: null,
     wish: null,
   });
@@ -164,7 +137,6 @@ test('derive: 未绑定只给邀请卡文案，不泄漏对方字段（文档 9.
   assert.strictEqual(patch.startDateText, '');
   assert.strictEqual(patch.anniversaryText, '');
   assert.strictEqual(patch.diarySub, '等 TA 住进来');
-  assert.strictEqual(patch.safetySub, '等 TA 住进来');
   assert.strictEqual(patch.myName, '我');
   assert.strictEqual(patch.myAvatar, '/images/avatars/default.png');
   assert.strictEqual(patch.partnerName, 'TA');
@@ -381,63 +353,6 @@ test('derive: 只有 startDate 没有纪念日时仍提示「开始那天就是�
   assert.strictEqual(patch.daysText, '第 1 天');
   assert.strictEqual(patch.anniversaryText, '开始那天就是纪念日');
 });
-
-test('derive: 暂停便签三态——active 有剩余分钟、ended 翻面、无暂停全空（M11 / 文档 7.17）', () => {
-  const page = instantiate(config);
-  const active = page.derive(baseHome({
-    pause: {
-      pauseId: 'p_1', byMe: false, byName: '阿安', durationMin: 30, status: 'active',
-      startedAt: '2026-11-16T06:10:00.000Z', endsAt: '2026-11-16T06:40:00.000Z', endChoice: null,
-    },
-  }));
-  assert.strictEqual(active.pauseState, 'active');
-  assert.strictEqual(active.pauseByMe, false);
-  assert.strictEqual(active.pauseByName, '阿安');
-  // serverNow 14:30 → endsAt 14:40，还剩 10 分钟
-  assert.strictEqual(active.pauseRemainText, '还有 10 分钟');
-
-  const ended = page.derive(baseHome({
-    pause: {
-      pauseId: 'p_1', byMe: true, byName: '小怡', durationMin: 30, status: 'ended',
-      startedAt: '2026-11-16T06:10:00.000Z', endsAt: '2026-11-16T06:40:00.000Z', endChoice: null,
-    },
-  }));
-  assert.strictEqual(ended.pauseState, 'ended');
-  assert.strictEqual(ended.pauseByMe, true);
-  assert.strictEqual(ended.pauseRemainText, '', '翻面后不再显示倒计时');
-
-  const none = page.derive(baseHome({ pause: null }));
-  assert.strictEqual(none.pauseState, '');
-  assert.strictEqual(none.pauseByName, '');
-});
-
-test('derive: 剩余不到 1 分钟说「马上就到点了」，未知状态不渲染便签（M11）', () => {
-  const page = instantiate(config);
-  const soon = page.derive(baseHome({
-    pause: {
-      pauseId: 'p_1', byMe: true, byName: '小怡', durationMin: 10, status: 'active',
-      startedAt: '2026-11-16T06:29:30.000Z', endsAt: '2026-11-16T06:30:20.000Z', endChoice: null,
-    },
-  }));
-  assert.strictEqual(soon.pauseRemainText, '还有 1 分钟', '向上取整到分钟');
-
-  const closed = page.derive(baseHome({
-    pause: {
-      pauseId: 'p_1', byMe: true, byName: '小怡', durationMin: 10, status: 'closed',
-      startedAt: NOW, endsAt: NOW, endChoice: 'later',
-    },
-  }));
-  assert.strictEqual(closed.pauseState, '', 'closed 等于不存在，不能留残影');
-
-  // 未绑定时即使服务端误带 pause 也不渲染（文档 9.2：未绑定不显示便签）
-  const unbound = page.derive(baseHome({
-    couple: null,
-    pause: { pauseId: 'p_1', byMe: false, byName: 'TA', status: 'active', endsAt: NOW },
-  }));
-  assert.strictEqual(unbound.pauseState, '');
-});
-
-// ── 成长卡（M11.4 / 文档 7.18 / 9.2 第 3.5 位）─────────────────────────
 
 test('derive: 成长卡优先显示进行中标题，待认领单独标记', () => {
   const page = instantiate(config);

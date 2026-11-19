@@ -1,5 +1,5 @@
 <view wx:if="{{show}}" class="mp-mask" bindtap="onClose" catchtouchmove="noop">
-  <view class="mp-sheet" catchtap="noop">
+  <view class="mp-sheet {{aboveTabBar ? 'mp-sheet--above' : ''}}" catchtap="noop">
     <view class="mp-handle"></view>
     <view class="mp-title">今天心情怎么样？</view>
     <view class="mp-sub">点一个最像今天的状态</view>

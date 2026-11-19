@@ -19,8 +19,8 @@ const { createHarness } = require('./helpers/cloud-entry');
 const DOC_PATH = path.join(__dirname, '..', 'docs', '技术设计文档.md');
 const COLLECTIONS = [
   'users', 'couples', 'bind_invites', 'moods',
-  'anniversaries', 'safety_checkins', 'diaries', 'wishes', 'ledger_entries',
-  'ledger_view_grants',
+  'anniversaries', 'diaries', 'wishes', 'ledger_entries',
+  'ledger_view_grants', 'growth_tasks',
 ];
 
 function stripTicks(text) {
@@ -132,7 +132,6 @@ async function runHappyFlow(h) {
   await call(B, 'mood.set', { mood: 'cloudy' });
   const anniversary = await call(A, 'anniversary.add', { title: '第一次见面', date: '2023-06-01' });
   await call(B, 'anniversary.update', { anniversaryId: anniversary.item.anniversaryId, title: '初见' });
-  await call(A, 'safety.checkin', { note: '到家了' });
   await call(A, 'diary.save', { content: '今天很好' });
   await call(B, 'diary.save', { content: '我也很好' });
   const wish = await call(A, 'wish.add', { title: '去看海', note: '夏天' });
@@ -143,6 +142,9 @@ async function runHappyFlow(h) {
   // M13：账本默认互不可见，走一次申请 + 批准，让 ledger_view_grants 也落盘
   const request = await call(A, 'ledger.requestView', { scope: 'temp' });
   await call(B, 'ledger.decideView', { requestId: request.request.requestId, approve: true });
+  // M11/M14：一起变好也是双人数据（M14 起它接在首页四宫格第三格）
+  const drafted = await call(A, 'growth.add', { title: '一起夜跑', category: 'sport', myPart: '带水' });
+  await call(B, 'growth.confirm', { taskId: drafted.task.taskId });
   return { A, B };
 }
 
@@ -217,12 +219,6 @@ test('数据模型：唯一键 / 日期格式 / 跨集合不变量', async () =>
   for (const forbidden of ['nextDate', 'daysLeft', 'years']) {
     assert.strictEqual(anniversaryDoc[forbidden], undefined, 'anniversaries 不该存 ' + forbidden);
   }
-  const safety = one('safety_checkins');
-  assert.strictEqual(safety.coupleId, couple._id);
-  assert.strictEqual(safety.openid, A);
-  assert.strictEqual(safety.note, '到家了');
-  assert.strictEqual(safety.date, dates[0]);
-  assert.ok(isDate(safety.createdAt));
   const diaries = fake.all('diaries');
   assert.strictEqual(diaries.length, 2, '两个人都写过日记');
   for (const diary of diaries) {

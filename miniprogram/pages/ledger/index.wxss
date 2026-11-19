@@ -490,3 +490,28 @@
   justify-content: center;
   margin-top: 22rpx;
 }
+
+/* ---------- 权限未知的骨架（M14 / 17.3） ---------- */
+/* 与锁面板同尺寸，避免定态后整页跳动；骨架条用虚线，符合涂鸦风 */
+.lock--loading {
+  text-align: left;
+}
+
+.lock--loading .lock__title {
+  margin-bottom: 20rpx;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.lock__skeleton {
+  height: 32rpx;
+  margin-bottom: 16rpx;
+  background-color: var(--wall);
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
+}
+
+.lock__skeleton--short {
+  width: 58%;
+  margin-bottom: 0;
+}

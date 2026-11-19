@@ -3,12 +3,12 @@
 /**
  * 订阅提醒（文档 F9 / 7.15）。
  *
- * 一句话说明它是什么：**给自己开的「该报平安了」闹钟**。
+ * 一句话说明它是什么：**给自己开的「该写日记了」闹钟**（M14 前是「该报平安了」）。
  *
  * 为什么不是「提醒对方」：微信订阅消息是一次性授权，用户每点一次同意只换一条下发额度。
  * 让 A 攒额度去提醒 B，等于用 A 的授权给 B 发消息——B 没同意过，收到只会莫名其妙，
  * 而且一旦被投诉，模板会被封。所以额度只用来提醒**攒额度的那个人自己**：
- * 到点了他还没报平安，就给他发一条「今天还没给 TA 报平安」。
+ * 到点了他还没写日记，就给他发一条「今天还没写日记」。
  *
  * 关键约束（文档 7.15）：
  * - 模板 ID 在没有配置时，所有「发」的路径都安静地不做任何事（`reminder.get` 会告诉
@@ -21,11 +21,10 @@
 const { AppError } = require('../lib/errors');
 const validate = require('../lib/validate');
 const time = require('../lib/time');
-const pause = require('./pause');
 const growthSub = require('../lib/growth-sub');
 
 /** 模板 ID 从环境变量读（控制台改环境变量比改代码安全），没配就是空串 */
-const TEMPLATE_PAGE = 'pages/safety/index';
+const TEMPLATE_PAGE = 'pages/diary/index';
 const DEFAULT_AT = '21:00';
 
 /**
@@ -35,7 +34,7 @@ const DEFAULT_AT = '21:00';
  */
 function templateData(user) {
   return {
-    thing1: { value: '今天还没给 TA 报平安' },
+    thing1: { value: '今天还没写日记' },
     time2: { value: time.normalizeHhmm(user && user.reminderAt) || DEFAULT_AT },
   };
 }
@@ -46,7 +45,7 @@ const QUOTA_MAX = 7;
 const BATCH_MAX = 100;
 /**
  * 「到点」窗口：cron 每 10 分钟一次，给 30 分钟余量——某次 tick 因故障错过时，
- * 下一个 tick 仍然会补发；超过 30 分钟就不补了（22:00 才提醒「该报平安」已经没意义）。
+ * 下一个 tick 仍然会补发；超过 30 分钟就不补了（22:00 才提醒「写日记」已经没意义）。
  * 跨天也靠它：23:55 的提醒，次日 00:00 的 tick 差 5 分钟，仍然算到点。
  */
 const DUE_WINDOW_MIN = 30;
@@ -129,12 +128,15 @@ function view(user) {
   };
 }
 
-/** 今天是否已经报过平安：只有绑定了才有意义 */
+/**
+ * 今天是否已经写过日记（M14 起提醒语义从「报平安」改成「写日记」，字段名沿用 checkedInToday）。
+ * 只认自己的记录，不看伴侣的；未绑定没有提醒，恒 false。
+ */
 async function checkedInToday(ctx) {
   if (!ctx.couple || !ctx.couple._id) return false;
   const todayKey = time.dateKeyOf(ctx.now);
-  const res = await ctx.db.collection('safety_checkins')
-    .where({ coupleId: ctx.couple._id, openid: ctx.openid, date: todayKey })
+  const res = await ctx.db.collection('diaries')
+    .where({ coupleId: ctx.couple._id, authorOpenid: ctx.openid, date: todayKey })
     .count();
   return !!(res && res.total > 0);
 }
@@ -152,7 +154,7 @@ async function get(payload, ctx) {
 }
 
 /**
- * 保存设置。开启提醒必须先绑定——提醒的内容是「给 TA 报平安」，
+ * 保存设置。开启提醒必须先绑定——提醒的内容是「今天还没写日记」，
  * 单身状态下开这个开关没有任何可执行的下一步。
  */
 async function set(payload, ctx) {
@@ -176,15 +178,19 @@ async function set(payload, ctx) {
  * 这里只加不校验来源：授权本身由微信判定，客户端伪造一次 grant 最多让自己多一条
  * 提醒额度——没有越权价值，但要卡上限（QUOTA_MAX）。
  *
- * M11 起支持两档模板（文档 7.15 / 7.18）：`safety`（报平安，缺省）与 `task`（成长任务）。
- * **额度按模板分开记**：报平安用 `reminderQuota`，任务用 `growthSubQuota`；共用一个字段会让
- * 任务事件把报平安的额度吃光。入参缺省 `safety`，老的客户端不改也能继续用。
+ * 两档模板，**额度按模板分开记**（文档 7.15 / 7.18）：
+ * - `diary`（缺省）：每日「今天还没写日记」提醒，额度存 `reminderQuota`，「我的」页开开关时攒；
+ * - `task`：成长任务事件提醒，额度存 `growthSubQuota`，成长页起草/完成时攒。
+ * 共用一个字段会让任务事件把每日提醒的额度吃光。
+ *
+ * M14 起报平安下线：`safety` 这一档取消，老客户端仍可能传，明确返回 INVALID_INPUT，
+ * 而不是「接受了却什么都不加」这种让人以为成功的静默行为。
  */
 async function grant(payload, ctx) {
   const p = validate.asObject(payload);
-  let template = 'safety';
+  let template = 'diary';
   if (p.template !== undefined && p.template !== null && p.template !== '') {
-    template = validate.oneOf(p.template, ['safety', 'task'], '提醒类型');
+    template = validate.oneOf(p.template, ['diary', 'task'], '提醒类型');
   }
 
   if (template === 'task') {
@@ -215,7 +221,7 @@ async function grant(payload, ctx) {
 }
 
 /**
- * 定时任务：把「到点、有额度、今天还没报平安、今天还没发过」的人挑出来发一条。
+ * 定时任务：把「到点、有额度、今天还没写日记、今天还没发过」的人挑出来发一条。
  * 不是 action（handlers/index.js 不导出它），客户端传 `action: 'reminder.tick'`
  * 会得到 UNKNOWN_ACTION。
  */
@@ -259,14 +265,11 @@ async function runTimer(options) {
     if (user.reminderLastSentDate === todayKey) { result.skipped += 1; continue; }
     if (Math.max(0, Number(user.reminderQuota) || 0) <= 0) { result.skipped += 1; continue; }
 
-    // 已报平安就别再叫了
-    const cnt = await db.collection('safety_checkins')
-      .where({ coupleId: user.coupleId, openid: user.openid, date: todayKey })
+    // 今天已经写过日记就别再叫了（M14：提醒语义从报平安改为日记）
+    const cnt = await db.collection('diaries')
+      .where({ coupleId: user.coupleId, authorOpenid: user.openid, date: todayKey })
       .count();
     if (cnt && cnt.total > 0) { result.skipped += 1; continue; }
-
-    // 暂停进行中：刹车优先，本轮不发也不占位（7.17 静音规则）
-    if (await pause.isOngoing(db, user.coupleId, now)) { result.skipped += 1; continue; }
 
     const claim = await claimToday(db, user._id, todayKey, now);
     if (!claim.claimed) { result.skipped += 1; continue; }

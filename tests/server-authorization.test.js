@@ -199,26 +199,27 @@ test('日记：正文不跨对泄漏，读取只按自己的 coupleId 过滤', a
   assert.strictEqual(store.get('diaries', C + '_' + diaryC.diary.date).coupleId, COUPLE_CD);
 });
 
-test('报平安与首页聚合只在本对可见：别家的记录不出现在我的时间线和首页', async () => {
+test('一起变好与首页聚合只在本对可见：别家的任务不出现在我的任务池和首页', async () => {
   seedTwoCouples();
-  const checkinA = await ok(A, 'safety.checkin', { note: '我到家啦' });
+  const draftedA = await ok(A, 'growth.add', { title: '一起夜跑', category: 'sport' });
   const wishA = await ok(A, 'wish.add', { title: 'A 的愿望' });
 
-  const listC = await ok(C, 'safety.list', {});
-  assert.deepStrictEqual(listC.items, [], 'C 不该看到 A 的报平安');
+  const listC = await ok(C, 'growth.list', {});
+  assert.deepStrictEqual(listC.items, [], 'C 不该看到 A 那对的任务');
 
-  const listA = await ok(A, 'safety.list', {});
+  const listA = await ok(A, 'growth.list', {});
   assert.strictEqual(listA.items.length, 1);
-  assert.strictEqual(listA.items[0].checkinId, checkinA.entry.checkinId);
-  assert.strictEqual(listA.items[0].openid, A);
+  assert.strictEqual(listA.items[0].taskId, draftedA.task.taskId);
+  assert.strictEqual(listA.items[0].title, '一起夜跑');
 
-  // B（A 的伴侣）首页门灯亮；C（别家）首页完全看不到 A 的记录
+  // B（A 的伴侣）首页看到「有待认领」；C（别家）首页完全看不到 A 那对的任务
   const homeB = await ok(B, 'home.get', {});
-  assert.strictEqual(homeB.safety.partnerToday, true);
+  assert.strictEqual(homeB.growth.inFlight, 1);
+  assert.strictEqual(homeB.growth.awaitingConfirm, true);
   const homeC = await ok(C, 'home.get', {});
-  assert.strictEqual(homeC.safety.partnerToday, false);
-  assert.strictEqual(homeC.safety.mineToday, false);
-  assert.strictEqual(homeC.safety.partnerLastAt, null);
+  assert.strictEqual(homeC.growth.inFlight, 0);
+  assert.strictEqual(homeC.growth.awaitingConfirm, false);
+  assert.strictEqual(homeC.growth.archivedCount, 0);
   assert.strictEqual(homeC.partner.nickname, '别人家', 'C 的伴侣只能是 D');
   assert.strictEqual(homeC.couple.coupleId, COUPLE_CD);
   assert.strictEqual(homeB.couple.coupleId, COUPLE_AB);
@@ -267,14 +268,11 @@ test('客户端传的 openid / coupleId / date / unlockAt 一律被忽略，只�
   assert.strictEqual(annDoc.coupleId, COUPLE_AB, '归属只认当前关系');
   assert.strictEqual(annDoc.createdBy, A, 'createdBy 只认服务端身份');
 
-  // 报平安：记录归属和日期都由服务端定
-  const checkin = await ok(A, 'safety.checkin', Object.assign({ note: '到家' }, injected));
-  assert.strictEqual(checkin.entry.openid, A);
-  const safetyDoc = store.get('safety_checkins', checkin.entry.checkinId);
-  assert.strictEqual(safetyDoc.coupleId, COUPLE_AB);
-  assert.strictEqual(safetyDoc.openid, A, '记录归属只认服务端 OPENID');
-  assert.strictEqual(safetyDoc.note, '到家');
-  assert.notStrictEqual(safetyDoc.date, '2000-01-01');
+  // 一起变好：coupleId / createdBy / createdAt 都由服务端定
+  const drafted = await ok(A, 'growth.add', Object.assign({ title: '一起夜跑', category: 'sport' }, injected));
+  const growthDoc = store.get('growth_tasks', drafted.task.taskId);
+  assert.strictEqual(growthDoc.coupleId, COUPLE_AB, '归属只认当前关系');
+  assert.strictEqual(growthDoc.createdBy, A, 'createdBy 只认服务端身份');
 
   // 日记：authorOpenid / coupleId / date / unlockAt 都忽略
   const diary = await ok(A, 'diary.save', Object.assign({
@@ -307,8 +305,8 @@ test('未绑定用户调用双人接口统一 NOT_BOUND，首页仍返回未绑�
     ['anniversary.list', {}],
     ['anniversary.update', { anniversaryId: 'a_not_mine', title: '改不动' }],
     ['anniversary.remove', { anniversaryId: 'a_not_mine' }],
-    ['safety.checkin', { note: '' }],
-    ['safety.list', {}],
+    ['growth.add', { title: '一起夜跑', category: 'sport' }],
+    ['growth.list', {}],
     ['diary.save', { content: '今天很好' }],
     ['diary.list', {}],
     ['wish.add', { title: '去看海' }],
@@ -328,8 +326,11 @@ test('未绑定用户调用双人接口统一 NOT_BOUND，首页仍返回未绑�
   assert.strictEqual(home.partner, null);
   assert.strictEqual(home.mood, null);
   assert.strictEqual(home.anniversary, null);
-  assert.strictEqual(home.safety, null);
+  assert.strictEqual(home.growth, null);
   assert.strictEqual(home.diary, null);
+  // M14 下线的两个区块连键都不该再出现（不是 null，是彻底没有）
+  assert.strictEqual(home.safety, undefined);
+  assert.strictEqual(home.pause, undefined);
   assert.strictEqual(home.wish, null);
 });
 

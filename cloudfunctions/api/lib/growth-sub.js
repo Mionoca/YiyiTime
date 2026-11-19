@@ -23,7 +23,6 @@
 
 const time = require('./time');
 const dbUtil = require('./db-util');
-const pause = require('../handlers/pause');
 
 /** 点开订阅消息落到「一起变好」页（M11.4 上线后才有；此时模板通常也还没配） */
 const TEMPLATE_PAGE = 'pages/growth/index';
@@ -118,12 +117,6 @@ async function notify(ctx, opts) {
       ? Math.max(0, Number(user.growthSubSentCount) || 0)
       : 0;
     if (sentToday >= DAILY_MAX) { out.reason = 'daily-limit'; return out; }
-
-    // 刹车优先：吵架期间别弹「来认领任务」（与 runTimer 静音同一条规则）
-    if (await pause.isOngoing(ctx.db, user.coupleId, ctx.now)) {
-      out.reason = 'paused';
-      return out;
-    }
 
     // 先扣额度再发：发送不可撤销，先扣可以保证「额度用光了就不会再发」；
     // 用 inc 而不是绝对写，避免把这期间用户刚攒的那条覆盖掉

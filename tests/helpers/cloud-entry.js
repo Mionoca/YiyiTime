@@ -36,6 +36,16 @@ let openapiAvailable = true;
 /** 记录云调用：{ api, args }，用来断言「审了哪段文本 / 发了哪条订阅消息」 */
 let openapiCalls = [];
 
+/** 云存储删除：默认全部成功，用例可替换实现来模拟部分失败 */
+function defaultFileApi() {
+  return async (args) => ({
+    fileList: ((args && args.fileList) || []).map((fileID) => ({ fileID, status: 0, errMsg: 'ok' })),
+  });
+}
+let fileImpl = defaultFileApi();
+/** 记录 cloud.deleteFile 的调用：每次一批 fileList */
+let fileCalls = [];
+
 function proxyCollection(name) {
   const real = fake.db.collection(name);
   if (!fault || fault.collection !== name) return real;
@@ -105,6 +115,10 @@ const wxStub = {
   init() {},
   getWXContext: () => (currentOpenid === undefined ? {} : { OPENID: currentOpenid }),
   database: () => proxyDb,
+  deleteFile(args) {
+    fileCalls.push((args && args.fileList) || []);
+    return fileImpl(args);
+  },
 };
 Object.defineProperty(wxStub, 'openapi', { get: currentOpenapi, enumerable: true });
 
@@ -135,6 +149,8 @@ function createHarness() {
   openapiImpl = defaultOpenapi();
   openapiAvailable = true;
   openapiCalls = [];
+  fileImpl = defaultFileApi();
+  fileCalls = [];
   const api = require('../../cloudfunctions/api/index');
   const handlers = require('../../cloudfunctions/api/handlers');
   return {
@@ -157,6 +173,8 @@ function createHarness() {
       openapiImpl = defaultOpenapi();
       openapiAvailable = true;
       openapiCalls = [];
+      fileImpl = defaultFileApi();
+      fileCalls = [];
     },
     /**
      * 注入故障：{ collection:'users', method:'get'|'update'|'add'|'collection', error }；传 null 清除。
@@ -195,6 +213,14 @@ function createHarness() {
     },
     openapiCalls() {
       return openapiCalls;
+    },
+    /** 替换 cloud.deleteFile 实现（模拟失败 / 部分失败）；不传则恢复默认全成功 */
+    setFileApi(next) {
+      fileImpl = next || defaultFileApi();
+    },
+    /** 记录到的 cloud.deleteFile 调用：[[fileID, ...], ...] 每批一项 */
+    fileCalls() {
+      return fileCalls;
     },
     handlers,
   };

@@ -113,6 +113,8 @@
   border: 3rpx dashed var(--line);
   background: var(--wall);
   box-shadow: 4rpx 4rpx 0 var(--marker-yellow);
+  /* 与 profile 头像一致：偏上对齐，避免竖构图把脸裁在中间偏下（17.7） */
+  object-position: center 30%;
 }
 
 .avatar-bubble--sm .avatar {

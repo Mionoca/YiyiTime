@@ -1,6 +1,7 @@
 const api = require('../../utils/api');
 const constants = require('../../utils/constants');
 const tabbar = require('../../utils/tabbar');
+const permissionCache = require('../../utils/permission-cache');
 const timeUtil = require('../../utils/time');
 const upload = require('../../utils/upload');
 const haptics = require('../../utils/haptics');
@@ -33,6 +34,8 @@ Page({
     hapticsEnabled: true,
     // 文档 11.6：数据与隐私说明（收集 / 不收集 / 用途 / 存储 / 删除数据）
     privacySheet: false,
+    // 注销进行中：防连点；成功后会 reLaunch，失败允许原地重试（服务端幂等）
+    deleting: false,
     privacySections: privacy.SECTIONS,
     privacyFooter: privacy.FOOTER,
     // 解绑（M9 / 文档 8.3.6）：none / pending_me / pending_partner
@@ -212,6 +215,114 @@ Page({
 
   uploadAvatar(filePath) {
     return upload.uploadAvatar(filePath);
+  },
+
+  /** 换头像入口（M14 / 17.7）：从相册或相机选一张，不再限定微信头像 */
+  onChooseAvatarTap() {
+    if (this.data.saving) return;
+    if (typeof wx.chooseMedia !== 'function') {
+      wx.showToast({ title: '这个版本不支持选图', icon: 'none' });
+      return;
+    }
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const file = res && res.tempFiles && res.tempFiles[0];
+        const path = file && file.tempFilePath;
+        if (path) this.cropThenUpload(path);
+      },
+      fail: (err) => {
+        const msg = String((err && err.errMsg) || '');
+        if (/cancel/i.test(msg)) return;
+        // 隐私说明没同意时 chooseMedia 会被平台直接拦下（errno 112），必须说清楚
+        if (/privacy/i.test(msg) || (err && err.errno === 112)) {
+          wx.showToast({ title: '先同意隐私说明，才能换头像', icon: 'none' });
+          return;
+        }
+        wx.showToast({ title: '选图失败，再试一次', icon: 'none' });
+      },
+    });
+  },
+
+  /**
+   * 头像容器是圆的，最终必须裁成 1:1；但「脸在哪」交给用户自己框，
+   * 不用 aspectFill 硬居中（竖构图会切掉额头 / 下巴）。
+   * 基础库 < 2.26 没有 wx.cropImage 时直接上传原图，展示侧偏上对齐兜底。
+   */
+  cropThenUpload(filePath) {
+    if (typeof wx.cropImage !== 'function') {
+      this.onChooseAvatar({ detail: { avatarUrl: filePath } });
+      return;
+    }
+    wx.cropImage({
+      src: filePath,
+      cropScale: '1:1',
+      success: (res) => {
+        const path = (res && res.tempFilePath) || '';
+        if (path) this.onChooseAvatar({ detail: { avatarUrl: path } });
+      },
+      // 用户在裁剪页取消：保留原头像，不提示（取消不是错误）
+      fail: () => {},
+    });
+  },
+
+  /** 注销入口（M14 / 17.8）：先讲影响，再要求输入「注销」二次确认 */
+  onTapDeleteAccount() {
+    if (this.data.deleting) return;
+    wx.showModal({
+      title: '注销账号？',
+      content: '会删掉：日记（含配图）、心情、个人账本、查看授权、账号资料。\n会留给对方：共同的纪念日、愿望、已归档的成长任务。\n关系会同时结束，删掉之后找不回来。',
+      confirmText: '下一步',
+      cancelText: '再想想',
+      success: (res) => {
+        if (res && res.confirm) this.confirmDeleteAccount();
+      },
+    });
+  },
+
+  /** 二次确认用输入框：只有真的打出「注销」两个字才继续，防误触 */
+  confirmDeleteAccount() {
+    wx.showModal({
+      title: '确认注销',
+      editable: true,
+      placeholderText: '输入「注销」两个字',
+      confirmText: '注销',
+      cancelText: '取消',
+      success: (res) => {
+        if (!res || !res.confirm) return;
+        const text = String(res.content || '').trim();
+        if (text !== '注销') {
+          this.toast('要输入「注销」两个字才能继续');
+          return;
+        }
+        this.deleteAccount();
+      },
+    });
+  },
+
+  async deleteAccount() {
+    if (this.data.deleting) return;
+    this.setData({ deleting: true });
+    try {
+      await api.call('user.deleteAccount', { confirm: 'delete' });
+      // 本地缓存里可能还有上一个身份的快照 / 权限 / 邀请码，一并清掉，避免重进时闪旧数据
+      try {
+        wx.clearStorageSync();
+      } catch (err) {
+        // 存储不可用不影响账号已经删掉的事实
+      }
+      wx.showToast({ title: '已经注销了', icon: 'none' });
+      // 等 toast 露一下再跳：reLaunch 会销毁当前页
+      setTimeout(() => {
+        wx.reLaunch({ url: constants.ROUTES.bind });
+      }, 600);
+    } catch (err) {
+      this.setData({ deleting: false });
+      api.showError(err);
+    }
   },
 
   async onChooseAvatar(e) {
@@ -504,6 +615,8 @@ Page({
     this.setData({ unbinding: true });
     try {
       await api.call('couple.confirmUnbind');
+      // 关系结束后账本授权不再成立：把权限快照清掉，别让下一次进账本先闪一下「能看」（17.3）
+      permissionCache.clear();
       this.setData({ unbinding: false });
       wx.showToast({ title: '已经解绑了', icon: 'none' });
       // 与绑定成功一致：清掉页面栈回首页，避免停在已失效的资料页
