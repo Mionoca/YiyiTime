@@ -212,7 +212,9 @@ Page({
     const privacyBlocked = /privacy/i.test(msg) || (err && err.errno === 112);
     if (privacyBlocked) {
       if (retried) {
-        wx.showToast({ title: '先同意隐私说明，才能选图', icon: 'none' });
+        // 已经为了隐私授权重试过一次还失败：再说「先同意隐私说明」就是误导（用户刚点过同意），
+        // 这时只能是微信侧还没放行，给一条能自己查的路径，且不再弹窗避免来回循环
+        wx.showToast({ title: '相册还没打开，去「微信 → 我 → 设置 → 隐私」看看', icon: 'none' });
         return;
       }
       this.askPrivacyThenRetry();

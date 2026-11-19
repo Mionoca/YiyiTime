@@ -379,13 +379,14 @@ test('privacy-guard：needAuthorization 才弹、24h 内不再打扰、同意/�
   const withApi = h.instantiateComponent(apiConfig);
   withApi.onOpenContract();
   assert.strictEqual(contractCalls, 1);
-  assert.ok(toasts.some((t) => t.title.indexOf('微信 - 设置 - 隐私') >= 0));
+  assert.ok(toasts.some((t) => /微信[^」]*设置[^」]*隐私/.test(String(t.title || ''))), '指引失败要给出微信里的查看路径');
 
   installWx({ getStorageSync: () => '', setStorageSync() {}, showToast: (opts) => toasts.push(opts) });
   const noApiConfig = h.loadComponent('miniprogram/components/privacy-guard/index.js');
   const noApi = h.instantiateComponent(noApiConfig);
   noApi.onOpenContract();
-  assert.ok(toasts.filter((t) => t.title.indexOf('微信 - 设置 - 隐私') >= 0).length >= 2);
+  const guide = (t) => /微信[^」]*设置[^」]*隐私/.test(String(t.title || ''));
+  assert.ok(toasts.filter(guide).length >= 2, '两条「查看指引」路径都要给出微信里的查看位置');
 });
 
 test('M14 下线：timeline-item 组件已删除，头像只由 avatar-bubble 渲染', () => {

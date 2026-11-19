@@ -266,5 +266,5 @@ test('首页仍接分享与隐私授权（8.9 / 13.8）', () => {
   assert.match(homeJs, /onShareAppMessage\(\)/, '首页缺少分享卡片');
   assert.match(homeJs, /onShareTimeline\(\)/, '首页缺少朋友圈分享');
   assert.match(homeJs, /\?code=/, '分享卡片要带上邀请码');
-  assert.ok(HOME_WXML.includes('<privacy-guard />'), '首页缺少隐私授权弹窗');
+  assert.match(HOME_WXML, /<privacy-guard[\s/>]/, '首页缺少隐私授权弹窗');
 });

@@ -132,6 +132,6 @@
   </view>
 
   <!-- 隐私授权（文档 9.6 / 13.8）：微信要求授权时出现 -->
-  <privacy-guard />
+  <privacy-guard id="privacyGuard" />
 
 </view>

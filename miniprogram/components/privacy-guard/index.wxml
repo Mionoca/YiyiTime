@@ -1,16 +1,25 @@
 <view class="privacy" wx:if="{{show}}">
   <view class="privacy__mask" catchtouchmove="noop"></view>
-  <view class="privacy__card" catchtap="noop">
+  <!-- 不用 catchtap：它对 open-type 按钮在部分机型上会吃掉点击；遮罩本身没有 tap 事件，拦不拦一样 -->
+  <view class="privacy__card">
     <view class="privacy__title">住进小屋之前</view>
     <view class="privacy__text">小屋只属于你们两个人，所以想先和你说清楚：</view>
     <view class="privacy__item">· 头像和昵称只会给绑定后的 TA 看</view>
     <view class="privacy__item">· 日记当天上锁，第二天两个人一起解锁</view>
-    <view class="privacy__item">· 心情、抱抱和报平安只留在你们的小屋里</view>
+    <view class="privacy__item">· 心情和一起做的小事，只留在你们的小屋里</view>
     <view class="privacy__link" bindtap="onOpenContract" aria-role="button">查看《小怡怡安隐私保护指引》</view>
+    <!--
+      open-type="agreePrivacyAuthorization" 只在基础库 ≥ 2.32.3 且公众平台已配置好
+      《用户隐私保护指引》时才回调 bindagreeprivacyauthorization；否则点了毫无反应，
+      弹窗像冻住一样（真机反馈）。因此额外绑 bindtap 兜底，见 onAgreeTap。
+    -->
     <button
       class="privacy__agree"
       open-type="agreePrivacyAuthorization"
       bindagreeprivacyauthorization="onAgree"
+      bindtap="onAgreeTap"
+      aria-role="button"
+      aria-label="同意隐私保护指引并继续"
     >
       同意并继续
     </button>

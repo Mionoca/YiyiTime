@@ -196,6 +196,6 @@
   />
 
   <!-- 隐私授权（文档 9.6 / 13.8）：只在微信要求授权时出现，低版本基础库交给微信原生弹窗 -->
-  <privacy-guard />
+  <privacy-guard id="privacyGuard" />
 
 </view>

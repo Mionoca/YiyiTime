@@ -404,3 +404,118 @@ test('隐私被拦：日记页同意后会重试选图，我的页同意后会�
   const profileAgree = profile.slice(profile.indexOf('onPrivacyAgreed('), profile.indexOf('onPrivacyAgreed(') + 120);
   assert.ok(/onChooseAvatarTap/.test(profileAgree), '我的页同意后应重开相册：' + profileAgree);
 });
+
+/* ── 「同意并继续」点不动：open-type 不回调时必须自己兜底（M14 二次修订） ───────── */
+
+test('隐私守卫：同意按钮同时绑 open-type 与 bindtap，卡片不得再有 catchtap', () => {
+  // 真机反馈：弹窗能出现，但「同意并继续」点了毫无反应。
+  // 根因是 open-type="agreePrivacyAuthorization" 只在基础库 ≥ 2.32.3 且公众平台配好
+  // 《用户隐私保护指引》时才回调；没有 bindtap 兜底时，点击连「关闭弹窗」都不会发生。
+  const wxml = fs.readFileSync(path.join(ROOT, 'miniprogram/components/privacy-guard/index.wxml'), 'utf8');
+  const button = /<button[^>]*class="privacy__agree"[^>]*>/.exec(wxml);
+  assert.ok(button, '找不到同意按钮');
+  assert.match(button[0], /open-type="agreePrivacyAuthorization"/, '保留平台授权 open-type');
+  assert.match(button[0], /bindagreeprivacyauthorization="onAgree"/, '保留平台回调');
+  assert.match(button[0], /bindtap="onAgreeTap"/, '必须有 bindtap 兜底，否则 open-type 失效时点了没反应');
+  assert.ok(!/privacy__card"\s+catchtap/.test(wxml), '卡片的 catchtap 对 open-type 按钮有吞点击风险，必须去掉');
+
+  const js = fs.readFileSync(path.join(ROOT, 'miniprogram/components/privacy-guard/index.js'), 'utf8');
+  assert.match(js, /requirePrivacyAuthorize/, '兜底要用原生授权接口');
+  assert.match(js, /AGREE_FALLBACK_MS/, '兜底窗口要有明确常量');
+});
+
+test('隐私守卫：open-type 不回调时，bindtap 兜底会拉起原生授权并完成同意', (t) => {
+  const calls = { authorize: 0, agree: 0, toast: [] };
+  installWx({
+    getStorageSync: () => '',
+    setStorageSync: () => {},
+    removeStorageSync: () => {},
+    showToast: (opts) => calls.toast.push(opts && opts.title),
+    getPrivacySetting: (opts) => opts.success({ needAuthorization: true }),
+    requirePrivacyAuthorize: (opts) => { calls.authorize += 1; opts.success(); },
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const comp = h.instantiateComponent(h.loadComponent('miniprogram/components/privacy-guard/index.js'));
+    comp.check(); // 等价于 attached（夹具不跑生命周期）
+    assert.strictEqual(comp.data.show, true, '需要授权时应显示弹窗');
+    comp.triggerEvent = (name) => { if (name === 'agree') calls.agree += 1; };
+
+    comp.onAgreeTap();
+    assert.strictEqual(calls.authorize, 0, '先给 open-type 一个回调窗口，不能抢跑（否则可能弹两次授权）');
+    t.mock.timers.tick(300);
+    assert.strictEqual(calls.authorize, 1, '窗口内没等到平台回调，必须用原生授权兜底');
+    assert.strictEqual(comp.data.show, false, '授权成功后弹窗要收起');
+    assert.strictEqual(calls.agree, 1, '同意后要通知页面继续刚才的动作');
+    assert.deepStrictEqual(calls.toast, [], '成功路径不该有提示音');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('隐私守卫：open-type 正常回调时不重复兜底，也不会广播两次', (t) => {
+  const calls = { authorize: 0, agree: 0 };
+  installWx({
+    getStorageSync: () => '',
+    setStorageSync: () => {},
+    removeStorageSync: () => {},
+    showToast: () => {},
+    getPrivacySetting: (opts) => opts.success({ needAuthorization: true }),
+    requirePrivacyAuthorize: (opts) => { calls.authorize += 1; opts.success(); },
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const comp = h.instantiateComponent(h.loadComponent('miniprogram/components/privacy-guard/index.js'));
+    comp.triggerEvent = (name) => { if (name === 'agree') calls.agree += 1; };
+    comp.check();
+    assert.strictEqual(comp.data.show, true, '需要授权时应显示弹窗');
+
+    comp.onAgreeTap();   // 用户点击
+    comp.onAgree();      // 平台在窗口内回调
+    t.mock.timers.tick(1000);
+    assert.strictEqual(calls.authorize, 0, '已经同意过就不该再拉原生授权（否则会弹两次相册）');
+    assert.strictEqual(calls.agree, 1, '同意事件只能广播一次');
+
+    // 已经收起后再点（例如页面残留手势）也不该再广播
+    comp.onAgree();
+    assert.strictEqual(calls.agree, 1, 'onAgree 必须幂等');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('隐私守卫：原生授权也失败时，弹窗保持打开并给出可执行的说明', (t) => {
+  const calls = { toast: [], agree: 0 };
+  installWx({
+    getStorageSync: () => '',
+    setStorageSync: () => {},
+    removeStorageSync: () => {},
+    showToast: (opts) => calls.toast.push(opts && opts.title),
+    getPrivacySetting: (opts) => opts.success({ needAuthorization: true }),
+    requirePrivacyAuthorize: (opts) => opts.fail({ errMsg: 'requirePrivacyAuthorize:fail' }),
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const comp = h.instantiateComponent(h.loadComponent('miniprogram/components/privacy-guard/index.js'));
+    comp.triggerEvent = () => { calls.agree += 1; };
+    comp.check();
+    assert.strictEqual(comp.data.show, true, '需要授权时应显示弹窗');
+
+    comp.onAgreeTap();
+    t.mock.timers.tick(300);
+    assert.strictEqual(comp.data.show, true, '授权失败不能假装成功，弹窗要保持打开');
+    assert.strictEqual(calls.agree, 0, '没同意就不能广播 agree');
+    assert.strictEqual(calls.toast.length, 1, '必须给出提示，不能静默');
+    assert.match(calls.toast[0], /隐私保护指引/, '提示要指向真正的原因（平台侧配置）');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('隐私守卫：四个页面都挂上 id，openGuard 才能拿到组件', () => {
+  ['home', 'bind', 'diary', 'profile'].forEach((page) => {
+    const wxml = fs.readFileSync(path.join(ROOT, 'miniprogram/pages', page, 'index.wxml'), 'utf8');
+    assert.match(wxml, /<privacy-guard[^>]*id="privacyGuard"/,
+      page + ' 页的守卫缺 id：privacy.openGuard(this) 会拿不到组件，自救链路直接失效');
+  });
+});
