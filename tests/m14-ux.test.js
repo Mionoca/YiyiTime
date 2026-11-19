@@ -159,6 +159,13 @@ test('日记配图：部分失败说「还差几张」，全部失败给具体�
   }
 });
 
+/** 取某个选择器的规则体（第一个匹配），用于断言具体声明 */
+function ruleBody(css, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(escaped + '\\s*\\{([^}]*)\\}').exec(css);
+  return match ? match[1] : '';
+}
+
 test('aboveTabBar：心情弹层与底部抽屉都要让开 tabBar 的 100rpx', () => {
   const moodWxml = fs.readFileSync(path.join(ROOT, 'miniprogram/components/mood-picker/index.wxml'), 'utf8');
   const moodJs = fs.readFileSync(path.join(ROOT, 'miniprogram/components/mood-picker/index.js'), 'utf8');
@@ -181,6 +188,51 @@ test('aboveTabBar：心情弹层与底部抽屉都要让开 tabBar 的 100rpx', 
     const wxml = fs.readFileSync(path.join(ROOT, 'miniprogram/pages', page, 'index.wxml'), 'utf8');
     assert.ok(/<bottom-sheet[\s\S]{0,200}above-tab-bar="\{\{true\}\}"/.test(wxml), page + ' 页的抽屉要开 aboveTabBar');
   });
+});
+
+test('首页自绘浮层（我们的日子 / TA 的心情）也要让开 tabBar——它不走组件，是页面里手写的', () => {
+  // 17.6 首版只改了 mood-picker 与 bottom-sheet 两个组件，漏了首页这两个自绘浮层，
+  // 真机上「知道啦」按钮的下半截仍然压在 tab 栏下面。这里把它钉住。
+  const css = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/home/index.wxss'), 'utf8');
+  const mask = ruleBody(css, '.sheet-mask');
+  assert.ok(mask, '找不到 .sheet-mask 规则');
+  assert.ok(/padding-bottom:\s*calc\([^;]*100rpx[^;]*\)/.test(mask), '.sheet-mask 底部要让开 tabBar 的 100rpx');
+  assert.ok(/env\(safe-area-inset-bottom\)/.test(mask), '.sheet-mask 还要叠安全区');
+
+  const sheet = ruleBody(css, '.sheet');
+  assert.ok(/max-height:\s*calc\([^;]*100rpx[^;]*\)/.test(sheet), '.sheet 的高度上限要扣掉 tabBar，否则内容多时顶出屏幕');
+
+  const wxml = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/home/index.wxml'), 'utf8');
+  const sheets = (wxml.match(/class="sheet-mask"/g) || []).length;
+  assert.ok(sheets >= 2, '首页应有两个自绘浮层（我们的日子 / TA 的心情），实际 ' + sheets);
+  assert.strictEqual((wxml.match(/class="sheet-close"/g) || []).length, sheets, '每个浮层都要有关闭按钮');
+});
+
+test('防漏：任何「贴底 + flex-end」的遮罩，其所在 wxss 都必须处理 tabBar 留白', () => {
+  // 只锁已知三个文件太脆：以后在 tab 页里再手写一个贴底浮层，谁也不会记得加 100rpx。
+  // 这里按「有没有 flex-end 贴底遮罩」扫一遍，要求该文件里出现 100rpx（让开 tabBar 的痕迹）。
+  const files = [];
+  const walk = (dir) => {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(abs);
+      if (entry.name.endsWith('.wxss')) files.push(abs);
+    });
+  };
+  walk(path.join(ROOT, 'miniprogram'));
+
+  const offenders = [];
+  files.forEach((abs) => {
+    const css = fs.readFileSync(abs, 'utf8');
+    const rules = css.match(/\.[\w-]+\s*\{[^}]*\}/g) || [];
+    const hasBottomSheet = rules.some((rule) => /position:\s*fixed/.test(rule) && /align-items:\s*flex-end/.test(rule));
+    if (!hasBottomSheet) return;
+    if (!/100rpx/.test(css)) {
+      offenders.push(path.relative(ROOT, abs).split(path.sep).join('/'));
+    }
+  });
+  assert.deepStrictEqual(offenders, [],
+    '这些 wxss 有贴底浮层但没有为 tabBar 留白（100rpx），tab 页里会遮住底部按钮：' + offenders.join(', '));
 });
 
 test('打卡弹层底部：给「记下今天的心情」留出安全区 + tabBar 的高度', () => {
