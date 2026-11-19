@@ -377,7 +377,7 @@ async function log(payload, ctx) {
   const where = { coupleId, status: 'archived' };
   if (cursor) where.archivedAt = ctx.db.command.lt(new Date(cursor.ms));
 
-  // 同毫秒按 _id 倒序，保证复合游标翻页时顺序确定（同 safety.list 先例）
+  // 同毫秒按 _id 倒序，保证复合游标翻页时顺序确定（同 diary.list 的游标约定）
   const res = await ctx.db.collection('growth_tasks')
     .where(where)
     .orderBy('archivedAt', 'desc')
@@ -437,7 +437,7 @@ async function loadOwned(ctx, taskId) {
   return doc;
 }
 
-/** 游标格式：服务端生成 "archivedAtISO|_id"，客户端原样回传（同 safety.list） */
+/** 游标格式：服务端生成 "archivedAtISO|_id"，客户端原样回传（同 diary.list） */
 function parseCursor(raw) {
   const text = String(raw);
   const sep = text.lastIndexOf(CURSOR_SEP);

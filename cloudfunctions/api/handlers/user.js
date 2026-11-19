@@ -21,7 +21,8 @@ async function get(payload, ctx) {
   return { user: publicUser(ctx.user) };
 }
 
-async function updateProfile(payload, ctx) {  const p = validate.asObject(payload);
+async function updateProfile(payload, ctx) {
+  const p = validate.asObject(payload);
   const hasNickname = p.nickname !== undefined && p.nickname !== null;
   const hasAvatar = p.avatarFileID !== undefined && p.avatarFileID !== null;
   if (!hasNickname && !hasAvatar) {

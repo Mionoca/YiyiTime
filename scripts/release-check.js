@@ -1069,7 +1069,7 @@ function runChecks(root) {
   lines.push({ level: 'TODO', msg: '云开发控制台确认：10 个集合（M13 新增 ledger_view_grants；M14 下线 safety_checkins / pauses，历史集合即使留着也不再读写）+ 权限「所有用户不可读写」+ 索引（见 docs/开发进度.md）' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 已重新上传部署（最近一次改动之后）' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 超时 10s、内存 256MB（文档 16.6；默认超时可能只有 3s，冷启动会偶发失败）' });
-  lines.push({ level: 'TODO', msg: '微信公众平台确认：用户隐私保护指引（头像/昵称）已声明' });
+  lines.push({ level: 'TODO', msg: '微信公众平台确认：用户隐私保护指引已逐项声明（昵称头像 / 摄像头 / 选中的照片 / 相册写入 / 剪切板写入；通讯录与「读取剪切板」不声明，见技术文档 11.6.1）' });
   lines.push({ level: 'TODO', msg: '云开发控制台确认：cloudfunctions/api 的定时触发器 reminder-tick 已生效（config.json 的 triggers 随部署上传）' });
   lines.push({ level: 'TODO', msg: '云函数环境变量确认：YIYI_REMINDER_TEMPLATE_ID 已配订阅消息模板 ID（未配时「我的」页提醒开关是禁用态）' });
   lines.push({ level: 'TODO', msg: '云函数环境变量确认：YIYI_GROWTH_TEMPLATE_ID 已配任务提醒模板 ID（可选；未配时成长任务提醒静默降级、页面不弹授权）' });
