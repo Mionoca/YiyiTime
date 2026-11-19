@@ -18,6 +18,7 @@ const timeUtil = require('../../utils/time');
 const upload = require('../../utils/upload');
 const meUtil = require('../../utils/me');
 const diaryExport = require('../../utils/diary-export');
+const privacy = require('../../utils/privacy');
 
 const PAGE_SIZE = 10;
 const CONTENT_MAX = constants.LIMITS.diary;
@@ -221,16 +222,32 @@ Page({
     wx.showToast({ title: this.pickErrorText(err), icon: 'none' });
   },
 
-  /** 主动拉起隐私授权；成功后自动重试一次选图（基础库没有该 API 时给文案兜底） */
+  /**
+   * 主动拉起隐私授权；成功后自动重试一次选图。
+   * 微信的 requirePrivacyAuthorize 被拒（或公众平台还没配好指引）时，把页面上的授权弹窗
+   * 叫回来——只弹一句 toast 的话，用户根本找不到「同意」在哪（M14 修订）。
+   */
   askPrivacyThenRetry() {
     if (typeof wx.requirePrivacyAuthorize !== 'function') {
-      wx.showToast({ title: '先同意隐私说明，才能选图', icon: 'none' });
+      this.showPrivacyGuard();
       return;
     }
     wx.requirePrivacyAuthorize({
       success: () => this.pickImages(true),
-      fail: () => wx.showToast({ title: '先同意隐私说明，才能选图', icon: 'none' }),
+      fail: () => this.showPrivacyGuard(),
     });
+  },
+
+  /** 唤起页面里的隐私弹窗；拿不到组件（极端情况）才退回文案提示 */
+  showPrivacyGuard() {
+    if (!privacy.openGuard(this)) {
+      wx.showToast({ title: '先同意隐私说明，才能选图', icon: 'none' });
+    }
+  },
+
+  /** 用户在弹窗里点了「同意并继续」→ 继续刚才没做成的选图 */
+  onPrivacyAgreed() {
+    this.pickImages(true);
   },
 
   /** errMsg 形如「chooseMedia:fail xxx」，只取冒号后的部分并截断，不把整串抛给用户 */
@@ -648,6 +665,12 @@ Page({
             success: () => resolve(filePath),
             fail: (err) => {
               const msg = String((err && err.errMsg) || '');
+              // 隐私协议没同意时保存相册同样会被拦（errno 112）：和选图走同一条自救路径
+              if (/privacy/i.test(msg) || (err && err.errno === 112)) {
+                this.showPrivacyGuard();
+                resolve(filePath);
+                return;
+              }
               if (msg.indexOf('auth deny') >= 0 || msg.indexOf('authorize') >= 0) {
                 this.guidePhotoSetting();
                 resolve(filePath);

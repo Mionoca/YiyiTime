@@ -37,9 +37,24 @@ Component({
       });
     },
 
-    /** 用户同意后平台会记住，这里只收起弹窗；后续接口由微信按契约放行 */
+    /**
+     * 页面主动唤起（M14 修订）：用户点过「先逛逛」会写 24h 跳过标记，之后隐私接口被微信
+     * 拦下时就没有任何可点的地方了——只能看到一句「先同意隐私说明」。选图/换头像失败时
+     * 由页面 selectComponent 调这个方法，清掉跳过标记并重新显示弹窗，给回一条自救路径。
+     */
+    open() {
+      try {
+        wx.removeStorageSync(SKIP_KEY);
+      } catch (err) {
+        // 存储不可用不影响弹出
+      }
+      this.setData({ show: true });
+    },
+
+    /** 用户同意后平台会记住，收起弹窗并通知页面继续刚才的动作（如重试选图） */
     onAgree() {
       this.setData({ show: false });
+      this.triggerEvent('agree');
     },
 
     onClose() {

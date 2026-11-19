@@ -15,7 +15,8 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { installWx, restoreWx, loadPage, instantiate } = require('./helpers/client-page');
+const h = require('./helpers/client-page');
+const { installWx, restoreWx, loadPage, instantiate } = h;
 const api = require('../miniprogram/utils/api');
 const upload = require('../miniprogram/utils/upload');
 const me = require('../miniprogram/utils/me');
@@ -342,4 +343,64 @@ test('头像渲染：aspectFill 保持比例 + object-position 偏上，避免�
     assert.ok(rule, wxssRel + ' 里找不到头像样式');
     assert.ok(/object-position:\s*center\s+30%/.test(rule[0]), wxssRel + ' 的头像要偏上对齐（center 30%）');
   });
+});
+
+/* ── 隐私授权被拦之后，必须有「可以点同意」的地方（M14 修订） ────────────── */
+
+test('隐私守卫：open() 清掉 24h 跳过标记并重新显示，agree 会广播给页面', () => {
+  const store = {};
+  installWx({
+    getStorageSync: (key) => (key in store ? store[key] : ''),
+    setStorageSync: (key, value) => { store[key] = value; },
+    removeStorageSync: (key) => { delete store[key]; },
+    getPrivacySetting: (opts) => opts.success({ needAuthorization: true }),
+    showToast: () => {},
+  });
+  try {
+    const comp = h.instantiateComponent(h.loadComponent('miniprogram/components/privacy-guard/index.js'));
+    // 用户点过「先逛逛，之后再说」→ 写跳过标记
+    comp.onClose();
+    assert.ok(store.privacy_prompt_skip_at, '关闭后要写跳过标记');
+    assert.strictEqual(comp.data.show, false);
+
+    // 之后选图被拦，页面调 open()：必须清标记并重新显示
+    const agreed = [];
+    comp.triggerEvent = (name) => agreed.push(name);
+    comp.open();
+    assert.strictEqual(comp.data.show, true, 'open() 要把弹窗叫回来');
+    assert.strictEqual(store.privacy_prompt_skip_at, undefined, 'open() 必须清掉跳过标记，否则下次又弹不出来');
+
+    comp.onAgree();
+    assert.strictEqual(comp.data.show, false);
+    assert.deepStrictEqual(agreed, ['agree'], '同意后要通知页面继续刚才的动作');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('隐私被拦：日记页与我的页都要唤起授权弹窗，而不是只丢一句 toast', () => {
+  // 静态锁接线：wxml 上有 id 与 bind:agree，js 里两处隐私失败分支走 privacy.openGuard
+  const cases = [
+    ['miniprogram/pages/diary/index.wxml', 'miniprogram/pages/diary/index.js'],
+    ['miniprogram/pages/profile/index.wxml', 'miniprogram/pages/profile/index.js'],
+  ];
+  cases.forEach(([wxmlRel, jsRel]) => {
+    const wxml = fs.readFileSync(path.join(ROOT, wxmlRel), 'utf8');
+    assert.ok(/<privacy-guard[^>]*id="privacyGuard"/.test(wxml), wxmlRel + ' 的守卫缺 id，页面 selectComponent 拿不到');
+    assert.ok(/<privacy-guard[^>]*bind:agree="onPrivacyAgreed"/.test(wxml), wxmlRel + ' 的守卫没接 agree 事件');
+    const js = fs.readFileSync(path.join(ROOT, jsRel), 'utf8');
+    assert.ok(/require\('\.\.\/\.\.\/utils\/privacy'\)/.test(js), jsRel + ' 没引入 utils/privacy');
+    assert.ok(/privacy\.openGuard\(this\)/.test(js), jsRel + ' 隐私失败时没有唤起授权弹窗');
+    assert.ok(/onPrivacyAgreed\s*\(/.test(js), jsRel + ' 缺少 onPrivacyAgreed 处理');
+  });
+});
+
+test('隐私被拦：日记页同意后会重试选图，我的页同意后会重开相册', () => {
+  const diary = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/diary/index.js'), 'utf8');
+  const agreeBody = diary.slice(diary.indexOf('onPrivacyAgreed('), diary.indexOf('onPrivacyAgreed(') + 120);
+  assert.ok(/pickImages/.test(agreeBody), '日记页同意后应重试选图：' + agreeBody);
+
+  const profile = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/profile/index.js'), 'utf8');
+  const profileAgree = profile.slice(profile.indexOf('onPrivacyAgreed('), profile.indexOf('onPrivacyAgreed(') + 120);
+  assert.ok(/onChooseAvatarTap/.test(profileAgree), '我的页同意后应重开相册：' + profileAgree);
 });

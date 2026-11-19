@@ -237,14 +237,22 @@ Page({
       fail: (err) => {
         const msg = String((err && err.errMsg) || '');
         if (/cancel/i.test(msg)) return;
-        // 隐私说明没同意时 chooseMedia 会被平台直接拦下（errno 112），必须说清楚
+        // 隐私说明没同意时 chooseMedia 会被平台直接拦下（errno 112）：
+        // 光提示「先同意」没用，用户不知道在哪点，必须把授权弹窗叫回来（M14 修订）
         if (/privacy/i.test(msg) || (err && err.errno === 112)) {
-          wx.showToast({ title: '先同意隐私说明，才能换头像', icon: 'none' });
+          if (!privacy.openGuard(this)) {
+            wx.showToast({ title: '先同意隐私说明，才能换头像', icon: 'none' });
+          }
           return;
         }
         wx.showToast({ title: '选图失败，再试一次', icon: 'none' });
       },
     });
+  },
+
+  /** 用户在隐私弹窗里点了「同意并继续」→ 重新打开相册 */
+  onPrivacyAgreed() {
+    this.onChooseAvatarTap();
   },
 
   /**

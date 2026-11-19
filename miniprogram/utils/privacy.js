@@ -34,7 +34,27 @@ const SECTIONS = [
 
 const FOOTER = '体验版阶段先以这份说明为准，正式上线前会补齐完整的《隐私政策》和《用户协议》。';
 
+/**
+ * 主动唤起页面上的隐私授权弹窗（M14 修订）。
+ *
+ * 为什么需要它：用户点过「先逛逛，之后再说」会写 24h 跳过标记，之后选图 / 换头像被微信
+ * 隐私接口拦下时，四个页面都不再弹窗——用户只能看到一句「先同意隐私说明，才能选图」，
+ * 却找不到任何可以点「同意」的地方。这里清掉跳过标记并把弹窗叫回来。
+ *
+ * 用法：页面给 `<privacy-guard id="privacyGuard" bind:agree="onPrivacyAgreed" />`，
+ * 失败时调 `privacy.openGuard(this)`；返回 false 表示这一页拿不到组件（降级由调用方 toast）。
+ */
+function openGuard(page) {
+  const guard = page && typeof page.selectComponent === 'function'
+    ? page.selectComponent('#privacyGuard')
+    : null;
+  if (!guard || typeof guard.open !== 'function') return false;
+  guard.open();
+  return true;
+}
+
 module.exports = {
   SECTIONS,
   FOOTER,
+  openGuard,
 };
