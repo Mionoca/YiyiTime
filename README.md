@@ -82,7 +82,7 @@ YiyiTime/
   - `ledger_entries`：`openid`+`month`+`date`+`createdAt`（我的账本按月查）、`openid`+`coupleId`+`month`+`date`+`createdAt`（伴侣视角按月查；后两位是同一天内的时间倒序）
   - `pauses`：`coupleId`+`status`+`startedAt`（倒序；查「当前这一条未 closed 的暂停」）
   - `growth_tasks`：`coupleId`+`status`+`createdAt`（任务池列表）、`coupleId`+`status`+`archivedAt`（倒序，成长日志复合游标）
-  - `ledger_view_grants`（M13）：`coupleId`+`status`（一次取一对的全部授权/申请，首页 `ledgerAccess` 与账本页 `viewRequests` 共用）、`ownerOpenid`+`status`（主人视角待处理）、`viewerOpenid`+`status`（申请人视角幂等判断）
+  - `ledger_view_grants`（M13）：**只建一条** `coupleId`+`updatedAt`（`updatedAt` 倒序）。账本页 `viewRequests`、首页 `ledgerAccess`、`ledger.list` 的权限判定全都走 `loadGrants`——一次取本关系的 ≤20 条再在内存里按 owner / viewer / status 分组，所以 `status` / `ownerOpenid` / `viewerOpenid` 不进索引（`status` 插在中间还会让排序用不上索引）
   - `diaries` 原有 `coupleId`+`date` 索引继续够用：M13 的 `diary.calendar`（按 `openid`+`month` 前缀）与 `diary.archive`（按 `openid`+`date` 区间）都落在同一索引前缀上，单对情侣量级（一年 ≤366 条）无需新增索引
 - 存储：头像由前端上传到云存储 `avatars/` 目录，日记配图上传到 `diary/{coupleId}/{date}/` 目录，默认权限即可；客户端上传前校验格式（头像 JPG / PNG、配图 JPG / PNG / WebP）与单张大小（头像 ≤2MB、配图 ≤5MB，文档 11.9），格式不符或超限直接提示、不发起上传
 
