@@ -178,14 +178,17 @@ test('loadSafety: 伴侣从没报过平安时 partnerLastAt 为 null', async () 
   assert.deepStrictEqual(res, { mineToday: false, partnerToday: false, partnerLastAt: null });
 });
 
-test('loadDiary: 今天写了是否已写 + 解锁时刻（当天 partnerUnlocked 恒为 false）', async () => {
+test('loadDiary: 只有已分享的日记才算「TA 写了」+ 解锁时刻（当天 partnerUnlocked 恒为 false）', async () => {
   const { ctx } = makeCtx({
     diaries: [
       {
-        _id: 'oA_' + TODAY, coupleId: 'c_1', authorOpenid: 'oA', date: TODAY, content: 'x', unlockAt: new Date('2026-11-16T16:00:00.000Z'), createdAt: NOW, updatedAt: NOW,
+        _id: 'oA_' + TODAY, coupleId: 'c_1', authorOpenid: 'oA', date: TODAY, content: 'x',
+        visibility: 'private', unlockAt: new Date('2026-11-16T16:00:00.000Z'), createdAt: NOW, updatedAt: NOW,
       },
       {
-        _id: 'oB_' + TODAY, coupleId: 'c_1', authorOpenid: 'oB', date: TODAY, content: 'y', unlockAt: new Date('2026-11-16T16:00:00.000Z'), createdAt: NOW, updatedAt: NOW,
+        // 对方这篇显式分享了，才算出「写了」
+        _id: 'oB_' + TODAY, coupleId: 'c_1', authorOpenid: 'oB', date: TODAY, content: 'y',
+        visibility: 'partner', unlockAt: new Date('2026-11-16T16:00:00.000Z'), createdAt: NOW, updatedAt: NOW,
       },
     ],
   });
@@ -207,6 +210,20 @@ test('loadDiary: 两人都没写时都为 false', async () => {
     partnerUnlocked: false,
     unlockAt: '2026-11-16T16:00:00.000Z',
   });
+});
+
+test('loadDiary: 对方的私密日记按不存在处理（partnerWritten=false，不泄露 unlockAt）', async () => {
+  const { ctx } = makeCtx({
+    diaries: [
+      {
+        _id: 'oB_' + TODAY, coupleId: 'c_1', authorOpenid: 'oB', date: TODAY, content: 'y',
+        visibility: 'private', unlockAt: new Date('2099-01-01T00:00:00.000Z'), createdAt: NOW, updatedAt: NOW,
+      },
+    ],
+  });
+  const res = await loadDiary(ctx, 'c_1', TODAY, 'oB');
+  assert.strictEqual(res.partnerWritten, false);
+  assert.strictEqual(res.unlockAt, '2026-11-16T16:00:00.000Z', '默认次日 00:00，不跟着私密文档走');
 });
 
 test('loadWish: 统计 total/done 与第一条未完成的标题（已完成的旧愿望不算 preview）', async () => {

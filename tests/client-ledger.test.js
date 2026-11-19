@@ -48,6 +48,11 @@ function setup(handlers, wxExtra) {
   };
 }
 
+/** M13 起页面会顺带拉 ledger.viewRequests：账本相关断言只看 ledger.list 的调用 */
+function listCalls(calls) {
+  return calls.filter((call) => call.action === 'ledger.list');
+}
+
 function listRes(patch) {
   return Object.assign({
     who: 'me',
@@ -104,7 +109,7 @@ test('ledger 页: 切到 TA 的账本会清掉旧列表并按 who=partner 重拉
   try {
     await page.load();
     await page.onSwitchWho({ currentTarget: { dataset: { who: 'partner' } } });
-    assert.deepStrictEqual(calls[1].payload, { who: 'partner', month: '2026-11' });
+    assert.deepStrictEqual(listCalls(calls)[1].payload, { who: 'partner', month: '2026-11' });
     assert.strictEqual(page.data.who, 'partner');
     assert.strictEqual(page.data.summaryLabel, '阿泽这个月花了');
     assert.deepStrictEqual(page.data.groups[0].items.map((item) => item.entryId), ['le_p']);
@@ -139,19 +144,19 @@ test('ledger 页: 月份切换只发允许的请求，当前月不能再往后',
   try {
     await page.load();
     await page.onPrevMonth();
-    assert.deepStrictEqual(calls[1].payload, { who: 'me', month: '2026-10' });
+    assert.deepStrictEqual(listCalls(calls)[1].payload, { who: 'me', month: '2026-10' });
     assert.strictEqual(page.data.month, '2026-10');
     assert.strictEqual(page.data.canGoNext, true, '回到当前月之前，可以往后翻');
 
-    const before = calls.length;
+    const before = listCalls(calls).length;
     page.onNextMonth();
-    assert.strictEqual(calls.length, before + 1, '往后翻一页到当前月');
+    assert.strictEqual(listCalls(calls).length, before + 1, '往后翻一页到当前月');
     assert.strictEqual(page.data.month, '2026-11');
 
     page.data.canGoNext = false;
-    const guard = calls.length;
+    const guard = listCalls(calls).length;
     page.onNextMonth();
-    assert.strictEqual(calls.length, guard, '已经在当前月，再点 › 不该发请求');
+    assert.strictEqual(listCalls(calls).length, guard, '已经在当前月，再点 › 不该发请求');
   } finally {
     restoreWx();
   }
@@ -275,7 +280,7 @@ test('ledger 页: 记到别的月份会自动跳到那个月', async () => {
     page.onDateChange({ detail: { value: '2026-09-03' } });
     await page.onSaveEntry();
     assert.strictEqual(page.data.month, '2026-09');
-    const last = calls[calls.length - 1];
+    const last = listCalls(calls).pop();
     assert.deepStrictEqual(last.payload, { who: 'me', month: '2026-09' });
   } finally {
     restoreWx();
@@ -358,11 +363,11 @@ test('ledger 页: 下拉刷新只发一次请求并收起转圈', async () => {
   const { page, calls, stopped } = setup({ 'ledger.list': () => listRes() });
   try {
     await page.load();
-    const before = calls.length;
+    const before = listCalls(calls).length;
     const run = page.onPullDownRefresh();
     const run2 = page.onPullDownRefresh();
     await Promise.all([run, run2]);
-    assert.strictEqual(calls.length - before, 1);
+    assert.strictEqual(listCalls(calls).length - before, 1, '账本列表只重拉一次（授权摘要另算一次）');
     assert.deepStrictEqual(stopped, [1, 1], '两次手势各收一次转圈');
   } finally {
     restoreWx();

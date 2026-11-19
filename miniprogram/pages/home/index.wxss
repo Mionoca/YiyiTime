@@ -52,26 +52,47 @@
   border-bottom: 2rpx dashed var(--accent-ink);
 }
 
-/* 解绑提示条（M9 / 文档 9.2）：细条，不用卡片样式，避免抢日子卡的视觉位置 */
-.unbind-bar {
+/* 细提示条（M9 解绑 / M13 账本申请，文档 9.2 第 0 位与第 0.6 位）：
+   两条同构——同样的尺寸、间距、虚线边，只有配色不同；结构写一份，配色各自覆盖 */
+.unbind-bar,
+.ledger-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 24rpx;
   padding: 8rpx 8rpx 8rpx 24rpx;
-  background-color: var(--card);
   border: 2rpx dashed var(--danger);
   border-radius: var(--radius-md);
 }
 
-.unbind-bar__text {
+/* 解绑：红虚线 + 白底，语气最重 */
+.unbind-bar {
+  background-color: var(--card);
+}
+
+/* 账本申请：强调色底（--accent-soft）+ 深强调色字，比解绑轻一点，仍比普通卡片显眼 */
+.ledger-bar {
+  background-color: var(--accent-soft);
+  border-color: var(--accent-ink);
+}
+
+.unbind-bar__text,
+.ledger-bar__text {
   flex: 1;
   min-width: 0;
   font-size: 24rpx;
+}
+
+.unbind-bar__text {
   color: var(--danger);
 }
 
-.unbind-bar__btn {
+.ledger-bar__text {
+  color: var(--accent-ink);
+}
+
+.unbind-bar__btn,
+.ledger-bar__btn {
   display: flex;
   align-items: center;
   justify-content: flex-end;

@@ -119,7 +119,7 @@ test('diary-card：今天/以前文案、锁定与解锁内容、解锁瞬间只
   assert.strictEqual(comp.data.isToday, false);
   assert.strictEqual(comp.data.dateLabel, timeUtil.formatMonthDay('2026-11-12'));
   assert.strictEqual(comp.data.mineEmptyText, '那天没有记录');
-  assert.strictEqual(comp.data.partnerEmptyText, '那天没有记录');
+  assert.strictEqual(comp.data.partnerEmptyText, 'TA 那天没有分享日记');
 
   comp.runLifetime('detached');
   await wait(20);
@@ -458,4 +458,100 @@ test('wish-item：首次不弹、完成→弹跳一次、事件载荷与 disable
 
   comp.runLifetime('detached');
   await wait(20);
+});
+test('mood-scale：五档 emoji + 文字同现、点选/取消只发事件、readonly 不响应', () => {
+  installWx();
+  const config = h.loadComponent('miniprogram/components/mood-scale/index.js');
+  const comp = h.instantiateComponent(config);
+
+  comp.setProps({ value: 0 });
+  assert.strictEqual(comp.data.items.length, 5);
+  assert.deepStrictEqual(comp.data.items.map((item) => item.score), [1, 2, 3, 4, 5]);
+  comp.data.items.forEach((item) => {
+    assert.ok(item.emoji, '每档都要有 emoji');
+    assert.ok(item.label, '每档都要有文字标签（不只靠颜色）');
+    assert.strictEqual(item.on, false);
+  });
+  assert.strictEqual(comp.data.currentLabel, '');
+
+  comp.setProps({ value: 4 });
+  assert.strictEqual(comp.data.currentLabel, '不错');
+  assert.deepStrictEqual(comp.data.items.filter((item) => item.on).map((item) => item.score), [4]);
+
+  // 点选：发 change({score})，组件自己不改 value
+  comp.onTap({ currentTarget: { dataset: { score: 5 } } });
+  assert.deepStrictEqual(comp.events[0], { name: 'change', detail: { score: 5 } });
+  // 再点同一格 = 取消
+  comp.onTap({ currentTarget: { dataset: { score: 4 } } });
+  assert.deepStrictEqual(comp.events[1], { name: 'change', detail: { score: 0 } });
+
+  // readonly（日记卡里展示当天分值）：点了不发事件
+  comp.setProps({ readonly: true });
+  comp.onTap({ currentTarget: { dataset: { score: 3 } } });
+  assert.strictEqual(comp.events.length, 2, 'readonly 不能改分值');
+
+  // 脏数据（score 缺失 / 0）不发事件
+  comp.setProps({ readonly: false });
+  comp.onTap({ currentTarget: { dataset: {} } });
+  comp.onTap({});
+  assert.strictEqual(comp.events.length, 2);
+});
+
+test('diary-card：M13 字段——分值角标、配图、可见性标签、未分享文案', () => {
+  installWx();
+  const config = h.loadComponent('miniprogram/components/diary-card/index.js');
+  const comp = h.instantiateComponent(config);
+  const todayKey = '2026-11-19';
+
+  comp.setProps({
+    todayKey,
+    item: {
+      date: todayKey,
+      unlockAt: '2026-11-19T16:00:00.000Z',
+      mine: {
+        content: '今天路过面包店', moodScore: 4,
+        images: ['cloud://a.jpg', 'cloud://b.jpg'],
+        visibility: 'partner', unlockMode: 'day', updatedAt: '2026-11-19T10:00:00.000Z',
+      },
+      partnerWritten: true,
+      partnerUnlocked: false,
+      partner: null,
+    },
+  });
+  assert.strictEqual(comp.data.mineMoodScore, 4);
+  assert.strictEqual(comp.data.mineMoodLabel, '不错');
+  assert.strictEqual(comp.data.mineMoodColor, constants.MOOD_SCALE[3].color);
+  assert.deepStrictEqual(comp.data.mineImages, ['cloud://a.jpg', 'cloud://b.jpg']);
+  assert.strictEqual(comp.data.mineShared, true);
+  assert.strictEqual(comp.data.partnerLocked, true);
+  assert.strictEqual(comp.data.partnerText, '', '未解锁不能渲染对方正文');
+  assert.ok(comp.data.partnerLockText.indexOf('TA 写了') === 0);
+
+  // 私密日记：标签改成「仅自己」，对方未分享 → 不出现任何可推断的痕迹
+  comp.setProps({
+    item: {
+      date: todayKey,
+      mine: { content: '只给自己', moodScore: null, images: [], visibility: 'private', unlockMode: 'day', updatedAt: '2026-11-19T11:00:00.000Z' },
+      partnerWritten: false,
+      partnerUnlocked: false,
+      partner: null,
+    },
+  });
+  assert.strictEqual(comp.data.mineShared, false);
+  assert.strictEqual(comp.data.mineMoodScore, 0);
+  assert.strictEqual(comp.data.partnerEmptyText, 'TA 那天没有分享日记');
+
+  // 已解锁：对方的分值与配图一起展示
+  comp.setProps({
+    item: {
+      date: '2026-11-18',
+      mine: null,
+      partnerWritten: true,
+      partnerUnlocked: true,
+      partner: { content: '昨天', moodScore: 2, images: ['cloud://c.jpg'], updatedAt: '2026-11-18T10:00:00.000Z' },
+    },
+  });
+  assert.strictEqual(comp.data.partnerMoodScore, 2);
+  assert.deepStrictEqual(comp.data.partnerImages, ['cloud://c.jpg']);
+  assert.strictEqual(comp.data.partnerLocked, false);
 });

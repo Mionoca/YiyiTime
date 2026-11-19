@@ -7,6 +7,7 @@ const security = require('../lib/security');
 const time = require('../lib/time');
 const relation = require('../lib/relation');
 const dbUtil = require('../lib/db-util');
+const access = require('./ledger-access');
 
 /** 文档 5.3.9 / 7.13：分类固定 6 种，客户端与文档必须与此一致 */
 const CATEGORIES = ['food', 'transport', 'shopping', 'fun', 'daily', 'other'];
@@ -200,7 +201,8 @@ async function remove(payload, ctx) {
 /**
  * 按月列账：month 冗余在文档上，所以查询是等值条件（不用范围查询，客户端 / 云开发索引都简单）。
  * - 自己的账本按 openid + month 查，解绑 / 换绑后仍能看到自己的全部记录；
- * - 伴侣的账本额外加 coupleId，换绑后新伴侣看不到上一段关系期间的账（文档 5.3.9）。
+ * - **伴侣的账本默认不可见（M13，7.13 / 7.19）**：必须先有有效授权（approved 且 temp 未过期）
+ *   才会发生 ledger_entries 查询；无权时不报错，返回空列表 + `permission` 状态，页面据此渲染锁 / 申请态。
  */
 async function list(payload, ctx) {
   const p = validate.asObject(payload);
@@ -223,10 +225,25 @@ async function list(payload, ctx) {
     : null;
 
   const targetOpenid = who === 'partner' ? partnerOpenid : ctx.openid;
-  const empty = {
-    who, month, todayKey, bound, partner, items: [], summary: { total: 0, count: 0 },
+
+  // 谁的账本：partner 时带授权快照（一次 ledger_view_grants 查询，读预算 +1）
+  let permission = null;
+  if (who === 'partner') {
+    permission = await access.permissionFor(ctx);
+  }
+  const allowed = who === 'me' || !!(permission && permission.status === 'approved');
+
+  const base = {
+    who, month, todayKey, bound, partner,
+    items: [],
+    summary: { total: 0, count: 0 },
+    permission,
   };
-  if (!targetOpenid) return empty;
+  if (!targetOpenid) return base;
+  if (!allowed) {
+    // 无授权 / 待处理 / 已过期：不发生任何账目读取，也不返回任何账目字段
+    return base;
+  }
 
   const where = who === 'partner'
     ? { openid: targetOpenid, coupleId, month }
@@ -250,6 +267,7 @@ async function list(payload, ctx) {
       total: docs.reduce((sum, doc) => sum + (typeof doc.amount === 'number' ? doc.amount : 0), 0),
       count: docs.length,
     },
+    permission,
   };
 }
 

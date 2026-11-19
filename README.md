@@ -1,6 +1,6 @@
 # 小怡怡安（YiyiTime）
 
-只属于两个人的微信小程序：今天的心情、一叠能左右翻的纪念日卡、到家报平安、第二天才解锁的日记、下次见面想做的事，都收在同一间屋子里；各自还能记自己的小账本（底部常驻），到点没报平安会提醒一下。
+只属于两个人的微信小程序：今天的心情、一叠能左右翻的纪念日卡、到家报平安、手帐风的日记（默认只有自己看得到，想给 TA 看的再手动打开，还能按「立即 / 明天 / 一周后」解锁）、下次见面想做的事，都收在同一间屋子里；各自还能记自己的小账本（底部常驻，**对方的账默认上锁，要申请并被同意才看得到**），到点没报平安会提醒一下。
 
 ## 技术栈
 
@@ -30,11 +30,11 @@ YiyiTime/
 │  │  ├─ bind/                      # 双人绑定与邀请码
 │  │  ├─ profile/                   # 我的（昵称头像、开始日期、每日提醒、解绑、隐私保护指引 / 数据与隐私说明）
 │  │  ├─ safety/                    # 报平安（我到家了 + 时间线）
-│  │  ├─ diary/                     # 台灯下的日记（当天上锁，次日解锁）
+│  │  ├─ diary/                     # 手帐日记 + 心情日历 + 年度长图（默认私密）
 │  │  ├─ wish/                      # 下次见面想做的事
 │  │  ├─ mood/                      # 心情记录（两人按天倒序，只读时间线）
 │  │  ├─ anniversary/               # 纪念日管理（添加 / 修改 / 删除自定义纪念日）
-│  │  ├─ ledger/                    # 记账本（tab 页：我的 / TA 的，按天分组 + 合计）
+│  │  ├─ ledger/                    # 记账本（tab 页：我的 / TA 的，按天分组 + 合计；TA 的需授权）
 │  │  └─ growth/                    # 一起变好（任务池 / 成长日志）
 │  ├─ custom-tab-bar/               # 自定义 tabBar（三项：今天 / 记账本 / 我的）
 │  ├─ components/                   # avatar-bubble / mood-picker / anniversary-stack / bottom-sheet /
@@ -58,7 +58,7 @@ YiyiTime/
    该文件已被 `.gitignore` 忽略，**不要提交**。
 3. 用微信开发者工具导入仓库根目录（appid 见 `project.config.json`）。
 4. 云函数：右键 `cloudfunctions/api` →「上传并部署：云端安装依赖」。**每次云函数代码有改动都要重新部署。**
-5. 云数据库：手动创建 11 个集合（见下方「云开发控制台一次性配置」）。
+5. 云数据库：手动创建 12 个集合（见下方「云开发控制台一次性配置」）。
 6. 删除云端模板遗留的 `quickstartFunctions` 云函数（本地代码已清理，云端需手动删）。
 7. 隐私：微信公众平台 →「设置 - 服务内容声明 - 用户隐私保护指引」声明头像、昵称用途，否则隐私接口会被拦截。**没声明时的表现是「点头像完全没反应」**：渲染层报 `chooseAvatar:fail api scope is not declared in the privacy agreement`（errno 112），昵称输入框每敲一个字报 `showNicknameAccessory:fail ... errno:112`。声明要选「收集你的昵称、头像」，提交后等审核通过才生效；本地调试临时把 `app.json` 的 `__usePrivacyCheck__` 改 `false` 可以绕过，**但不要随版本发布**（真机与审核都要求它是 `true`）。
 8. 订阅提醒（可选，不配也能跑）：公众平台「订阅消息」里选一个「打卡 / 待办提醒」类模板，把模板 ID 配到云函数环境变量 `YIYI_REMINDER_TEMPLATE_ID`；模板关键词要和 `cloudfunctions/api/handlers/reminder.js` 的 `templateData` 对齐（默认 `thing1` + `time2`），字段名不一致微信返回 47003。没配时「我的」页的提醒开关是禁用态，定时任务静默跳过。
@@ -67,9 +67,9 @@ YiyiTime/
 
 ## 云开发控制台一次性配置
 
-- 集合：`users`、`couples`、`bind_invites`、`moods`、`anniversaries`、`safety_checkins`、`diaries`、`wishes`、`ledger_entries`、`pauses`、`growth_tasks`
+- 集合：`users`、`couples`、`bind_invites`、`moods`、`anniversaries`、`safety_checkins`、`diaries`、`wishes`、`ledger_entries`、`pauses`、`growth_tasks`、`ledger_view_grants`
   - M12 起 `hugs` 已下线：如果控制台还留着这个集合，先导出备份再删除（代码不再读它）
-  - `pauses` / `growth_tasks` 是 M11 新增：云函数写不存在的集合会报错，**先建集合再部署**（同 `ledger_entries` 先例）
+  - `pauses` / `growth_tasks` 是 M11 新增、`ledger_view_grants`（账本查看授权）是 M13 新增：云函数写不存在的集合会报错，**先建集合再部署**（同 `ledger_entries` 先例）；缺 `ledger_view_grants` 时账本的「申请查看」点不动
 - 权限：全部设置为「所有用户不可读写」（只允许云函数访问）
 - 索引：
   - `bind_invites`：`creatorOpenid`+`status`、`applicantOpenid`+`status`、`expiresAt`
@@ -82,12 +82,14 @@ YiyiTime/
   - `ledger_entries`：`openid`+`month`+`date`+`createdAt`（我的账本按月查）、`openid`+`coupleId`+`month`+`date`+`createdAt`（伴侣视角按月查；后两位是同一天内的时间倒序）
   - `pauses`：`coupleId`+`status`+`startedAt`（倒序；查「当前这一条未 closed 的暂停」）
   - `growth_tasks`：`coupleId`+`status`+`createdAt`（任务池列表）、`coupleId`+`status`+`archivedAt`（倒序，成长日志复合游标）
-- 存储：头像由前端上传到云存储 `avatars/` 目录，默认权限即可；客户端上传前校验格式（JPG / PNG）与单张 ≤2MB（文档 11.9 / 3442），格式不符或超限直接提示、不发起上传
+  - `ledger_view_grants`（M13）：`coupleId`+`status`（一次取一对的全部授权/申请，首页 `ledgerAccess` 与账本页 `viewRequests` 共用）、`ownerOpenid`+`status`（主人视角待处理）、`viewerOpenid`+`status`（申请人视角幂等判断）
+  - `diaries` 原有 `coupleId`+`date` 索引继续够用：M13 的 `diary.calendar`（按 `openid`+`month` 前缀）与 `diary.archive`（按 `openid`+`date` 区间）都落在同一索引前缀上，单对情侣量级（一年 ≤366 条）无需新增索引
+- 存储：头像由前端上传到云存储 `avatars/` 目录，日记配图上传到 `diary/{coupleId}/{date}/` 目录，默认权限即可；客户端上传前校验格式（头像 JPG / PNG、配图 JPG / PNG / WebP）与单张大小（头像 ≤2MB、配图 ≤5MB，文档 11.9），格式不符或超限直接提示、不发起上传
 
 ## 测试
 
 ```bash
-node --test tests/*.test.js       # 自动发现 tests/*.test.js（Node 22 实测 743 个用例）
+node --test tests/*.test.js       # 自动发现 tests/*.test.js（Node 22 实测 769 个用例）
 # 或只跑一个文件：node tests/anniversary.test.js
 ```
 
@@ -124,7 +126,7 @@ node scripts/release-check.js   # 页面/组件路径与注册（`usingComponent
 ## 进度与文档
 
 - 文档索引（哪份看什么）：[`docs/README.md`](docs/README.md)
-- 技术设计文档（契约唯一真相，v0.1.7）：`docs/技术设计文档.md`
+- 技术设计文档（契约唯一真相，v0.2.0）：`docs/技术设计文档.md`
 - 开发进度与项目现状（**做到哪了 / 还剩什么 / 已知偏差**）：`docs/开发进度.md`
 - 双人真机验收与发布清单（边做边打勾）：`docs/M6-真机验收与发布.md`
 - 2026-11-18 合并前的旧文档（逐轮明细、M11 增补稿、旧交接说明）：`docs/archive/2026-11-18/`

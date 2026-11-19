@@ -1,50 +1,205 @@
 <view class="page">
-  <!-- 固定顶部编辑器（文档 8.3.3 / 10.7） -->
-  <view class="editor">
-    <textarea
-      class="editor__input"
-      value="{{content}}"
-      placeholder="今天想对 TA 说的一句话，明天 TA 才能看到"
-      placeholder-class="editor__placeholder"
-      maxlength="{{contentMax}}"
-      auto-height
-      cursor-spacing="24"
-      bindinput="onContentInput"
-      aria-label="今天的日记"
-    ></textarea>
-    <view class="editor__bar">
-      <text class="editor__count">{{content.length}}/{{contentMax}}</text>
-      <view
-        class="editor__save {{canSave && !saving ? '' : 'editor__save--disabled'}}"
-        bindtap="onSave"
-        aria-label="保存今天日记"
-        aria-disabled="{{!canSave || saving}}"
-      >{{saving ? '保存中…' : '保存'}}</view>
-    </view>
+  <!-- 分段：手帐 / 心情日历（文档 8.3.3） -->
+  <view class="seg" aria-role="tablist">
+    <view
+      class="seg__item {{view === 'journal' ? 'seg__item--on' : ''}}"
+      data-view="journal"
+      bindtap="onSwitchView"
+      aria-role="tab"
+      aria-selected="{{view === 'journal'}}"
+    >手帐</view>
+    <view
+      class="seg__item {{view === 'calendar' ? 'seg__item--on' : ''}}"
+      data-view="calendar"
+      bindtap="onSwitchView"
+      aria-role="tab"
+      aria-selected="{{view === 'calendar'}}"
+    >心情日历</view>
   </view>
 
-  <view wx:if="{{loading}}" class="hint">正在打开台灯…</view>
+  <block wx:if="{{view === 'journal'}}">
+    <!-- 一页手帐：纸纹卡 + 胶带 + 楷体正文（文档 8.7.1） -->
+    <view class="editor">
+      <view class="editor__tape" aria-hidden="true"></view>
+      <view class="editor__head">
+        <text class="editor__title">今天这一页</text>
+        <text class="editor__privacy">默认只有你自己看得到</text>
+      </view>
 
-  <empty-state
-    wx:elif="{{error}}"
-    title="{{error}}"
-    action-text="再试一次"
-    bind:action="onRetry"
-  />
+      <textarea
+        class="editor__input"
+        value="{{content}}"
+        placeholder="今天这一页，只有你自己看得到"
+        placeholder-class="editor__placeholder"
+        maxlength="{{contentMax}}"
+        auto-height
+        cursor-spacing="24"
+        bindinput="onContentInput"
+        aria-label="今天的日记正文"
+      ></textarea>
+      <view class="editor__count">{{content.length}}/{{contentMax}}</view>
 
-  <block wx:else>
-    <diary-card wx:for="{{items}}" wx:key="date" item="{{item}}" today-key="{{todayKey}}" />
+      <view class="editor__label">今天的心情</view>
+      <mood-scale value="{{moodScore}}" bind:change="onMoodChange" />
 
-    <empty-state wx:if="{{!items.length}}" icon="🕯️" title="还没有日记，今天先写一句吧" />
+      <view class="editor__label">配图（最多 3 张）</view>
+      <view class="editor__pics">
+        <view wx:for="{{images}}" wx:key="*this" class="editor__pic-wrap">
+          <image
+            class="editor__pic"
+            src="{{item}}"
+            mode="aspectFill"
+            data-index="{{index}}"
+            bindtap="onPreviewImage"
+            aria-label="第 {{index + 1}} 张配图"
+          />
+          <view
+            class="editor__del"
+            data-index="{{index}}"
+            catchtap="onRemoveImage"
+            aria-role="button"
+            aria-label="删除第 {{index + 1}} 张配图"
+          >×</view>
+        </view>
+        <view
+          wx:if="{{images.length + uploadingCount < 3}}"
+          class="editor__add"
+          bindtap="onChooseImage"
+          aria-role="button"
+          aria-label="添加配图"
+        >＋</view>
+        <view wx:if="{{uploadingCount}}" class="editor__add editor__add--busy">…</view>
+      </view>
 
-    <view wx:if="{{loadingMore}}" class="hint">正在翻页…</view>
-    <view
-      wx:elif="{{listError}}"
-      class="hint hint--error"
-      bindtap="onRetryList"
-      aria-role="button"
-      aria-label="重新加载日记列表"
-    >{{listError}}</view>
-    <view wx:elif="{{!hasMore && items.length > 1}}" class="hint hint--faint">没有更多啦</view>
+      <view class="editor__row">
+        <view class="editor__row-text">
+          <text class="editor__row-label">这篇给他看</text>
+          <text class="editor__row-desc">不开就只有你自己看得到</text>
+        </view>
+        <switch checked="{{shared}}" color="#FF6B6B" bindchange="onShareChange" aria-label="这篇给他看" />
+      </view>
+
+      <view wx:if="{{shared}}" class="editor__modes">
+        <view
+          wx:for="{{unlockOptions}}"
+          wx:key="key"
+          class="editor__mode {{unlockMode === item.key ? 'editor__mode--on' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onUnlockChange"
+          aria-role="radio"
+          aria-checked="{{unlockMode === item.key}}"
+        >{{item.label}}</view>
+      </view>
+
+      <!-- 已经给 TA 看过的那篇当天不能再改（文档 5.3.7）：先说清楚，别让人写完才被拒 -->
+      <view wx:if="{{lockedToday}}" class="editor__locked" aria-role="alert">
+        <text class="editor__locked-text">这篇已经给 TA 看过了，改不了了。明天再写新的一页吧</text>
+      </view>
+      <view
+        wx:else
+        class="editor__save {{canSave && !saving ? '' : 'editor__save--disabled'}}"
+        bindtap="onSave"
+        aria-label="保存今天这页手帐"
+        aria-disabled="{{!canSave || saving}}"
+      >{{saving ? '收起来…' : '保存这一页'}}</view>
+    </view>
+
+    <view wx:if="{{loading}}" class="hint">正在翻开手帐…</view>
+
+    <empty-state
+      wx:elif="{{error}}"
+      title="{{error}}"
+      action-text="再试一次"
+      bind:action="onRetry"
+    />
+
+    <block wx:else>
+      <diary-card wx:for="{{items}}" wx:key="date" item="{{item}}" today-key="{{todayKey}}" />
+
+      <empty-state wx:if="{{!items.length}}" icon="🕯️" title="还没有日记，今天先写一句吧" />
+
+      <view wx:if="{{loadingMore}}" class="hint">正在翻页…</view>
+      <view
+        wx:elif="{{listError}}"
+        class="hint hint--error"
+        bindtap="onRetryList"
+        aria-role="button"
+        aria-label="重新加载日记列表"
+      >{{listError}}</view>
+      <view wx:elif="{{!hasMore && items.length > 1}}" class="hint hint--faint">没有更多啦</view>
+    </block>
   </block>
+
+  <!-- 心情日历：30 格深浅 + 统计 + 年度导出（文档 8.3.3） -->
+  <block wx:else>
+    <view class="cal">
+      <view class="cal__bar">
+        <view class="cal__nav" bindtap="onPrevMonth" aria-role="button" aria-label="上一个月">‹</view>
+        <text class="cal__month">{{calMonthText || '心情日历'}}</text>
+        <view
+          class="cal__nav {{calCanNext ? '' : 'cal__nav--off'}}"
+          bindtap="onNextMonth"
+          aria-role="button"
+          aria-label="下一个月"
+          aria-disabled="{{!calCanNext}}"
+        >›</view>
+      </view>
+
+      <view wx:if="{{calLoading}}" class="hint">正在翻日历…</view>
+
+      <empty-state
+        wx:elif="{{calError}}"
+        title="{{calError}}"
+        action-text="再试一次"
+        bind:action="onRetryCalendar"
+      />
+
+      <block wx:else>
+        <view class="cal__week" aria-hidden="true">
+          <text class="cal__weekday">日</text>
+          <text class="cal__weekday">一</text>
+          <text class="cal__weekday">二</text>
+          <text class="cal__weekday">三</text>
+          <text class="cal__weekday">四</text>
+          <text class="cal__weekday">五</text>
+          <text class="cal__weekday">六</text>
+        </view>
+        <view class="cal__grid">
+          <view
+            wx:for="{{calCells}}"
+            wx:key="key"
+            class="cal__cell {{item.blank ? 'cal__cell--blank' : ''}} {{item.isToday ? 'cal__cell--today' : ''}}"
+            style="{{item.color ? 'background-color: ' + item.color : ''}}"
+            aria-label="{{item.blank ? '' : item.label}}"
+          >
+            <text wx:if="{{!item.blank}}" class="cal__day">{{item.day}}</text>
+            <text wx:if="{{!item.blank && item.score}}" class="cal__score">{{item.score}}</text>
+            <text wx:if="{{item.isToday}}" class="cal__now">今</text>
+          </view>
+        </view>
+
+        <view class="cal__legend">
+          <text class="cal__legend-text">心情</text>
+          <view class="cal__chip cal__chip--1"></view>
+          <view class="cal__chip cal__chip--2"></view>
+          <view class="cal__chip cal__chip--3"></view>
+          <view class="cal__chip cal__chip--4"></view>
+          <view class="cal__chip cal__chip--5"></view>
+          <text class="cal__legend-text">低 → 高</text>
+        </view>
+
+        <view class="cal__stats">{{calStatsText}}</view>
+
+        <view
+          class="cal__export {{exporting ? 'cal__export--busy' : ''}}"
+          bindtap="onExport"
+          aria-role="button"
+          aria-label="把这一年的手帐导出成长图"
+        >{{exporting ? '正在拼长图…' : '导出这一年'}}</view>
+        <view class="cal__tip">导出的是你自己的全部日记，长图会存到相册</view>
+      </block>
+    </view>
+  </block>
+
+  <canvas type="2d" id="poster" class="poster-canvas" style="width:{{posterWidth}}px;height:{{posterHeight}}px"></canvas>
 </view>

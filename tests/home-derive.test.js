@@ -81,7 +81,7 @@ test('derive: 四个入口的状态摘要（日记 / 愿望 / 报平安）（文
   const page = instantiate(config);
 
   const both = page.derive(baseHome());
-  assert.strictEqual(both.diarySub, '你写了，TA 的明天解锁');
+  assert.strictEqual(both.diarySub, '你写了，TA 的还没解锁');
   assert.strictEqual(both.wishSub, '1/3 完成');
   assert.strictEqual(both.safetySub, 'TA 到家了');
 
@@ -98,7 +98,12 @@ test('derive: 四个入口的状态摘要（日记 / 愿望 / 报平安）（文
   const partnerOnly = page.derive(baseHome({
     diary: { mineWritten: false, partnerWritten: true, partnerUnlocked: false },
   }));
-  assert.strictEqual(partnerOnly.diarySub, 'TA 写了，明天就能看');
+  assert.strictEqual(partnerOnly.diarySub, 'TA 写了，到时间就能看');
+
+  const partnerUnlocked = page.derive(baseHome({
+    diary: { mineWritten: false, partnerWritten: true, partnerUnlocked: true },
+  }));
+  assert.strictEqual(partnerUnlocked.diarySub, 'TA 写了，去看看');
 
   const neither = page.derive(baseHome({
     diary: { mineWritten: false, partnerWritten: false, partnerUnlocked: false },
@@ -470,4 +475,45 @@ test('derive: 没有进行中但有认领中、完全空、未绑定三种情况
     growth: { inFlight: 1, firstActiveTitle: '不应该出现', awaitingConfirm: false, archivedCount: 0 },
   }));
   assert.strictEqual(unbound.growthTitle, '');
+});
+
+// M13 / 文档 9.2 第 0.6 位 + 7.19：首页只在「TA 申请看我的账本且待处理」时出现一条可点提示
+test('derive: 账本申请提示条只认 pendingIncoming', () => {
+  const page = instantiate(config);
+
+  const one = page.derive(baseHome({
+    ledgerAccess: { pendingIncoming: 1, approvedIncoming: 0, canViewPartner: false },
+  }));
+  assert.strictEqual(one.ledgerNotice, true);
+  assert.strictEqual(one.ledgerNoticeText, 'TA 想看看你的账本');
+
+  // 多条待处理时把条数说出来，用户知道不是同一件事反复弹
+  const many = page.derive(baseHome({
+    ledgerAccess: { pendingIncoming: 3, approvedIncoming: 1, canViewPartner: true },
+  }));
+  assert.strictEqual(many.ledgerNotice, true);
+  assert.match(many.ledgerNoticeText, /3 条待处理/);
+
+  // 只有「我已授权」「我能看 TA」都不该在首页提醒：那是既成事实，不是待办
+  const granted = page.derive(baseHome({
+    ledgerAccess: { pendingIncoming: 0, approvedIncoming: 2, canViewPartner: true },
+  }));
+  assert.strictEqual(granted.ledgerNotice, false);
+  assert.strictEqual(granted.ledgerNoticeText, '');
+});
+
+test('derive: 账本提示条在降级与未绑定时不渲染', () => {
+  const page = instantiate(config);
+
+  // 单块读失败降级 null：宁可少提一次，也不要让用户点进去扑空
+  assert.strictEqual(page.derive(baseHome({ ledgerAccess: null })).ledgerNotice, false);
+  // 老版本服务端没有这个字段
+  assert.strictEqual(page.derive(baseHome()).ledgerNotice, false);
+  // 未绑定：即使服务端误带也不显示
+  const unbound = page.derive(baseHome({
+    couple: null,
+    ledgerAccess: { pendingIncoming: 1, approvedIncoming: 0, canViewPartner: false },
+  }));
+  assert.strictEqual(unbound.ledgerNotice, false);
+  assert.strictEqual(unbound.ledgerNoticeText, '');
 });

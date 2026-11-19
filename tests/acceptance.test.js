@@ -573,8 +573,8 @@ test('F6 报平安：一键 / 10 分钟去重 / 双方今日状态 / 时间线�
   assert.strictEqual(homeOld.safety.partnerLastAt, old.toISOString());
 });
 
-// ---------------------------------------------------------------- F7 日记
-test('F7 双人日记：1–200 字 / 当天对方不可见 / 次日 00:00 解锁 / 列表倒序分页', async () => {
+// ---------------------------------------------------------------- F7 日记（M13 手帐）
+test('F7 手帐日记：默认私密 / 逐篇分享 / 三档解锁 / 500 字 / 日历与年度归档', async () => {
   seedBound();
   const home0 = await callAs(A, 'home.get', {});
   const todayKey = home0.todayKey;
@@ -585,52 +585,137 @@ test('F7 双人日记：1–200 字 / 当天对方不可见 / 次日 00:00 解�
   const saved = await callAs(A, 'diary.save', { content: '今天路过面包店' });
   assert.strictEqual(saved.diary.date, todayKey);
   assert.strictEqual(saved.diary.unlockAt, unlockISO);
-  assert.strictEqual((await callAs(A, 'diary.save', { content: '字'.repeat(200) })).diary.content.length, 200);
-  await expectFail(A, 'diary.save', { content: '字'.repeat(201) }, 'TEXT_TOO_LONG');
+  assert.strictEqual(saved.diary.visibility, 'private', '默认只能是私密');
+  assert.strictEqual(saved.diary.moodScore, null);
+  assert.deepStrictEqual(saved.diary.images, []);
+  assert.strictEqual((await callAs(A, 'diary.save', { content: '字'.repeat(500) })).diary.content.length, 500);
+  await expectFail(A, 'diary.save', { content: '字'.repeat(501) }, 'TEXT_TOO_LONG');
+  await expectFail(A, 'diary.save', { content: '心情越界', moodScore: 6 }, 'INVALID_INPUT');
+  await expectFail(A, 'diary.save', {
+    content: '配图太多',
+    images: ['cloud://a/1.jpg', 'cloud://a/2.jpg', 'cloud://a/3.jpg', 'cloud://a/4.jpg'],
+  }, 'DIARY_IMAGE_LIMIT');
 
   // 当天可修改：同一人同一天只有一条
   const edited = await callAs(A, 'diary.save', { content: '改一下：路过面包店' });
   assert.strictEqual(edited.diary.content, '改一下：路过面包店');
   assert.strictEqual(h.fake().all('diaries').filter((doc) => doc.authorOpenid === A).length, 1);
 
-  // 对方当天看不到内容，只能看到「TA 已经写了，明天解锁」
+  // 私密是红线：B 侧与「A 那天没写」完全不可区分（没有 partnerWritten、没有 unlockAt 泄露）
   await callAs(B, 'diary.save', { content: '我也是' });
   const listB = await callAs(B, 'diary.list', {});
   assert.strictEqual(listB.items[0].date, todayKey);
-  assert.strictEqual(listB.items[0].partnerWritten, true);
+  assert.strictEqual(listB.items[0].partnerWritten, false, '私密日记在对方侧等于不存在');
   assert.strictEqual(listB.items[0].partnerUnlocked, false);
-  assert.strictEqual(listB.items[0].partner, null, '未解锁时绝不能下发对方正文');
+  assert.strictEqual(listB.items[0].partner, null);
   assert.strictEqual(listB.items[0].mine.content, '我也是');
   assert.strictEqual(listB.todayKey, todayKey);
   const homeB = await callAs(B, 'home.get', {});
-  assert.strictEqual(homeB.diary.partnerWritten, true);
-  assert.strictEqual(homeB.diary.partnerUnlocked, false);
+  assert.strictEqual(homeB.diary.partnerWritten, false, '首页摘要也不能透露私密日记');
+
+  // day 档（默认）：对方当天只看到「写了」，次日 00:00 解锁
+  const dayShared = await callAs(A, 'diary.save', { content: '明天见', visibility: 'partner' });
+  assert.strictEqual(dayShared.diary.unlockAt, unlockISO);
+  assert.ok(dayShared.diary.sharedAt, '首次分享要记 sharedAt');
+  const lockedB = await callAs(B, 'diary.list', {});
+  assert.strictEqual(lockedB.items[0].partnerWritten, true);
+  assert.strictEqual(lockedB.items[0].partnerUnlocked, false);
+  assert.strictEqual(lockedB.items[0].partner, null, '未解锁时绝不能下发对方正文');
+
+  // 改成「立即」：对方马上能读到正文 + 分值 + 配图
+  const shared = await callAs(A, 'diary.save', {
+    content: '今天的海很好看',
+    moodScore: 5,
+    images: ['cloud://diary/c_abcdef0123456789/2026-11-16/1.jpg'],
+    visibility: 'partner',
+    unlockMode: 'immediate',
+  });
+  assert.strictEqual(shared.diary.visibility, 'partner');
+  const sharedB = await callAs(B, 'diary.list', {});
+  assert.strictEqual(sharedB.items[0].partnerWritten, true);
+  assert.strictEqual(sharedB.items[0].partnerUnlocked, true);
+  assert.strictEqual(sharedB.items[0].partner.content, '今天的海很好看');
+  assert.strictEqual(sharedB.items[0].partner.moodScore, 5);
+  assert.deepStrictEqual(sharedB.items[0].partner.images, ['cloud://diary/c_abcdef0123456789/2026-11-16/1.jpg']);
 
   // 次日 00:00 后对方可见（14.5 的 dev 手法：把 unlockAt 改成过去 → 重新拉列表）
   const yesterday = time.addDays(todayKey, -1);
   const past = new Date(Date.now() - 24 * 3600 * 1000);
+
   h.reset({
     users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
     couples: [coupleDoc(COUPLE_ID)],
     diaries: [
-      { _id: B + '_' + yesterday, coupleId: COUPLE_ID, authorOpenid: B, date: yesterday, content: '昨天 TA 写的', unlockAt: past, createdAt: past, updatedAt: past },
-      { _id: A + '_' + yesterday, coupleId: COUPLE_ID, authorOpenid: A, date: yesterday, content: '昨天我写的', unlockAt: past, createdAt: past, updatedAt: past },
+      {
+        _id: B + '_' + yesterday, coupleId: COUPLE_ID, authorOpenid: B, date: yesterday,
+        content: '昨天 TA 写的', moodScore: null, images: [], visibility: 'private', unlockMode: 'day',
+        unlockAt: past, sharedAt: null, createdAt: past, updatedAt: past,
+      },
+      {
+        _id: A + '_' + yesterday, coupleId: COUPLE_ID, authorOpenid: A, date: yesterday,
+        content: '昨天我写的', moodScore: 3, images: [], visibility: 'partner', unlockMode: 'day',
+        unlockAt: past, sharedAt: past, createdAt: past, updatedAt: past,
+      },
     ],
   });
   const unlocked = await callAs(B, 'diary.list', {});
   assert.strictEqual(unlocked.items[0].partnerUnlocked, true);
   assert.strictEqual(unlocked.items[0].partner.content, '昨天我写的');
+  assert.strictEqual(unlocked.items[0].partner.moodScore, 3);
 
-  // 已解锁的旧日记不能再改（14.9 / 7.10 DIARY_LOCKED）
+  // 已解锁的旧日记不能再改（14.9 / 7.10 DIARY_LOCKED），改可见性也拦
   h.reset({
     users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
     couples: [coupleDoc(COUPLE_ID)],
     diaries: [{
       _id: A + '_' + todayKey, coupleId: COUPLE_ID, authorOpenid: A, date: todayKey,
-      content: '今天写的', unlockAt: past, createdAt: past, updatedAt: past,
+      content: '今天写的', moodScore: 4, images: [], visibility: 'private', unlockMode: 'day',
+      unlockAt: past, sharedAt: null, createdAt: past, updatedAt: past,
     }],
   });
   await expectFail(A, 'diary.save', { content: '想改已经解锁的' }, 'DIARY_LOCKED');
+  await expectFail(A, 'diary.save', { content: '想改已经解锁的', visibility: 'partner' }, 'DIARY_LOCKED');
+
+  // 月度心情日历：只统计自己的分值；同日有记录但没填分值 → score=null
+  const month = todayKey.slice(0, 7);
+  const dayOne = month + '-01';
+  h.reset({
+    users: [userDoc(A, '小怡', COUPLE_ID), userDoc(B, '阿安', COUPLE_ID)],
+    couples: [coupleDoc(COUPLE_ID)],
+    diaries: [
+      {
+        _id: A + '_' + dayOne, coupleId: COUPLE_ID, authorOpenid: A, date: dayOne,
+        content: '一号', moodScore: 2, images: [], visibility: 'private', unlockMode: 'day',
+        unlockAt: past, sharedAt: null, createdAt: past, updatedAt: past,
+      },
+      {
+        _id: A + '_' + todayKey, coupleId: COUPLE_ID, authorOpenid: A, date: todayKey,
+        content: '今天', moodScore: 4, images: [], visibility: 'partner', unlockMode: 'day',
+        unlockAt: past, sharedAt: past, createdAt: past, updatedAt: past,
+      },
+      {
+        _id: B + '_' + dayOne, coupleId: COUPLE_ID, authorOpenid: B, date: dayOne,
+        content: 'TA 的', moodScore: 1, images: [], visibility: 'partner', unlockMode: 'day',
+        unlockAt: past, sharedAt: past, createdAt: past, updatedAt: past,
+      },
+    ],
+  });
+  const calendar = await callAs(A, 'diary.calendar', { month });
+  assert.strictEqual(calendar.month, month);
+  assert.strictEqual(calendar.todayKey, todayKey);
+  assert.ok(calendar.days.length >= 28 && calendar.days.length <= 31, '日历覆盖当月每一天');
+  assert.strictEqual(calendar.days[0].score, 2);
+  assert.strictEqual(calendar.days[0].hasDiary, true);
+  assert.strictEqual(calendar.days[0].shared, false);
+  assert.deepStrictEqual(calendar.stats.best, { date: todayKey, score: 4 });
+  assert.deepStrictEqual(calendar.stats.lowest, { date: dayOne, score: 2 }, '对方的分值绝不进日历');
+  assert.strictEqual(calendar.stats.recorded, 2);
+  assert.strictEqual(calendar.stats.average, 3);
+
+  const archive = await callAs(A, 'diary.archive', { year: Number(todayKey.slice(0, 4)) });
+  assert.deepStrictEqual(archive.items.map((item) => item.date), [dayOne, todayKey], '归档按日期升序');
+  assert.strictEqual(archive.count, 2, '只含自己的日记');
+  assert.strictEqual(archive.truncated, false);
 
   // 列表按日期倒序、分页加载
   h.reset({

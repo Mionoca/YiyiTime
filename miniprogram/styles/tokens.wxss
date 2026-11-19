@@ -61,6 +61,16 @@ page {
   --font-lg: 40rpx;
   --font-xl: 56rpx;
 
+  /* ── 手帐分支（M13，文档 8.7.1）：只作用于日记页 / 日记卡 / 心情分值 ── */
+  /* 心情五档：低 → 高由浅灰蓝到暖黄；文字一律 --ink 压在浅色格上（≥4.5:1） */
+  --mood-1: #B9C0CA;
+  --mood-2: #A9C6D8;
+  --mood-3: #D9D2B6;
+  --mood-4: #FFE08A;
+  --mood-5: #FFD93D;
+  /* 楷体栈：iOS 有楷体、Android 回退衬线；不引网络字体（8.8） */
+  --font-hand: "Kaiti SC", "STKaiti", "KaiTi", serif;
+
   /* ── tabBar 与安全区（文档 8.2 / 9.9）─────────────────────── */
   --tabbar-h: 100rpx;
   --tabbar-safe: calc(140rpx + env(safe-area-inset-bottom));

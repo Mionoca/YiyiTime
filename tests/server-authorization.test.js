@@ -376,11 +376,31 @@ test('记账本：伴侣账本只读、别家改删一律拒绝、未绑定不�
   const entryId = mine.entry.entryId;
   const partnerEntry = await ok(B, 'ledger.add', { amount: 800, category: 'daily' });
 
-  // 伴侣能看，但不能改 / 删
+  // M13：伴侣账本默认不可见，必须先申请、由主人批准
+  const lockedView = await ok(A, 'ledger.list', { who: 'partner' });
+  assert.deepStrictEqual(lockedView.items, [], '无授权时看不到任何账目');
+  assert.strictEqual(lockedView.permission, null);
+  const asked = await ok(A, 'ledger.requestView', { scope: 'permanent' });
+  assert.strictEqual(asked.request.status, 'pending');
+  const requestId = asked.request.requestId;
+  // 申请人不能自己批，也不能撤回别人的申请；第三方的决定一律拒绝
+  await fail(A, 'ledger.decideView', { requestId, approve: true }, 'FORBIDDEN');
+  await fail(B, 'ledger.cancelView', { requestId }, 'FORBIDDEN');
+  // 第三方连记录都不该看见：按「找不到」返回，不泄露别家申请
+  await fail(C, 'ledger.decideView', { requestId, approve: true }, 'LEDGER_ACCESS_NOT_FOUND');
+  await ok(B, 'ledger.decideView', { requestId, approve: true });
+
+  // 授权后只读：能看，但不能改 / 删
   const viewed = await ok(A, 'ledger.list', { who: 'partner' });
   assert.deepStrictEqual(viewed.items.map((item) => item.entryId), [partnerEntry.entry.entryId]);
+  assert.strictEqual(viewed.permission.status, 'approved');
   await fail(A, 'ledger.update', { entryId: partnerEntry.entry.entryId, amount: 1 }, 'FORBIDDEN');
   await fail(A, 'ledger.remove', { entryId: partnerEntry.entry.entryId }, 'FORBIDDEN');
+  // 主人收回后立刻变回锁
+  await ok(B, 'ledger.revokeView', { requestId });
+  const revokedView = await ok(A, 'ledger.list', { who: 'partner' });
+  assert.deepStrictEqual(revokedView.items, []);
+  assert.strictEqual(revokedView.permission.status, 'none', '收回后申请人侧折叠成 none，可重新申请');
 
   // 别家的人拿着 entryId 也不能改 / 删
   await fail(C, 'ledger.update', { entryId, amount: 1 }, 'FORBIDDEN');
@@ -426,4 +446,31 @@ test('解绑：别家不能替别人确认，跨对的解绑状态互不干扰',
   const mineAfter = await ok(A, 'ledger.list', {});
   assert.strictEqual(mineAfter.bound, false);
   await fail(A, 'ledger.list', { who: 'partner' }, 'NOT_BOUND');
+});
+
+// M13 / 文档 5.5、7.19：同意与拒绝都要幂等——两台设备同时点、或返回后再点，不该变成报错
+test('账本授权：同意 / 拒绝幂等，处理过之后不能改判', async () => {
+  seedTwoCouples();
+  const asked = await ok(A, 'ledger.requestView', { scope: 'temp' });
+  const requestId = asked.request.requestId;
+
+  const first = await ok(B, 'ledger.decideView', { requestId, approve: true });
+  assert.strictEqual(first.request.status, 'approved');
+  assert.ok(first.request.expiresAt, '临时授权必须带到期时间');
+  const again = await ok(B, 'ledger.decideView', { requestId, approve: true });
+  assert.strictEqual(again.request.requestId, requestId, '重复同意返回同一条记录');
+  await fail(B, 'ledger.decideView', { requestId, approve: false }, 'LEDGER_ACCESS_STATE');
+
+  // 拒绝同样幂等，且拒绝后申请人可以重新申请
+  await ok(B, 'ledger.revokeView', { requestId });
+  const second = await ok(A, 'ledger.requestView', { scope: 'permanent' });
+  const secondId = second.request.requestId;
+  assert.notStrictEqual(secondId, requestId, '重新申请是一条新记录，历史保留');
+  const rejected = await ok(B, 'ledger.decideView', { requestId: secondId, approve: false });
+  assert.strictEqual(rejected.request.status, 'rejected');
+  const rejectedAgain = await ok(B, 'ledger.decideView', { requestId: secondId, approve: false });
+  assert.strictEqual(rejectedAgain.request.status, 'rejected');
+
+  const third = await ok(A, 'ledger.requestView', { scope: 'permanent' });
+  assert.strictEqual(third.request.status, 'pending', '被拒绝后还能再问一次');
 });

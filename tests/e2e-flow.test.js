@@ -177,20 +177,31 @@ test('双账号端到端主链路：绑定 → 首页聚合 → 心情/纪念日
   assert.strictEqual(homeB3.safety.partnerToday, true);
   assert.strictEqual(homeB3.safety.partnerLastAt, checkin.entry.createdAt);
 
-  // 日记：当天两人都写，但对方正文要等次日 00:00 才可见
+  // 日记（M13）：默认私密，双方互不可见；手动开启「这篇给他看」后对方才看到「写了」
   const unlockISO = time.nextUnlockAt(todayKey).toISOString();
-  const diaryA = await callAs(A, 'diary.save', { content: '今天很开心' });
+  const diaryA = await callAs(A, 'diary.save', { content: '今天很开心', moodScore: 4 });
   assert.strictEqual(diaryA.diary.unlockAt, unlockISO);
+  assert.strictEqual(diaryA.diary.visibility, 'private');
   await callAs(B, 'diary.save', { content: '我也是' });
+  const privateList = await callAs(A, 'diary.list', {});
+  assert.strictEqual(privateList.items.length, 1);
+  assert.strictEqual(privateList.items[0].partnerWritten, false, '私密日记在对方侧等于不存在');
+  assert.strictEqual(privateList.items[0].partner, null);
+  assert.strictEqual(privateList.items[0].unlockAt, unlockISO);
+
+  await callAs(A, 'diary.save', { content: '今天很开心', moodScore: 4, visibility: 'partner' });
   const diaryList = await callAs(A, 'diary.list', {});
-  assert.strictEqual(diaryList.items.length, 1);
   const dayA = diaryList.items[0];
   assert.strictEqual(dayA.date, todayKey);
   assert.strictEqual(dayA.mine.content, '今天很开心');
-  assert.strictEqual(dayA.partnerWritten, true);
-  assert.strictEqual(dayA.partnerUnlocked, false);
+  assert.strictEqual(dayA.mine.visibility, 'partner');
+  assert.strictEqual(dayA.partnerWritten, false, 'B 没分享，A 侧看不到「TA 写了」');
   assert.strictEqual(dayA.partner, null);
   assert.strictEqual(dayA.unlockAt, unlockISO);
+  const diaryListB = await callAs(B, 'diary.list', {});
+  assert.strictEqual(diaryListB.items[0].partnerWritten, true, 'A 分享了，B 侧看到「TA 写了」');
+  assert.strictEqual(diaryListB.items[0].partnerUnlocked, false);
+  assert.strictEqual(diaryListB.items[0].partner, null);
   const homeB4 = await callAs(B, 'home.get', {});
   assert.strictEqual(homeB4.diary.mineWritten, true);
   assert.strictEqual(homeB4.diary.partnerWritten, true);
@@ -238,6 +249,7 @@ test('跨天日记解锁后，能读到对方正文（直接种库）', async (t
         authorOpenid: A,
         date: yesterday,
         content: '昨天我写的',
+        visibility: 'partner',
         unlockAt: past,
         createdAt: past,
         updatedAt: past,
@@ -248,6 +260,7 @@ test('跨天日记解锁后，能读到对方正文（直接种库）', async (t
         authorOpenid: B,
         date: yesterday,
         content: '昨天 TA 写的',
+        visibility: 'partner',
         unlockAt: past,
         createdAt: past,
         updatedAt: past,

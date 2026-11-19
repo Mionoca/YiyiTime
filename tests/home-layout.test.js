@@ -225,10 +225,11 @@ test('8.9 首页热区不小于 88rpx（含底部重试与链接式入口）', (
 });
 
 test('9.9 tab 页底部留出 tabBar + 安全区，否则最后一张卡被压住', () => {
-  for (const page of ['home', 'diary', 'wish', 'mood', 'profile']) {
+  // 只有 tab 页（今天 / 记账本 / 我的）需要给 tabBar 留白；diary / wish / mood 是普通页（文档 8.2）
+  for (const page of ['home', 'ledger', 'profile']) {
     const css = read('pages/' + page + '/index.wxss');
     assert.ok(
-      /env\(safe-area-inset-bottom\)/.test(css) && /140rpx/.test(css),
+      /env\(safe-area-inset-bottom\)/.test(css) && /(140|360)rpx/.test(css),
       page + ' 页底部没有留 tabBar 高度 + 安全区'
     );
   }

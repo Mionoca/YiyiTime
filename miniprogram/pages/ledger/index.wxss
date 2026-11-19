@@ -307,3 +307,186 @@
   font-size: var(--font-sm);
   color: var(--danger);
 }
+
+/* ---------- 账本查看授权（M13，文档 8.3.8） ---------- */
+.access {
+  margin-top: 20rpx;
+  padding: 20rpx 22rpx;
+  background-color: var(--wall);
+  border: 2rpx dashed var(--ink);
+  border-radius: var(--radius-sm);
+}
+
+.access--granted {
+  background-color: var(--card);
+  border-color: var(--ink-faint);
+}
+
+.access--ok {
+  background-color: var(--accent-soft);
+  border-color: var(--accent-ink);
+}
+
+.access__title {
+  margin-bottom: 12rpx;
+  font-size: var(--font-sm);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.access__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 10rpx 0;
+  border-top: 2rpx dashed var(--ink-faint);
+}
+
+.access__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.access__scope {
+  font-size: var(--font-sm);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.access__time {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.access__actions {
+  display: flex;
+  gap: 12rpx;
+}
+
+.access__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 108rpx;
+  min-height: 76rpx;
+  padding: 0 18rpx;
+  background-color: var(--card);
+  border: 2rpx dashed var(--ink);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+  color: var(--ink);
+  transition: transform 150ms linear;
+}
+
+.access__btn--yes {
+  background-color: var(--accent-strong);
+  color: var(--card);
+  border-color: var(--line);
+}
+
+.access__btn:active {
+  transform: translate(2rpx, 2rpx);
+}
+
+.access__hint {
+  margin-top: 10rpx;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.access__ok-text {
+  font-size: var(--font-sm);
+  color: var(--accent-ink);
+  line-height: 1.6;
+}
+
+/* 锁：TA 的账本默认不可见 */
+.lock {
+  margin-top: 20rpx;
+  padding: 40rpx 28rpx;
+  text-align: center;
+  background-color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.lock__icon {
+  font-size: 56rpx;
+  line-height: 1.2;
+}
+
+.lock__title {
+  margin-top: 12rpx;
+  font-size: var(--font-md);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.lock__text {
+  margin-top: 10rpx;
+  font-size: var(--font-sm);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.lock__scopes {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 26rpx;
+}
+
+.lock__scope {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+  background-color: var(--card);
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+  color: var(--muted);
+  transition: transform 150ms linear;
+}
+
+.lock__scope--on {
+  background-color: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  font-weight: 700;
+  transform: translate(-1rpx, -1rpx);
+}
+
+.lock__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+  margin-top: 22rpx;
+  background-color: var(--accent-strong);
+  color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-btn);
+  font-size: var(--font-md);
+  font-weight: 800;
+  transition: transform 150ms linear;
+}
+
+.lock__btn:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: none;
+}
+
+.lock__btn--busy {
+  opacity: 0.6;
+}
+
+.lock__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 22rpx;
+}

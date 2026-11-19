@@ -208,6 +208,22 @@ test('ledger.list: 默认当月、只返回自己的账，summary 按返回结�
   assert.strictEqual(res.bound, true, '已绑定要告诉页面可以显示「TA 的」分段');
 });
 
+/** M13 账本授权记录：默认永久批准，owner=对方、viewer=自己 */
+function grantDoc(overrides) {
+  return Object.assign({
+    _id: 'lg_0000000000000001',
+    coupleId: 'c_1',
+    ownerOpenid: 'oB',
+    viewerOpenid: 'oA',
+    scope: 'permanent',
+    status: 'approved',
+    requestedAt: NOW,
+    decidedAt: NOW,
+    expiresAt: null,
+    updatedAt: NOW,
+  }, overrides);
+}
+
 test('ledger.list: 伴侣账本只读且只含本段关系期间的账（换绑后看不到旧的）', async () => {
   const { ctx } = makeCtx({
     data: {
@@ -216,12 +232,50 @@ test('ledger.list: 伴侣账本只读且只含本段关系期间的账（换绑�
         entryDoc({ _id: 'le_old', openid: 'oB', coupleId: 'c_old', amount: 7000 }),
         entryDoc({ _id: 'le_mine', amount: 100 }),
       ],
+      ledger_view_grants: [grantDoc()],
     },
   });
   const res = await ledger.list({ who: 'partner' }, ctx);
   assert.strictEqual(res.who, 'partner');
   assert.deepStrictEqual(res.items.map((item) => item.entryId), ['le_now']);
   assert.deepStrictEqual(res.summary, { total: 500, count: 1 });
+  assert.deepStrictEqual(res.permission, {
+    status: 'approved', scope: 'permanent', expiresAt: null, requestedAt: NOW.toISOString(),
+  });
+});
+
+test('ledger.list: 没有授权时「TA 的」是一把锁，不返回任何账目字段', async () => {
+  const { ctx } = makeCtx({
+    data: { ledger_entries: [entryDoc({ _id: 'le_now', openid: 'oB', amount: 500 })] },
+  });
+  const res = await ledger.list({ who: 'partner' }, ctx);
+  assert.deepStrictEqual(res.items, []);
+  assert.deepStrictEqual(res.summary, { total: 0, count: 0 });
+  assert.strictEqual(res.permission, null, '从没申请过 → null，页面渲染锁 + 申请入口');
+});
+
+test('ledger.list: 待处理 / 已过期的授权同样不返回账目，页面据 status 渲染', async () => {
+  const pending = makeCtx({
+    data: {
+      ledger_entries: [entryDoc({ _id: 'le_now', openid: 'oB', amount: 500 })],
+      ledger_view_grants: [grantDoc({ _id: 'lg_p', status: 'pending', decidedAt: null, expiresAt: null })],
+    },
+  });
+  const pendingRes = await ledger.list({ who: 'partner' }, pending.ctx);
+  assert.deepStrictEqual(pendingRes.items, []);
+  assert.strictEqual(pendingRes.permission.status, 'pending');
+
+  const expired = makeCtx({
+    data: {
+      ledger_entries: [entryDoc({ _id: 'le_now', openid: 'oB', amount: 500 })],
+      ledger_view_grants: [grantDoc({
+        _id: 'lg_e', scope: 'temp', expiresAt: new Date(NOW.getTime() - 1000),
+      })],
+    },
+  });
+  const expiredRes = await ledger.list({ who: 'partner' }, expired.ctx);
+  assert.deepStrictEqual(expiredRes.items, []);
+  assert.strictEqual(expiredRes.permission.status, 'expired');
 });
 
 test('ledger.list: 我的账本不受 coupleId 影响（解绑 / 换绑后仍是自己的）', async () => {

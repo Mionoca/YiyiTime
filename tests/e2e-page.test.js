@@ -387,7 +387,7 @@ test('报平安：A 报平安后 B 的首页门灯亮、门牌显示 TA 到家�
   pageB.onUnload();
 });
 
-test('日记：A 写完当天日记后，B 的首页只看到「写了」，正文不可读', async () => {
+test('日记：默认私密双方互不可见，手动开启「这篇给他看」后对方才读到正文', async () => {
   setup();
   await seedBound();
   const pageA = await openHome(A);
@@ -399,39 +399,68 @@ test('日记：A 写完当天日记后，B 的首页只看到「写了」，正�
   const serverHome = await ok(A, 'home.get');
   assert.strictEqual(diaryA.data.todayKey, serverHome.todayKey);
   assert.strictEqual(diaryA.data.content, '');
+  assert.strictEqual(diaryA.data.shared, false, '「这篇给他看」默认关闭');
+  assert.strictEqual(diaryA.data.moodScore, 0);
 
+  // 私密保存：服务端写 visibility=private，文案强调只有自己看过
   diaryA.onContentInput({ detail: { value: '今天很开心' } });
   assert.strictEqual(diaryA.data.canSave, true);
   await diaryA.onSave();
   assert.strictEqual(diaryA.data.saving, false);
-  assert.strictEqual(toasts[toasts.length - 1], '明天 TA 才能看到', '实际 toasts：' + JSON.stringify(toasts));
+  assert.strictEqual(toasts[toasts.length - 1], '收好了，只有你看过', '实际 toasts：' + JSON.stringify(toasts));
   assert.strictEqual(diaryA.data.items.length, 1);
   assert.strictEqual(diaryA.data.items[0].mine.content, '今天很开心');
+  assert.strictEqual(diaryA.data.items[0].mine.visibility, 'private');
   assert.strictEqual(diaryA.data.items[0].date, diaryA.data.todayKey);
 
-  // 云函数侧按「服务端今天 + _id」落库，幂等覆盖同一天
   const listA = await ok(A, 'diary.list', { limit: 10 });
   assert.strictEqual(listA.items[0].mine.content, '今天很开心');
   assert.strictEqual(listA.todayKey, diaryA.data.todayKey);
 
+  // 伴侣侧：私密日记等于不存在，首页也不能提示「TA 写了」
   const pageB = await openHome(B);
-  assert.strictEqual(pageB.data.diarySub, 'TA 写了，明天就能看', 'B 没写、A 写了未解锁，摘要要说清');
+  assert.strictEqual(pageB.data.diarySub, '今天还没写', '私密日记不能透露「TA 写了」');
   const homeB = await ok(B, 'home.get');
   assert.strictEqual(homeB.diary.mineWritten, false);
-  assert.strictEqual(homeB.diary.partnerWritten, true);
-  assert.strictEqual(homeB.diary.partnerUnlocked, false);
+  assert.strictEqual(homeB.diary.partnerWritten, false);
 
   currentOpenid = B;
   const diaryB = openPage(DIARY);
   diaryB.onLoad();
-  await waitFor(() => !diaryB.data.loading && diaryB.data.items.length === 1, 'B 的日记页加载当天卡片');
-  assert.strictEqual(diaryB.data.items[0].partnerWritten, true);
-  assert.strictEqual(diaryB.data.items[0].partnerUnlocked, false);
-  assert.strictEqual(diaryB.data.items[0].partner, null, '未解锁不能下发对方正文');
-  assert.strictEqual(diaryB.data.content, '', 'B 的编辑器不能带出 A 的内容');
+  await waitFor(() => !diaryB.data.loading, 'B 的日记页加载完成');
+  assert.strictEqual(diaryB.data.items.length, 0, 'B 的列表里不应出现 A 的私密日记');
+  assert.strictEqual(diaryB.data.content, '');
 
-  // 昨天那条已过解锁时刻：B 重新加载时能看到 A 的正文（跨天解锁走真实 diary.list）
-  const todayKey = homeB.todayKey;
+  // A 手动开启分享 + 心情分值 + 立即解锁
+  currentOpenid = A;
+  diaryA.onMoodChange({ detail: { score: 4 } });
+  diaryA.onShareChange({ detail: { value: true } });
+  diaryA.onUnlockChange({ currentTarget: { dataset: { key: 'immediate' } } });
+  assert.strictEqual(diaryA.data.shared, true);
+  await diaryA.onSave();
+  assert.strictEqual(toasts[toasts.length - 1], 'TA 现在就能看到了', '实际 toasts：' + JSON.stringify(toasts));
+  assert.strictEqual(diaryA.data.items[0].mine.visibility, 'partner');
+  assert.strictEqual(diaryA.data.items[0].mine.moodScore, 4);
+
+  // B 侧：首页提示「TA 写了，去看看」，日记页能读到正文与分值
+  const pageB2 = await openHome(B);
+  assert.strictEqual(pageB2.data.diarySub, 'TA 写了，去看看');
+  const homeB2 = await ok(B, 'home.get');
+  assert.strictEqual(homeB2.diary.partnerWritten, true);
+  assert.strictEqual(homeB2.diary.partnerUnlocked, true);
+
+  currentOpenid = B;
+  const diaryB2 = openPage(DIARY);
+  diaryB2.onLoad();
+  await waitFor(() => !diaryB2.data.loading && diaryB2.data.items.length === 1, 'B 的日记页加载当天卡片');
+  assert.strictEqual(diaryB2.data.items[0].partnerWritten, true);
+  assert.strictEqual(diaryB2.data.items[0].partnerUnlocked, true);
+  assert.strictEqual(diaryB2.data.items[0].partner.content, '今天很开心');
+  assert.strictEqual(diaryB2.data.items[0].partner.moodScore, 4);
+  assert.strictEqual(diaryB2.data.content, '', 'B 的编辑器不能带出 A 的内容');
+
+  // 昨天那条已解锁：B 重新加载时能看到（跨天解锁走真实 diary.list）
+  const todayKey = homeB2.todayKey;
   const yesterdayKey = cloudTime.addDays(todayKey, -1);
   const unlockAt = new Date(Date.parse(yesterdayKey + 'T00:00:00+08:00')).toISOString();
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -441,16 +470,21 @@ test('日记：A 写完当天日记后，B 的首页只看到「写了」，正�
       authorOpenid: A,
       date: yesterdayKey,
       content: '昨天的秘密',
+      moodScore: 3,
+      images: [],
+      visibility: 'partner',
+      unlockMode: 'day',
       unlockAt,
+      sharedAt: yesterday,
       createdAt: yesterday,
       updatedAt: yesterday,
     },
   });
 
-  const diaryB2 = openPage(DIARY);
-  diaryB2.onLoad();
-  await waitFor(() => !diaryB2.data.loading && diaryB2.data.items.length === 2, 'B 看到昨天已解锁的日记');
-  const yesterdayItem = diaryB2.data.items.find((item) => item.date === yesterdayKey);
+  const diaryB3 = openPage(DIARY);
+  diaryB3.onLoad();
+  await waitFor(() => !diaryB3.data.loading && diaryB3.data.items.length === 2, 'B 看到昨天已解锁的日记');
+  const yesterdayItem = diaryB3.data.items.find((item) => item.date === yesterdayKey);
   assert.ok(yesterdayItem, '昨天卡片应存在');
   assert.strictEqual(yesterdayItem.partnerUnlocked, true);
   assert.strictEqual(yesterdayItem.partner.content, '昨天的秘密', '已解锁的日记 B 应能读到正文');
@@ -458,6 +492,7 @@ test('日记：A 写完当天日记后，B 的首页只看到「写了」，正�
 
   pageA.onUnload();
   pageB.onUnload();
+  pageB2.onUnload();
 });
 
 test('愿望：A 新增愿望后，B 的首页统计与愿望页都能看到，打勾后双方同步', async () => {
@@ -562,7 +597,7 @@ test('纪念日：B 删掉 A 正在看的那张后，A 刷新时堆叠回到第�
   pageA.onUnload();
 });
 
-test('记账本：A 记一笔后 B 切到 TA 的账本能看到，B 改不了别人的账', async () => {
+test('记账本：TA 的账本默认上锁，申请并由主人同意后才能看，收回后立刻失效', async () => {
   setup();
   await seedBound();
   const todayKey = cloudTime.dateKeyOf(new Date());
@@ -570,6 +605,7 @@ test('记账本：A 记一笔后 B 切到 TA 的账本能看到，B 改不了别
   currentOpenid = A;
   const page = openPage('miniprogram/pages/ledger/index.js');
   page.onLoad();
+  page.onShow(); // 真实生命周期：onLoad 后紧跟 onShow（首次只消耗 firstShow，不重复请求）
   await waitFor(() => !page.data.loading, 'A 记账本加载');
   assert.strictEqual(page.data.month, todayKey.slice(0, 7), '默认月份必须与服务端 todayKey 一致');
   assert.strictEqual(page.data.maxDate, todayKey, '日期选择上限是服务端今天');
@@ -586,14 +622,42 @@ test('记账本：A 记一笔后 B 切到 TA 的账本能看到，B 改不了别
   const entryId = page.data.groups[0].items[0].entryId;
   assert.strictEqual(h.fake().get('ledger_entries', entryId).amount, 2350, '落库金额必须是整数分');
 
+  // B 切到 TA 的账本：默认是一把锁，没有任何账目字段
   currentOpenid = B;
   const pageB = openPage('miniprogram/pages/ledger/index.js');
   pageB.onLoad();
   await waitFor(() => !pageB.data.loading, 'B 记账本加载');
   assert.deepStrictEqual(pageB.data.groups, [], 'B 自己的账本应为空');
-
   pageB.onSwitchWho({ currentTarget: { dataset: { who: 'partner' } } });
-  await waitFor(() => pageB.data.groups.length === 1, 'B 切到 TA 的账本看到记录');
+  await waitFor(() => pageB.data.who === 'partner' && !pageB.data.loading, 'B 切到 TA 的账本');
+  assert.deepStrictEqual(pageB.data.groups, [], '没有授权时看不到任何账目');
+  assert.strictEqual(pageB.data.access, null, '从没申请过 → permission=null，页面渲染锁');
+
+  // B 申请永久查看 → 锁变成「等 TA 同意」
+  pageB.onScopeChange({ currentTarget: { dataset: { scope: 'permanent' } } });
+  await pageB.onRequestView();
+  await waitFor(() => pageB.data.access && pageB.data.access.status === 'pending', 'B 的申请进入待处理');
+  assert.strictEqual(pageB.data.groups.length, 0, '待处理期间仍然看不到');
+  assert.strictEqual(pageB.data.outgoing.length, 1);
+
+  // A 的主人视角看到待办，同意后 granted 出现一条
+  currentOpenid = A;
+  // 同一件事在首页也要有一条可点提示（文档 9.2 第 0.6 位 / 7.19），否则 A 不进记账本就永远不知道
+  const homeA = await openHome(A);
+  assert.strictEqual(homeA.data.ledgerNotice, true, 'A 首页要出现账本申请提示条');
+  assert.match(homeA.data.ledgerNoticeText, /TA 想看看你的账本/);
+  page.onShow();
+  await waitFor(() => page.data.incoming.length === 1, 'A 看到 TA 的申请');
+  const requestId = page.data.incoming[0].requestId;
+  assert.strictEqual(page.data.incoming[0].scopeText, '一直可以看');
+  await page.onDecideView({ currentTarget: { dataset: { id: requestId, approve: '1' } } });
+  await waitFor(() => page.data.granted.length === 1, '同意后出现在已授权名单');
+
+  // B 重新拉：能看，但只能看
+  currentOpenid = B;
+  await pageB.load(true, true);
+  await waitFor(() => pageB.data.groups.length === 1, 'B 被同意后看到记录');
+  assert.strictEqual(pageB.data.access.status, 'approved');
   assert.strictEqual(pageB.data.groups[0].items[0].note, '牛肉面');
   assert.strictEqual(pageB.data.groups[0].items[0].amountText, '¥23.50');
   assert.strictEqual(pageB.data.summaryLabel, '小怡这个月花了', '看对方账本时用对方昵称');
@@ -603,11 +667,19 @@ test('记账本：A 记一笔后 B 切到 TA 的账本能看到，B 改不了别
   assert.strictEqual(toasts[toasts.length - 1], 'TA 的账本只能看');
 
   // 绕过页面直接调接口也会被服务端拒绝
-  currentOpenid = B;
   const res = await h.callAs(B, 'ledger.update', { entryId, amount: 1 });
   assert.strictEqual(res.ok, false);
   assert.strictEqual(res.code, 'FORBIDDEN');
   assert.strictEqual(h.fake().get('ledger_entries', entryId).amount, 2350);
+
+  // 主人收回（showModal 桩自动确认）→ B 立刻变回锁
+  currentOpenid = A;
+  page.onRevokeView({ currentTarget: { dataset: { id: requestId } } });
+  await waitFor(() => page.data.granted.length === 0, '收回后已授权名单清空');
+  currentOpenid = B;
+  await pageB.load(true, true);
+  await waitFor(() => pageB.data.groups.length === 0 && pageB.data.access && pageB.data.access.status === 'none',
+    '收回后 B 的列表立刻为空');
 
   page.onUnload();
   pageB.onUnload();

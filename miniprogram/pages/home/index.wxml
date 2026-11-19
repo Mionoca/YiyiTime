@@ -92,6 +92,19 @@
       </block>
     </view>
 
+    <!-- 0.6 账本申请提示条（M13 / 文档 9.2 / 7.19）：TA 申请看我的账本且待处理时出现；
+         与解绑条同构的细条，不参与卡片旋转；点了去「记账本」处理 -->
+    <view
+      class="ledger-bar"
+      wx:if="{{ledgerNotice}}"
+      bindtap="onTapLedgerNotice"
+      aria-role="button"
+      aria-label="TA 想看看你的账本，去处理"
+    >
+      <text class="ledger-bar__text">{{ledgerNoticeText}}</text>
+      <text class="ledger-bar__btn">去看看 ›</text>
+    </view>
+
     <!-- 未绑定 / 邀请中：只留一张邀请卡，其他卡片进去也是空态（文档 9.12） -->
     <view class="dk-card invite-card dk-card--tilt-l" wx:if="{{!home.couple}}">
       <view class="dk-tape"></view>

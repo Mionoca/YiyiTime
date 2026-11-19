@@ -7,6 +7,30 @@ const MOODS = [
   { key: 'thunder', label: '雷', emoji: '⛈️', color: '#6C6A8A' },
 ];
 
+/**
+ * 手帐日记的心情分值（M13，文档 8.4 `mood-scale`）：1–5，emoji 与文字必须同时出现（8.9）。
+ * 颜色只用于格子底色与角标，文字一律 --ink 压在浅色格上。
+ */
+// 五档色与 styles/tokens.wxss 的 --mood-1..5 一一对应（wxss 变量 JS 读不到，色值只能各存一份，改色两处一起改）
+const MOOD_SCALE = [
+  { score: 1, label: '很低落', emoji: '😞', color: '#B9C0CA' },
+  { score: 2, label: '低落', emoji: '😔', color: '#A9C6D8' },
+  { score: 3, label: '一般', emoji: '😐', color: '#D9D2B6' },
+  { score: 4, label: '不错', emoji: '🙂', color: '#FFE08A' },
+  { score: 5, label: '很开心', emoji: '😊', color: '#FFD93D' },
+];
+
+/**
+ * 日记可见性与延迟解锁（M13，文档 5.3.7 / 8.3.3）。
+ * 默认值只能是 private / day：客户端的初始值也照此写，服务端仍会再兜一次。
+ */
+const DIARY_VISIBILITY = { private: 'private', partner: 'partner' };
+const DIARY_UNLOCK_MODES = [
+  { key: 'immediate', label: '立即' },
+  { key: 'day', label: '明天 00:00' },
+  { key: 'week', label: '7 天后' },
+];
+
 const ROUTES = {
   home: '/pages/home/index',
   bind: '/pages/bind/index',
@@ -38,7 +62,9 @@ const LIMITS = {
   nickname: 12,
   moodNote: 50,
   safetyNote: 50,
-  diary: 200,
+  // 手帐日记（M13，文档 5.3.7 / 6.5）：正文 ≤500 字、配图 ≤3 张
+  diary: 500,
+  diaryImages: 3,
   wishTitle: 30,
   wishNote: 100,
   wishCount: 100,
@@ -87,5 +113,15 @@ const GROWTH_CATEGORIES = [
 const DEFAULT_AVATAR = '/images/avatars/default.png';
 
 module.exports = {
-  MOODS, ROUTES, TAB_ROUTES, isTabRoute, LIMITS, LEDGER_CATEGORIES, GROWTH_CATEGORIES, DEFAULT_AVATAR,
+  MOODS,
+  MOOD_SCALE,
+  DIARY_VISIBILITY,
+  DIARY_UNLOCK_MODES,
+  ROUTES,
+  TAB_ROUTES,
+  isTabRoute,
+  LIMITS,
+  LEDGER_CATEGORIES,
+  GROWTH_CATEGORIES,
+  DEFAULT_AVATAR,
 };

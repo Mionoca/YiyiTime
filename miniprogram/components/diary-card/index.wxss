@@ -1,16 +1,33 @@
-/* 日记卡：涂鸦便签（文档 8.7） */
+/* 手帐日记卡（文档 8.7 / 8.7.1）：纸纹底 + 虚线边 + 彩影，正文用楷体栈 */
 .dc {
-  margin-bottom: 24rpx;
-  padding: 28rpx 28rpx 24rpx;
+  position: relative;
+  margin-bottom: 28rpx;
+  padding: 32rpx 30rpx 26rpx;
   background-color: var(--card);
+  background-image: url('../../images/paper-fiber.png');
+  background-repeat: repeat;
   border: 3rpx dashed var(--line);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
 }
 
-/* 今天的日记：换成马克笔红硬阴影，一眼能认出 */
+/* 今天的日记：换成马克笔红硬阴影，一眼能认出（贴纸只在今天这张，同屏 ≤3 个） */
 .dc--today {
   box-shadow: 8rpx 8rpx 0 var(--marker-red);
+}
+
+/* 装饰胶带：半透明黄、轻微旋转，永远不吃点击 */
+.dc__tape {
+  position: absolute;
+  top: -14rpx;
+  left: 36rpx;
+  width: 96rpx;
+  height: 26rpx;
+  background-color: rgba(255, 217, 61, 0.7);
+  border-left: 2rpx dashed rgba(44, 44, 44, 0.35);
+  border-right: 2rpx dashed rgba(44, 44, 44, 0.35);
+  transform: rotate(-4deg);
+  pointer-events: none;
 }
 
 /* 日记解锁微光：opacity + 轻微上移，400ms 一次（文档 9.7） */
@@ -33,20 +50,49 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20rpx;
+  margin-bottom: 18rpx;
   padding-bottom: 12rpx;
   border-bottom: 2rpx dashed var(--ink-faint);
 }
 
 .dc__date {
-  font-size: var(--font-sm);
-  color: var(--muted);
-  letter-spacing: 1rpx;
+  font-family: var(--font-hand);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 2rpx;
 }
 
 .dc--today .dc__date {
   color: var(--accent-ink);
-  font-weight: 800;
+}
+
+.dc__marks {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+/* 可见性标签：方角小标签，文字说清是「给他看」还是「仅自己」 */
+.dc__share,
+.dc__privacy {
+  padding: 2rpx 12rpx;
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dc__share {
+  background-color: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+}
+
+.dc__privacy {
+  background-color: transparent;
+  color: var(--muted);
 }
 
 .dc__lock {
@@ -54,7 +100,7 @@
 }
 
 .dc__block {
-  padding: 16rpx 0;
+  padding: 14rpx 0;
 }
 
 .dc__block--partner {
@@ -63,7 +109,9 @@
 
 .dc__who {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
   margin-bottom: 10rpx;
 }
 
@@ -85,15 +133,25 @@
 }
 
 .dc__time {
-  margin-left: 12rpx;
   font-size: var(--font-xs);
   color: var(--muted);
 }
 
-.dc__text {
-  font-size: var(--font-md);
+/* 分值角标：数字 + 文字都在，颜色只做底（8.9） */
+.dc__mood {
+  padding: 2rpx 12rpx;
+  border: 2rpx dashed var(--ink);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
+  font-weight: 700;
   color: var(--ink);
-  line-height: 1.7;
+}
+
+.dc__text {
+  font-family: var(--font-hand);
+  font-size: 30rpx;
+  color: var(--ink);
+  line-height: 1.8;
   word-break: break-all;
   white-space: pre-wrap;
 }
@@ -107,4 +165,19 @@
   font-size: var(--font-md);
   color: var(--muted);
   line-height: 1.6;
+}
+
+/* 配图：一行最多三张，方角、虚线边，与纸同色底 */
+.dc__pics {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.dc__pic {
+  width: 180rpx;
+  height: 180rpx;
+  background-color: var(--wall);
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
 }

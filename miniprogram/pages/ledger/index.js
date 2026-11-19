@@ -52,6 +52,13 @@ Page({
     groups: [],
     summaryText: '¥0.00',
     summaryCount: 0,
+    // 账本查看授权（M13，文档 7.19 / 8.3.8）：默认互不可见，申请 + 主人批准后才有 permission
+    access: null,          // { status, scope, expiresAt, requestedAt }
+    accessBusy: false,
+    incoming: [],          // 我是主人、待我处理的申请
+    outgoing: [],          // 我是申请人、等对方处理
+    granted: [],           // 我已授权的记录（可收回）
+    scopeChoice: 'temp',
     todayKey: '',
     maxDate: '',
     categories: constants.LEDGER_CATEGORIES,
@@ -77,13 +84,16 @@ Page({
       this._firstShow = false;
       return;
     }
-    if (this._loaded) this.load(true);
+    if (this._loaded) {
+      this.load(true);
+      this.loadAccess();
+    }
   },
 
   onPullDownRefresh() {
     // 文档 L637：子页支持下拉刷新；成功失败都收起转圈
     const stop = () => wx.stopPullDownRefresh();
-    this.load(true).then(stop, stop);
+    return Promise.all([this.load(true), this.loadAccess()]).then(stop, stop);
   },
 
   onUnload() {
@@ -173,6 +183,8 @@ Page({
         // 未绑定（还没住进来 / 已经解绑）时只给自己的账本，不留一个点不动的「TA 的」
         const bound = res && res.bound !== undefined ? !!res.bound : true;
 
+        // M13：partner 视角带 permission（none/pending/approved/expired），me 视角恒为 null
+        const access = res && res.permission ? res.permission : null;
         this._loaded = true;
         this.setData({
           loading: false,
@@ -181,6 +193,7 @@ Page({
           todayKey,
           maxDate: todayKey,
           bound,
+          access,
           who: bound ? this.data.who : 'me',
           month,
           monthText: timeUtil.formatMonthCN(month),
@@ -191,6 +204,11 @@ Page({
           summaryCount: summary.count || 0,
           groups: this.decorate((res && res.items) || [], todayKey),
         });
+        // 主人视角的待办与已授权名单（一次请求）；未绑定没有可申请的对方，跳过
+        if (bound && !this._accessLoaded) {
+          this._accessLoaded = true;
+          this.loadAccess();
+        }
       } catch (err) {
         if (stale()) return;
         if (err && err.code === 'NOT_BOUND') {
@@ -242,10 +260,12 @@ Page({
       summaryCount: 0,
       summaryLabel: who === 'me' ? '我这个月花了' : this.data.partnerName + '这个月花了',
       listError: '',
+      access: null,
       formOpen: false,
       editing: false,
     });
     this.load(false, true);
+    this.loadAccess();
   },
 
   /** 只改月份本身：合计与翻页态立刻重置，不等请求回来（失败时也不会卡在上个月翻不回来） */
@@ -452,6 +472,135 @@ Page({
     } catch (err) {
       if (this._unloaded) return;
       this.setData({ saving: false });
+      api.showError(err);
+    }
+  },
+
+  // ── 账本查看授权（M13，文档 7.19 / 8.3.8）────────────────────
+  /** 一次拿全双方视角：待我处理 / 我等对方 / 我已授权 / 我能看谁 */
+  async loadAccess() {
+    if (!this.data.bound) {
+      this.setData({ incoming: [], outgoing: [], granted: [], canViewPartner: false });
+      return;
+    }
+    try {
+      const res = await api.call('ledger.viewRequests');
+      if (this._unloaded) return;
+      this.setData({
+        incoming: this.decorateRequests(res && res.incoming),
+        outgoing: this.decorateRequests(res && res.outgoing),
+        granted: this.decorateRequests(res && res.granted),
+      });
+    } catch (err) {
+      // 授权摘要失败不影响账本本身：锁态文案仍由 ledger.list 的 permission 决定
+    }
+  },
+
+  decorateRequests(list) {
+    const todayKey = this.data.todayKey || timeUtil.todayKey();
+    return (list || []).map((item) => ({
+      requestId: item.requestId,
+      status: item.status,
+      scope: item.scope,
+      scopeText: item.scope === 'permanent' ? '一直可以看' : '临时 24 小时',
+      requestedText: item.requestedAt ? timeUtil.formatTime(item.requestedAt, todayKey) : '',
+      expiresText: item.expiresAt ? timeUtil.formatTime(item.expiresAt, todayKey) + ' 到期' : '',
+      otherName: (item.other && item.other.nickname) || 'TA',
+    }));
+  },
+
+  onScopeChange(e) {
+    const scope = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.scope) === 'permanent'
+      ? 'permanent' : 'temp';
+    this.setData({ scopeChoice: scope });
+  },
+
+  /** 向对方申请查看（临时 / 永久） */
+  async onRequestView() {
+    if (this.data.accessBusy) return;
+    this.setData({ accessBusy: true });
+    try {
+      await api.call('ledger.requestView', { scope: this.data.scopeChoice });
+      if (this._unloaded) return;
+      this.setData({ accessBusy: false });
+      this.toast('申请发出去啦，等 TA 同意');
+      await Promise.all([this.load(true, true), this.loadAccess()]);
+    } catch (err) {
+      if (this._unloaded) return;
+      this.setData({ accessBusy: false });
+      api.showError(err);
+    }
+  },
+
+  /** 撤回自己还没被处理的申请 */
+  async onCancelView() {
+    if (this.data.accessBusy) return;
+    const target = (this.data.outgoing || [])[0];
+    if (!target) return;
+    this.setData({ accessBusy: true });
+    try {
+      await api.call('ledger.cancelView', { requestId: target.requestId });
+      if (this._unloaded) return;
+      this.setData({ accessBusy: false });
+      this.toast('申请撤回啦');
+      await Promise.all([this.load(true, true), this.loadAccess()]);
+    } catch (err) {
+      if (this._unloaded) return;
+      this.setData({ accessBusy: false });
+      api.showError(err);
+    }
+  },
+
+  /** 主人处理申请：同意 / 拒绝 */
+  async onDecideView(e) {
+    if (this.data.accessBusy) return;
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const requestId = ds.id;
+    const approve = String(ds.approve) === '1';
+    if (!requestId) return;
+    this.setData({ accessBusy: true });
+    try {
+      await api.call('ledger.decideView', { requestId, approve });
+      if (this._unloaded) return;
+      this.setData({ accessBusy: false });
+      this.toast(approve ? '同意啦，只有查看权限' : '已经拒绝');
+      await Promise.all([this.load(true, true), this.loadAccess()]);
+    } catch (err) {
+      if (this._unloaded) return;
+      this.setData({ accessBusy: false });
+      api.showError(err);
+    }
+  },
+
+  /** 主人收回已经给出的权限：二次确认，避免误点 */
+  onRevokeView(e) {
+    if (this.data.accessBusy) return;
+    const requestId = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id;
+    if (!requestId) return;
+    wx.showModal({
+      title: '收回查看权限？',
+      content: '收回后 TA 就看不到你的账本了，随时可以再同意。',
+      confirmText: '收回',
+      cancelText: '再想想',
+      success: (res) => {
+        if (this._unloaded) return;
+        if (res && res.confirm) this.revokeView(requestId);
+      },
+    });
+  },
+
+  async revokeView(requestId) {
+    if (this.data.accessBusy) return;
+    this.setData({ accessBusy: true });
+    try {
+      await api.call('ledger.revokeView', { requestId });
+      if (this._unloaded) return;
+      this.setData({ accessBusy: false });
+      this.toast('已经收回');
+      await this.loadAccess();
+    } catch (err) {
+      if (this._unloaded) return;
+      this.setData({ accessBusy: false });
       api.showError(err);
     }
   },

@@ -1,0 +1,63 @@
+/* 心情分值 1–5（文档 8.4 / 8.7.1）：方角 + 虚线边，颜色只做底色 */
+.ms {
+  display: flex;
+  gap: 10rpx;
+}
+
+.ms__cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 118rpx;
+  padding: 8rpx 4rpx;
+  border: 2rpx dashed var(--ink);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  box-shadow: 4rpx 4rpx 0 var(--ink-faint);
+  transition: transform 150ms linear;
+}
+
+.ms__cell--on {
+  border-width: 3rpx;
+  box-shadow: 4rpx 4rpx 0 var(--ink);
+  transform: translate(-1rpx, -1rpx);
+}
+
+.ms__cell:active {
+  transform: translate(2rpx, 2rpx);
+}
+
+.ms--readonly .ms__cell {
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.ms--readonly .ms__cell--on {
+  opacity: 1;
+  box-shadow: 2rpx 2rpx 0 var(--ink-faint);
+}
+
+.ms__emoji {
+  font-size: 30rpx;
+  line-height: 1.2;
+}
+
+.ms__score {
+  font-size: var(--font-xs);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ms__label {
+  font-size: 20rpx;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.ms__readonly-text {
+  margin-top: 10rpx;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}

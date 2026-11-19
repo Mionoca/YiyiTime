@@ -34,7 +34,7 @@ function sdk() {
 
 /** v2 的 scene：1 资料 / 2 评论 / 3 论坛 / 4 社交日志。字段性质不同，选的 scene 也不同 */
 const SCENE = { profile: 1, comment: 2, forum: 3, social: 4 };
-/** v2 单次上限 2500 字；我们的字段最长 200，这里只是防御 */
+/** v2 单次上限 2500 字；我们的字段最长 500（M13 手帐日记），这里只是防御 */
 const MAX_LEN = 2500;
 /** 审核是「附加」检查，不能让它拖住写操作；超时就当不可用处理 */
 const TIMEOUT_MS = 1500;
@@ -148,4 +148,96 @@ async function assertText(ctx, text, scene) {
   }
 }
 
-module.exports = { assertText, SCENE };
+/**
+ * M13 日记配图送审（文档 7.10 / 11.7）：
+ * - 逐张 `cloud.downloadFile` → `security.imgSecCheck`；`risky`（errCode 87014）→ 拦（CONTENT_RISKY）；
+ * - 接口不可用 / 下载失败 / 超时 / 超过 1MB / 类型不支持 → 放行并记日志（fail-open，与文本同一口径：
+ *   内容只在两个人之间，审核抖动不能堵死写日记；客户端上传前已压缩，>1MB 属异常情况）；
+ * - 与 assertText 一样只记原因与长度，不把 fileID 全量写日志。
+ */
+const IMAGE_TYPES = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+  webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp',
+};
+const IMAGE_MAX_BYTES = 1024 * 1024;
+
+function imageContentTypeOf(fileID) {
+  const path = String(fileID).split('?')[0];
+  const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
+  return IMAGE_TYPES[ext] || null;
+}
+
+async function checkOneImage(ctx, fileID) {
+  const cloud = sdk();
+  const imgAvailable = !!(cloud
+    && typeof cloud.downloadFile === 'function'
+    && cloud.openapi && cloud.openapi.security
+    && typeof cloud.openapi.security.imgSecCheck === 'function');
+  // 本地单测没有 wx-server-sdk：预期情形，不记日志
+  if (!cloud) return;
+  if (!imgAvailable) {
+    warn('img-openapi-unavailable', { length: String(fileID).length });
+    return;
+  }
+
+  const contentType = imageContentTypeOf(fileID);
+  if (!contentType) {
+    warn('img-type-unsupported', { ext: String(fileID).slice(-6) });
+    return;
+  }
+
+  let download = null;
+  try {
+    download = await withTimeout(cloud.downloadFile({ fileID }), TIMEOUT_MS);
+  } catch (err) {
+    warn('img-download-failed', { code: String((err && (err.errCode || err.code)) || 'unknown') });
+    return;
+  }
+  const buffer = download && download.fileContent;
+  if (!buffer || !buffer.length) {
+    warn('img-empty', {});
+    return;
+  }
+  if (buffer.length > IMAGE_MAX_BYTES) {
+    warn('img-too-large', { size: buffer.length });
+    return;
+  }
+
+  let res = null;
+  try {
+    res = await withTimeout(sdk().openapi.security.imgSecCheck({
+      media: { contentType, value: buffer },
+    }), TIMEOUT_MS);
+  } catch (err) {
+    // imgSecCheck 违规（87014）时云调用会 throw：必须先拦，再谈 fail-open
+    const errCode = Number(err && (err.errCode || err.code));
+    if (RISKY_ERR_CODES.indexOf(errCode) !== -1) {
+      warn('img-blocked-by-errcode', { code: String(errCode) });
+      throw new AppError('CONTENT_RISKY', '这张配图可能不太合适，换一张试试');
+    }
+    warn('img-call-failed', { code: String(errCode || 'unknown') });
+    return;
+  }
+
+  const errCode = Number(res && res.errCode);
+  if (errCode !== 0) {
+    if (RISKY_ERR_CODES.indexOf(errCode) !== -1) {
+      warn('img-blocked-by-errcode', { code: String(errCode) });
+      throw new AppError('CONTENT_RISKY', '这张配图可能不太合适，换一张试试');
+    }
+    warn('img-api-error', { code: String(errCode) });
+  }
+  // imgSecCheck v1 没有 suggest 字段：errCode 0 即通过
+}
+
+/** 校验一组配图（≤3 由 handler 先校验数量）。空数组直接跳过，不发起任何调用。 */
+async function assertImages(ctx, images) {
+  const list = Array.isArray(images) ? images : [];
+  const openid = (ctx && ctx.openid) || '';
+  if (!list.length || !openid) return;
+  for (const fileID of list) {
+    await checkOneImage(ctx, fileID);
+  }
+}
+
+module.exports = { assertText, assertImages, SCENE };

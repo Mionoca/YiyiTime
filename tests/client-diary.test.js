@@ -127,14 +127,19 @@ test('diary: 同一天静默刷新不覆盖正在输入的草稿', async () => {
   }
 });
 
-test('diary: 保存成功后把今天卡片写回列表并提示明天可见', async () => {
+test('diary: 保存成功后把今天卡片写回列表，私密保存提示「只有你看过」', async () => {
   const today = tomorrowKey();
   const { page, toasts, calls } = setup({
     'diary.list': () => listRes({ todayKey: today, items: [] }),
     'diary.save': (payload) => {
       assert.strictEqual(payload.content, '晚安');
+      assert.strictEqual(payload.visibility, 'private', '默认必须发私密（服务端仍会兜底）');
+      assert.strictEqual(payload.moodScore, undefined, '没选心情就不传，服务端存 null');
       return {
-        diary: { date: today, content: '晚安', unlockAt: today + 'T16:00:00.000Z', updatedAt: 'u2' },
+        diary: {
+          date: today, content: '晚安', moodScore: null, images: [], visibility: 'private',
+          unlockMode: 'day', unlockAt: today + 'T16:00:00.000Z', updatedAt: 'u2',
+        },
       };
     },
   });
@@ -146,7 +151,7 @@ test('diary: 保存成功后把今天卡片写回列表并提示明天可见', a
     assert.strictEqual(page.data.items.length, 1);
     assert.strictEqual(page.data.items[0].date, today);
     assert.strictEqual(page.data.items[0].mine.content, '晚安');
-    assert.ok(toasts.some((t) => t.title === '明天 TA 才能看到'));
+    assert.ok(toasts.some((t) => t.title === '收好了，只有你看过'));
     assert.ok(calls.some((c) => c.action === 'diary.save'));
   } finally {
     restoreWx();
@@ -417,4 +422,57 @@ test('diary: 模板里的底部重试入口真实绑定且排在翻页提示之�
   assert.ok(listErrorAt > loadingMoreAt, '重试入口排在翻页提示之后');
   const wxss = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/diary/index.wxss'), 'utf8');
   assert.ok(/\.hint--error\s*\{[^}]*var\(--accent-(ink|strong)/.test(wxss), '重试文案用深色 token 保证对比度');
+});
+
+// 文档 5.3.7：已解锁的日记当天不能再改。immediate 档保存即解锁，
+// 编辑器要提前说明，而不是让用户写完一屏再被 DIARY_LOCKED 拒掉
+test('diary: immediate 档当天已解锁 → 编辑器只读，onSave 不发请求', async () => {
+  const today = tomorrowKey();
+  const { page, calls, toasts } = setup({
+    'diary.list': () =>
+      listRes({
+        todayKey: today,
+        items: [{
+          date: today,
+          unlockAt: 'x',
+          mine: { content: '已经给 TA 看了', unlockMode: 'immediate', visibility: 'partner' },
+          partner: null,
+        }],
+      }),
+  });
+  try {
+    await page.load();
+    assert.strictEqual(page.data.lockedToday, true);
+    assert.strictEqual(page.data.shared, true, '已分享的开关状态仍要正确回填');
+    const before = calls.length;
+    await page.onSave();
+    assert.strictEqual(calls.length, before, '只读时不能发 diary.save');
+    assert.strictEqual(toasts[toasts.length - 1].title, '这篇已经给 TA 看过了，改不了');
+  } finally {
+    restoreWx();
+  }
+});
+
+test('diary: day / week 档当天仍可编辑（只有 immediate 会当天解锁）', async () => {
+  for (const unlockMode of ['day', 'week']) {
+    const today = tomorrowKey();
+    const { page } = setup({
+      'diary.list': () =>
+        listRes({
+          todayKey: today,
+          items: [{
+            date: today,
+            unlockAt: 'x',
+            mine: { content: '还没解锁', unlockMode, visibility: 'partner' },
+            partner: null,
+          }],
+        }),
+    });
+    try {
+      await page.load();
+      assert.strictEqual(page.data.lockedToday, false, unlockMode + ' 档不该锁编辑器');
+    } finally {
+      restoreWx();
+    }
+  }
 });

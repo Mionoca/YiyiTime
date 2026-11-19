@@ -116,8 +116,46 @@ async function uploadAvatar(filePath) {
   return res.fileID;
 }
 
+/** 日记配图（M13，文档 7.10 / 11.7）：路径 diary/{coupleId}/{date}/，文件名 {ts}-{rand}.{ext} */
+const MAX_DIARY_BYTES = 5 * 1024 * 1024;
+const DIARY_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+
+async function uploadDiaryImage(filePath, options) {
+  if (!filePath) throw Object.assign(new Error('图片文件不存在'), { code: 'DIARY_IMAGE_INVALID' });
+  const opts = options || {};
+  const ext = extensionOf(filePath);
+  if (ext && DIARY_EXTENSIONS.indexOf(ext) === -1) {
+    throw Object.assign(new Error('配图只支持 JPG / PNG / WebP'), { code: 'DIARY_IMAGE_INVALID' });
+  }
+  const size = await getFileSize(filePath);
+  if (size !== null && size > MAX_DIARY_BYTES) {
+    // 客户端码：超限只在上传前本地拦，服务端不重复关心体积（只校验 fileID 形态）
+    throw Object.assign(new Error('图片超过 5MB，换一张试试'), { code: 'DIARY_IMAGE_TOO_LARGE' });
+  }
+  const src = await compressImage(filePath);
+  const srcExt = extensionOf(src);
+  const finalExt = DIARY_EXTENSIONS.indexOf(srcExt) >= 0 ? srcExt : 'jpg';
+  const safeCouple = String(opts.coupleId || 'solo').replace(/[^a-zA-Z0-9_]/g, '');
+  const date = String(opts.date || '').replace(/[^0-9-]/g, '') || 'day';
+  const cloudPath = 'diary/' + safeCouple + '/' + date + '/'
+    + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + finalExt;
+  const res = await wx.cloud.uploadFile({ cloudPath, filePath: src });
+  if (!res || !res.fileID) {
+    throw Object.assign(new Error('图片上传失败，再试一次'), { code: 'DIARY_IMAGE_UPLOAD_FAILED' });
+  }
+  return res.fileID;
+}
+
+/** 是否是配图校验错误（页面据此给出具体文案，而不是笼统的「上传失败」） */
+function isDiaryImageError(err) {
+  return !!(err && ['DIARY_IMAGE_INVALID', 'DIARY_IMAGE_TOO_LARGE', 'DIARY_IMAGE_UPLOAD_FAILED'].indexOf(err.code) >= 0);
+}
+
 module.exports = {
   uploadAvatar,
+  uploadDiaryImage,
   isAvatarValidationError,
+  isDiaryImageError,
   MAX_AVATAR_BYTES,
+  MAX_DIARY_BYTES,
 };

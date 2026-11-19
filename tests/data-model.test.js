@@ -20,6 +20,7 @@ const DOC_PATH = path.join(__dirname, '..', 'docs', '技术设计文档.md');
 const COLLECTIONS = [
   'users', 'couples', 'bind_invites', 'moods',
   'anniversaries', 'safety_checkins', 'diaries', 'wishes', 'ledger_entries',
+  'ledger_view_grants',
 ];
 
 function stripTicks(text) {
@@ -32,7 +33,8 @@ function parseSchema(text) {
   const schema = Object.create(null);
   let current = null;
   for (const line of lines) {
-    const heading = line.match(/^#### 5\.3\.\d+ \u0060([a-z_]+)\u0060$/);
+    // 标题可能带迭代后缀，如 `#### 5.3.7 \`diaries\`（M13 手帐日记）`
+    const heading = line.match(/^#### 5\.3\.\d+ \u0060([a-z_]+)\u0060/);
     if (heading) {
       current = { fields: Object.create(null), order: [] };
       schema[heading[1]] = current;
@@ -76,10 +78,10 @@ function typeMatches(type, value) {
     if (part === 'number') return typeof value === 'number' && Number.isFinite(value);
     if (part === 'boolean') return typeof value === 'boolean';
     if (part === 'Date') return isDate(value);
-    const arr = part.match(/^string\[(\d+)\]$/);
+    const arr = part.match(/^string\[(\d*)\]$/);
     if (arr) {
-      return Array.isArray(value) && value.length === Number(arr[1])
-        && value.every((item) => typeof item === 'string');
+      return Array.isArray(value) && value.every((item) => typeof item === 'string')
+        && (arr[1] === '' || value.length === Number(arr[1]));
     }
     throw new Error('schema: 未识别的字段类型 ' + part);
   });
@@ -138,6 +140,9 @@ async function runHappyFlow(h) {
   await call(A, 'wish.update', { wishId, title: '去看海吧' });
   await call(A, 'wish.setDone', { wishId, done: true });
   await call(A, 'ledger.add', { amount: 2350, category: 'food', note: '牛肉面' });
+  // M13：账本默认互不可见，走一次申请 + 批准，让 ledger_view_grants 也落盘
+  const request = await call(A, 'ledger.requestView', { scope: 'temp' });
+  await call(B, 'ledger.decideView', { requestId: request.request.requestId, approve: true });
   return { A, B };
 }
 

@@ -1,24 +1,68 @@
 <view wx:if="{{item}}" class="dc {{isToday ? 'dc--today' : ''}} {{unlockedGlow ? 'dc--glow' : ''}}">
+  <view wx:if="{{isToday}}" class="dc__tape" aria-hidden="true"></view>
+
   <view class="dc__head">
     <text class="dc__date">{{dateLabel}}</text>
-    <text wx:if="{{partnerLocked}}" class="dc__lock" aria-label="TA 的日记还没解锁">🔒</text>
+    <view class="dc__marks">
+      <text wx:if="{{mineShared}}" class="dc__share">给他看</text>
+      <text wx:elif="{{item.mine}}" class="dc__privacy">仅自己</text>
+      <text wx:if="{{partnerLocked}}" class="dc__lock" aria-label="TA 的日记还没解锁">🔒</text>
+    </view>
   </view>
 
   <view class="dc__block">
     <view class="dc__who">
       <text class="dc__tag">我</text>
       <text wx:if="{{mineTimeText}}" class="dc__time">{{mineTimeText}}</text>
+      <text
+        wx:if="{{mineMoodScore}}"
+        class="dc__mood"
+        style="background-color: {{mineMoodColor}}"
+      >{{mineMoodScore}} · {{mineMoodLabel}}</text>
     </view>
     <view wx:if="{{mineText}}" class="dc__text">{{mineText}}</view>
     <view wx:else class="dc__empty">{{mineEmptyText}}</view>
+    <view wx:if="{{mineImages.length}}" class="dc__pics">
+      <image
+        wx:for="{{mineImages}}"
+        wx:key="*this"
+        class="dc__pic"
+        src="{{item}}"
+        mode="aspectFill"
+        data-who="mine"
+        data-index="{{index}}"
+        bindtap="onPreview"
+        aria-label="我的第 {{index + 1}} 张配图"
+      />
+    </view>
   </view>
 
   <view class="dc__block dc__block--partner">
     <view class="dc__who">
       <text class="dc__tag dc__tag--partner">TA</text>
+      <text
+        wx:if="{{partnerMoodScore}}"
+        class="dc__mood"
+        style="background-color: {{partnerMoodColor}}"
+      >{{partnerMoodScore}} · {{partnerMoodLabel}}</text>
     </view>
     <view wx:if="{{partnerLocked}}" class="dc__locktext">{{partnerLockText}}</view>
-    <view wx:elif="{{partnerText}}" class="dc__text">{{partnerText}}</view>
+    <block wx:elif="{{partnerText}}">
+      <view class="dc__text">{{partnerText}}</view>
+      <view wx:if="{{partnerImages.length}}" class="dc__pics">
+        <image
+          wx:for="{{partnerImages}}"
+          wx:key="*this"
+          class="dc__pic"
+          src="{{item}}"
+          mode="aspectFill"
+          data-who="partner"
+          data-index="{{index}}"
+          bindtap="onPreview"
+          aria-label="TA 的第 {{index + 1}} 张配图"
+        />
+      </view>
+    </block>
     <view wx:else class="dc__empty">{{partnerEmptyText}}</view>
   </view>
 </view>

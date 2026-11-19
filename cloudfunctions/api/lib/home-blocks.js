@@ -5,6 +5,7 @@ const relation = require('./relation');
 const anniversaryHandler = require('../handlers/anniversary');
 const pauseHandler = require('../handlers/pause');
 const growthHandler = require('../handlers/growth');
+const ledgerAccess = require('../handlers/ledger-access');
 
 const iso = relation.iso;
 /** 自定义纪念日上限（文档 5.3.5）：与 handlers/anniversary.js 同源，避免两处常量漂移 */
@@ -89,8 +90,9 @@ async function loadSafety(ctx, coupleId, todayKey, partnerOpenid) {
 }
 
 /**
- * 日记聚合（文档 7.8）：今天两人是否已写 + 解锁时刻。
- * 今天写的日记要到次日 00:00 才解锁，所以 partnerUnlocked 今天恒为 false。
+ * 日记聚合（文档 7.8 / 5.3.7 M13）：今天两人是否已写 + 解锁时刻。
+ * 隐私红线：对方的记录只有 visibility=partner 才算「写过」；私密日记按不存在处理，
+ * 它的 unlockAt 也不能泄露（拿不到已分享记录时退回默认次日 00:00）。
  */
 async function loadDiary(ctx, coupleId, todayKey, partnerOpenid) {
   const res = await ctx.db.collection('diaries')
@@ -98,13 +100,18 @@ async function loadDiary(ctx, coupleId, todayKey, partnerOpenid) {
     .limit(2)
     .get();
   const docs = (res && res.data) || [];
-  const mineWritten = docs.some((doc) => doc.authorOpenid === ctx.openid);
-  const partnerWritten = partnerOpenid
-    ? docs.some((doc) => doc.authorOpenid === partnerOpenid)
-    : false;
-  const unlockAt = time.nextUnlockAt(todayKey);
+  const mineDoc = docs.find((doc) => doc.authorOpenid === ctx.openid) || null;
+  const partnerDoc = partnerOpenid
+    ? docs.find((doc) => doc.authorOpenid === partnerOpenid && doc.visibility === 'partner') || null
+    : null;
+  const mineWritten = !!mineDoc;
+  const partnerWritten = !!partnerDoc;
+  // 解锁时刻：优先自己那篇（自己永远知道自己的），否则用已分享的那篇；都没有 → 默认次日 00:00
+  const unlockAt = (mineDoc && mineDoc.unlockAt)
+    || (partnerDoc && partnerDoc.unlockAt)
+    || time.nextUnlockAt(todayKey);
   const unlockMs = time.toMillis(unlockAt);
-  // 跨天刷新后 todayKey 变化时这里自然变成 true（当天写入的日记当天永远看不到）
+  // immediate 当天即可见；day 模式当天写入的日记当天永远看不到（跨天刷新后 todayKey 变化，这里自然变 true）
   const partnerUnlocked = partnerWritten
     && Number.isFinite(unlockMs)
     && ctx.now.getTime() >= unlockMs;
@@ -115,6 +122,14 @@ async function loadDiary(ctx, coupleId, todayKey, partnerOpenid) {
     partnerUnlocked,
     unlockAt: iso(unlockAt),
   };
+}
+
+/**
+ * 账本授权摘要（文档 7.8 / 7.19 M13）：一次查询算三个数（待我处理 / 我已授权 / 我能不能看）。
+ * 首页只渲染 pendingIncoming > 0 的提示条，其余字段给记账本 tab 的角标 / 文案备用。
+ */
+async function loadLedgerAccess(ctx) {
+  return ledgerAccess.homeAccess(ctx);
 }
 
 /**
@@ -179,5 +194,5 @@ async function optionalBlock(ctx, name, task) {
 
 module.exports = {
   loadMood, loadAnniversary, loadSafety, loadDiary, loadWish, loadPause, loadGrowth,
-  optionalBlock, iso,
+  loadLedgerAccess, optionalBlock, iso,
 };

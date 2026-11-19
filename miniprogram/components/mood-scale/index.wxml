@@ -1,0 +1,18 @@
+<view class="ms {{readonly ? 'ms--readonly' : ''}}" aria-role="group" aria-label="今天的心情分值">
+  <view
+    wx:for="{{items}}"
+    wx:key="score"
+    class="ms__cell {{item.on ? 'ms__cell--on' : ''}}"
+    style="background-color: {{item.color}}"
+    data-score="{{item.score}}"
+    bindtap="onTap"
+    aria-role="button"
+    aria-label="{{item.score}} 分，{{item.label}}"
+    aria-pressed="{{item.on}}"
+  >
+    <text class="ms__emoji">{{item.emoji}}</text>
+    <text class="ms__score">{{item.score}}</text>
+    <text class="ms__label">{{item.label}}</text>
+  </view>
+</view>
+<view wx:if="{{readonly && currentLabel}}" class="ms__readonly-text">那天心情：{{currentLabel}}</view>

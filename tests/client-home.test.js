@@ -871,3 +871,48 @@ test('home wxml: 成长卡是条件卡且不进四宫格（M11.4 / 文档 9.2）
   const gridEnd = wxml.indexOf('<!-- 3.5 成长卡');
   assert.ok(gridStart > 0 && gridEnd > gridStart, '成长卡应排在四宫格之后');
 });
+
+/* M13 账本申请提示条（文档 9.2 第 0.6 位 / 7.19）：TA 申请看我的账本，点了去「记账本」 */
+test('home: TA 申请看账本时出现提示条，点了 switchTab 去记账本', async () => {
+  const { page, navs } = setup(
+    {
+      'home.get': () => baseHome({
+        ledgerAccess: { pendingIncoming: 1, approvedIncoming: 0, canViewPartner: false },
+      }),
+    },
+    { nextTick: (fn) => fn() }
+  );
+  try {
+    page.onShow();
+    await page.loadingPromise;
+    assert.strictEqual(page.data.ledgerNotice, true);
+    assert.match(page.data.ledgerNoticeText, /TA 想看看你的账本/);
+    page.onTapLedgerNotice();
+    assert.deepStrictEqual(navs, [{ kind: 'switchTab', url: constants.ROUTES.ledger }]);
+    await new Promise((r) => setTimeout(r, 50));
+  } finally {
+    restoreWx();
+  }
+});
+
+test('home: 没有待处理申请 / 区块降级时不出现账本提示条', async () => {
+  const cases = [
+    { ledgerAccess: { pendingIncoming: 0, approvedIncoming: 1, canViewPartner: true } },
+    { ledgerAccess: null },
+  ];
+  for (const extra of cases) {
+    const { page } = setup(
+      { 'home.get': () => baseHome(extra) },
+      { nextTick: (fn) => fn() }
+    );
+    try {
+      page.onShow();
+      await page.loadingPromise;
+      assert.strictEqual(page.data.ledgerNotice, false, JSON.stringify(extra));
+      assert.strictEqual(page.data.ledgerNoticeText, '');
+      await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      restoreWx();
+    }
+  }
+});

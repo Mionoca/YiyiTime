@@ -38,6 +38,25 @@ function nextUnlockAt(dateKey) {
   return new Date(startOfDateKey(dateKey).getTime() + DAY_MS);
 }
 
+/**
+ * M13 手帐日记的三档延迟解锁（文档 5.3.7 / 7.10）：服务端唯一实现，客户端不能传 unlockAt。
+ * - immediate：保存即可见（返回当前时刻的拷贝，不把 ctx.now 引用写库）
+ * - week：保存时刻 + 7 天
+ * - day（默认）：次日 00:00 +08（与旧版语义一致）
+ */
+function unlockAtFor(mode, dateKey, now = new Date()) {
+  if (mode === 'immediate') return new Date(now.getTime());
+  if (mode === 'week') return new Date(now.getTime() + 7 * DAY_MS);
+  return nextUnlockAt(dateKey);
+}
+
+/** 'YYYY-MM' 当月最后一天的 dateKey；格式非法返回 null */
+function monthEndKey(month) {
+  if (typeof month !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null;
+  const [y, m] = month.split('-').map(Number);
+  return `${month}-${pad2(daysInMonth(y, m))}`;
+}
+
 /** 任意时刻 → 东八区 HH:mm（提醒时间用；定长字符串，字典序即时间序） */
 function hhmmOf(input = new Date()) {
   const d = new Date(input.getTime() + TZ_OFFSET_MS);
@@ -124,7 +143,8 @@ function yearlyOccurrence(date, todayKey) {
 }
 
 /** 严格校验 YYYY-MM-DD 是真实存在的日期 */
-function isValidDateKey(key) {  if (typeof key !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+function isValidDateKey(key) {
+  if (typeof key !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
   const [y, m, d] = key.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
@@ -152,6 +172,8 @@ module.exports = {
   addDays,
   daysTogether,
   nextUnlockAt,
+  unlockAtFor,
+  monthEndKey,
   hhmmOf,
   normalizeHhmm,
   phaseOf,

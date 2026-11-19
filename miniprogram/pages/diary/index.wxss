@@ -1,50 +1,226 @@
-/* 台灯下的日记：涂鸦风（文档 8.7） */
+/* 手帐日记（文档 8.7 涂鸦风 + 8.7.1 手帐分支）：纸纹、楷体、胶带、虚线边 */
 .page {
   min-height: 100vh;
-  /* tab 页底部留出 tabBar + 安全区（文档 8.2 / 9.9） */
-  padding: 24rpx 24rpx calc(140rpx + env(safe-area-inset-bottom));
+  padding: 24rpx 24rpx 64rpx;
   background-color: var(--bg);
 }
 
-/* ---------- 顶部编辑器 ---------- */
-.editor {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+/* ---------- 分段：手帐 / 心情日历 ---------- */
+.seg {
+  display: flex;
+  gap: 12rpx;
   margin-bottom: 24rpx;
-  padding: 24rpx;
+}
+
+.seg__item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
   background-color: var(--card);
+  border: 2rpx dashed var(--ink);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  color: var(--muted);
+  transition: transform 150ms linear;
+}
+
+.seg__item--on {
+  background-color: var(--wall);
+  border-width: 3rpx;
+  color: var(--ink);
+  box-shadow: 4rpx 4rpx 0 var(--marker-yellow);
+  transform: translate(-1rpx, -1rpx);
+}
+
+/* ---------- 一页手帐（编辑器） ---------- */
+.editor {
+  position: relative;
+  margin-bottom: 28rpx;
+  padding: 30rpx 26rpx 26rpx;
+  background-color: var(--card);
+  background-image: url('../../images/paper-fiber.png');
+  background-repeat: repeat;
   border: 3rpx dashed var(--line);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
 }
 
+/* 胶带：手帐页左上角，同屏只此一处（8.7.1 贴纸 ≤3） */
+.editor__tape {
+  position: absolute;
+  top: -14rpx;
+  left: 44rpx;
+  width: 108rpx;
+  height: 26rpx;
+  background-color: rgba(255, 217, 61, 0.7);
+  border-left: 2rpx dashed rgba(44, 44, 44, 0.35);
+  border-right: 2rpx dashed rgba(44, 44, 44, 0.35);
+  transform: rotate(-4deg);
+  pointer-events: none;
+}
+
+.editor__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+}
+
+.editor__title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 2rpx;
+  transform: rotate(-2deg);
+}
+
+.editor__privacy {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
 .editor__input {
   width: 100%;
-  min-height: 168rpx;
-  padding: 20rpx;
-  background-color: var(--wall);
+  min-height: 220rpx;
+  padding: 18rpx;
+  background-color: rgba(255, 254, 245, 0.6);
   border: 2rpx dashed var(--ink-faint);
   border-radius: var(--radius-sm);
-  font-size: var(--font-md);
-  line-height: 1.7;
+  font-family: var(--font-hand);
+  font-size: 30rpx;
+  line-height: 1.9;
   color: var(--ink);
 }
 
 .editor__placeholder {
-  color: var(--muted);
-}
-
-.editor__bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 16rpx;
+  color: var(--ink-faint);
 }
 
 .editor__count {
+  margin-top: 6rpx;
+  text-align: right;
   font-size: var(--font-xs);
   color: var(--muted);
+}
+
+.editor__label {
+  margin: 24rpx 0 12rpx;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+/* ---------- 配图 ---------- */
+.editor__pics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}
+
+.editor__pic-wrap {
+  position: relative;
+  width: 184rpx;
+  height: 184rpx;
+}
+
+.editor__pic {
+  width: 184rpx;
+  height: 184rpx;
+  background-color: var(--wall);
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
+}
+
+.editor__del {
+  position: absolute;
+  top: -10rpx;
+  right: -10rpx;
+  width: 44rpx;
+  height: 44rpx;
+  line-height: 40rpx;
+  text-align: center;
+  background-color: var(--card);
+  border: 2rpx dashed var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 28rpx;
+  color: var(--ink);
+}
+
+.editor__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 184rpx;
+  height: 184rpx;
+  background-color: var(--wall);
+  border: 2rpx dashed var(--ink);
+  border-radius: var(--radius-sm);
+  font-size: 44rpx;
+  color: var(--muted);
+}
+
+.editor__add--busy {
+  color: var(--ink-faint);
+}
+
+/* ---------- 可见性 ---------- */
+.editor__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 26rpx;
+  padding-top: 20rpx;
+  border-top: 2rpx dashed var(--ink-faint);
+}
+
+.editor__row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.editor__row-label {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.editor__row-desc {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.editor__modes {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.editor__mode {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80rpx;
+  background-color: var(--card);
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
+  color: var(--muted);
+  transition: transform 150ms linear;
+}
+
+.editor__mode--on {
+  background-color: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  font-weight: 700;
+  transform: translate(-1rpx, -1rpx);
 }
 
 /* 保存：墨黑实心 + 虚线边 + 马克笔红硬阴影 */
@@ -52,8 +228,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 88rpx;
-  padding: 0 40rpx;
+  min-height: 92rpx;
+  margin-top: 26rpx;
   background-color: var(--accent-strong);
   color: var(--card);
   border: 3rpx dashed var(--line);
@@ -73,6 +249,208 @@
 .editor__save--disabled {
   opacity: 0.45;
   box-shadow: none;
+}
+
+/* ---------- 心情日历 ---------- */
+.cal {
+  padding: 26rpx 22rpx 30rpx;
+  background-color: var(--card);
+  background-image: url('../../images/paper-fiber.png');
+  background-repeat: repeat;
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.cal__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.cal__month {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 2rpx;
+}
+
+.cal__nav {
+  width: 88rpx;
+  height: 88rpx;
+  line-height: 84rpx;
+  text-align: center;
+  font-size: 40rpx;
+  color: var(--ink);
+  border: 2rpx dashed var(--ink);
+  border-radius: var(--radius-sm);
+  transition: transform 150ms linear;
+}
+
+.cal__nav--off {
+  color: var(--ink-faint);
+  border-color: var(--ink-faint);
+}
+
+.cal__nav:active {
+  transform: translate(2rpx, 2rpx);
+}
+
+.cal__week {
+  display: flex;
+  margin-bottom: 8rpx;
+}
+
+.cal__weekday {
+  flex: 1;
+  text-align: center;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.cal__grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+/* 方角 + 虚线边（8.7.1 第 6 条）；宽度按 7 列算 */
+.cal__cell {
+  position: relative;
+  width: calc(100% / 7 - 6rpx);
+  height: 92rpx;
+  margin: 3rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+}
+
+.cal__cell--blank {
+  border-color: transparent;
+}
+
+.cal__cell--today {
+  border-style: solid;
+  border-color: var(--accent-ink);
+  background-color: var(--accent-soft);
+}
+
+.cal__day {
+  font-size: var(--font-sm);
+  line-height: 1.2;
+}
+
+.cal__score {
+  font-size: var(--font-xs);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+/* 今天的角标：实线小方块，文字说明「今」 */
+.cal__now {
+  position: absolute;
+  top: -12rpx;
+  right: -8rpx;
+  padding: 0 6rpx;
+  background-color: var(--card);
+  border: 2rpx solid var(--accent-ink);
+  border-radius: var(--radius-sm);
+  font-size: 18rpx;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.cal__legend {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 22rpx;
+}
+
+.cal__legend-text {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.cal__chip {
+  width: 28rpx;
+  height: 28rpx;
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
+}
+
+.cal__chip--1 {
+  background-color: var(--mood-1);
+}
+
+.cal__chip--2 {
+  background-color: var(--mood-2);
+}
+
+.cal__chip--3 {
+  background-color: var(--mood-3);
+}
+
+.cal__chip--4 {
+  background-color: var(--mood-4);
+}
+
+.cal__chip--5 {
+  background-color: var(--mood-5);
+}
+
+.cal__stats {
+  margin-top: 22rpx;
+  padding: 16rpx 18rpx;
+  background-color: var(--wall);
+  border: 2rpx dashed var(--ink-faint);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.cal__export {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 92rpx;
+  margin-top: 24rpx;
+  background-color: var(--accent-strong);
+  color: var(--card);
+  border: 3rpx dashed var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-btn);
+  font-size: var(--font-sm);
+  font-weight: 800;
+  transition: transform 150ms linear;
+}
+
+.cal__export:active {
+  transform: translate(3rpx, 3rpx);
+  box-shadow: none;
+}
+
+.cal__export--busy {
+  opacity: 0.6;
+}
+
+.cal__tip {
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+/* 长图画布：移出视口，只用于绘制（不参与页面布局） */
+.poster-canvas {
+  position: fixed;
+  left: -2000rpx;
+  top: 0;
 }
 
 /* ---------- 状态 ---------- */
@@ -96,34 +474,21 @@
   border-bottom: 2rpx dashed var(--accent-ink);
 }
 
-.state {
-  padding: 120rpx 48rpx;
-  text-align: center;
-}
-
-.state__text {
-  margin-bottom: 40rpx;
-  font-size: var(--font-md);
-  color: var(--muted);
-}
-
-.state__btn {
-  display: inline-flex;
+/* 已解锁当天：编辑器改只读说明（文档 5.3.7「已解锁不可改」），样式与保存按钮同高，不跳动 */
+.editor__locked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 88rpx;
-  padding: 0 56rpx;
+  margin-top: 12rpx;
+  padding: 12rpx 20rpx;
+  background-color: var(--accent-soft);
+  border: 2rpx dashed var(--accent-ink);
+  border-radius: var(--radius-md);
 }
 
-.empty {
-  padding: 96rpx 48rpx;
-  text-align: center;
-}
-
-.empty__icon {
-  font-size: 64rpx;
-}
-
-.empty__text {
-  margin-top: 16rpx;
-  font-size: var(--font-md);
-  color: var(--muted);
+.editor__locked-text {
+  font-size: var(--font-xs);
+  line-height: 1.5;
+  color: var(--accent-ink);
 }

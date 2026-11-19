@@ -6,6 +6,7 @@
   "backgroundColor": "#FFFEF5",
   "usingComponents": {
     "diary-card": "/components/diary-card/index",
+    "mood-scale": "/components/mood-scale/index",
     "empty-state": "/components/empty-state/index"
   }
 }

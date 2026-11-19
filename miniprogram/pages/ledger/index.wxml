@@ -32,7 +32,101 @@
       >›</view>
     </view>
 
-    <view class="summary">
+    <!-- 主人视角（M13）：TA 想看看你的账本（待处理）+ 已授权名单（可收回） -->
+    <view wx:if="{{who === 'me' && incoming.length}}" class="access">
+      <view class="access__title">TA 想看看你的账本</view>
+      <view class="access__row" wx:for="{{incoming}}" wx:key="requestId">
+        <view class="access__info">
+          <text class="access__scope">{{item.scopeText}}</text>
+          <text class="access__time">{{item.requestedText}} 申请</text>
+        </view>
+        <view class="access__actions">
+          <view
+            class="access__btn access__btn--yes"
+            data-id="{{item.requestId}}"
+            data-approve="1"
+            bindtap="onDecideView"
+            aria-role="button"
+            aria-label="同意 TA 查看我的账本"
+          >同意</view>
+          <view
+            class="access__btn"
+            data-id="{{item.requestId}}"
+            data-approve="0"
+            bindtap="onDecideView"
+            aria-role="button"
+            aria-label="拒绝这次申请"
+          >拒绝</view>
+        </view>
+      </view>
+      <view class="access__hint">同意后 TA 只能看，不能改也不能删</view>
+    </view>
+
+    <view wx:if="{{who === 'me' && granted.length}}" class="access access--granted">
+      <view class="access__title">已经可以看你的账本</view>
+      <view class="access__row" wx:for="{{granted}}" wx:key="requestId">
+        <view class="access__info">
+          <text class="access__scope">{{item.otherName}} · {{item.scopeText}}</text>
+          <text wx:if="{{item.expiresText}}" class="access__time">{{item.expiresText}}</text>
+        </view>
+        <view
+          class="access__btn"
+          data-id="{{item.requestId}}"
+          bindtap="onRevokeView"
+          aria-role="button"
+          aria-label="收回 TA 的查看权限"
+        >收回</view>
+      </view>
+    </view>
+
+    <!-- 「TA 的」默认是一把锁（M13）：没有授权前不渲染任何账目 -->
+    <view wx:if="{{who === 'partner' && (!access || access.status !== 'approved')}}" class="lock">
+      <view class="lock__icon" aria-hidden="true">🔒</view>
+      <view class="lock__title">TA 的账本是 TA 的隐私</view>
+      <view wx:if="{{access.status === 'pending'}}" class="lock__text">已经跟 TA 申请了，等 TA 同意</view>
+      <view wx:elif="{{access.status === 'expired'}}" class="lock__text">临时查看过期了，可以再问一次</view>
+      <view wx:else class="lock__text">想看得先问一句，TA 同意后才能看</view>
+
+      <view wx:if="{{access.status === 'pending'}}" class="lock__actions">
+        <view
+          class="access__btn"
+          bindtap="onCancelView"
+          aria-role="button"
+          aria-label="撤回查看申请"
+        >撤回申请</view>
+      </view>
+      <block wx:else>
+        <view class="lock__scopes">
+          <view
+            class="lock__scope {{scopeChoice === 'temp' ? 'lock__scope--on' : ''}}"
+            data-scope="temp"
+            bindtap="onScopeChange"
+            aria-role="radio"
+            aria-checked="{{scopeChoice === 'temp'}}"
+          >临时 24 小时</view>
+          <view
+            class="lock__scope {{scopeChoice === 'permanent' ? 'lock__scope--on' : ''}}"
+            data-scope="permanent"
+            bindtap="onScopeChange"
+            aria-role="radio"
+            aria-checked="{{scopeChoice === 'permanent'}}"
+          >一直可以看</view>
+        </view>
+        <view
+          class="lock__btn {{accessBusy ? 'lock__btn--busy' : ''}}"
+          bindtap="onRequestView"
+          aria-role="button"
+          aria-label="向 TA 申请查看账本"
+        >{{accessBusy ? '正在发…' : '申请查看'}}</view>
+      </block>
+    </view>
+
+    <view wx:if="{{who === 'partner' && access && access.status === 'approved'}}" class="access access--ok">
+      <text class="access__ok-text">TA 同意你{{access.scope === 'permanent' ? '一直可以看' : '临时看一下'}}{{access.expiresAt ? '，到时间会自动收回' : ''}}</text>
+      <text wx:if="{{access.scope === 'permanent'}}" class="access__ok-text">不想看了可以切回「我的」</text>
+    </view>
+
+    <view wx:if="{{who === 'me' || (access && access.status === 'approved')}}" class="summary">
       <view class="summary__top">
         <text class="summary__label">{{summaryLabel}}</text>
         <text class="summary__count">共 {{summaryCount}} 笔</text>
@@ -82,7 +176,7 @@
     </view>
 
     <empty-state
-      wx:if="{{!groups.length}}"
+      wx:if="{{!groups.length && (who === 'me' || (access && access.status === 'approved'))}}"
       icon="🧾"
       title="这个月还没记账"
       desc="点下面的「记一笔」，把花销记下来"

@@ -86,6 +86,9 @@ Page({
     // 解绑提示条（M9 / 文档 9.2）：只有对方发起时才在首页提示，自己发起的看「我的」
     unbindNotice: false,
     unbindNoticeText: '',
+    // 账本申请提示条（M13 / 文档 9.2 第 0.6 位、7.19）：TA 申请看我的账本且待处理时出现
+    ledgerNotice: false,
+    ledgerNoticeText: '',
     // 先停一下（M11 / 文档 9.2 第 0.5 位、9.3、7.17）：条件卡，无暂停时整块不存在
     pauseState: '',            // '' | active | ended
     pauseByMe: false,
@@ -208,6 +211,15 @@ Page({
     const unbind = home.unbind || { status: 'none', requestedByMe: false };
     patch.unbindNotice = !!(home.couple && unbind.status === 'pending' && unbind.requestedByMe === false);
     patch.unbindNoticeText = patch.unbindNotice ? 'TA 申请了解绑，去「我的」看看' : '';
+
+    // 账本申请提示条（M13 / 文档 9.2 第 0.6 位、7.19）：只有「TA 申请看我的账本且待处理」才提示。
+    // ledgerAccess 为 null（未绑定 / 单块降级）时一律不提示——宁可少提一次，也不要让用户点进去扑空
+    const ledgerAccess = home.couple ? (home.ledgerAccess || null) : null;
+    const pendingIncoming = (ledgerAccess && ledgerAccess.pendingIncoming) || 0;
+    patch.ledgerNotice = pendingIncoming > 0;
+    patch.ledgerNoticeText = patch.ledgerNotice
+      ? (pendingIncoming > 1 ? 'TA 想看看你的账本（' + pendingIncoming + ' 条待处理）' : 'TA 想看看你的账本')
+      : '';
 
     // 先停一下（M11 / 文档 7.17）：未绑定、没有暂停、单块读失败降级 null 三种情况都不渲染便签
     const pauseView = home.couple ? (home.pause || null) : null;
@@ -461,6 +473,11 @@ Page({
     wx.switchTab({ url: constants.ROUTES.profile });
   },
 
+  /** 账本申请提示条（M13 / 文档 9.2 第 0.6 位）：记账本是 tab 页，只能 switchTab */
+  onTapLedgerNotice() {
+    wx.switchTab({ url: constants.ROUTES.ledger });
+  },
+
   /** 点我的头像：打开心情打卡弹层 */
   onTapMyAvatar() {
     const home = this.data.home;
@@ -708,11 +725,11 @@ function diarySubText(couple, diary) {
   if (!couple) return '等 TA 住进来';
   if (!diary) return '今天还没写';
   if (diary.mineWritten && diary.partnerWritten) {
-    // 双方都写了，但对方那篇要等到明天才解锁
-    return diary.partnerUnlocked ? '你们都写了今天' : '你写了，TA 的明天解锁';
+    // 双方都写了：M13 起解锁可能是「立即 / 明天 / 7 天后」，不再写死「明天」
+    return diary.partnerUnlocked ? '你们都写了今天' : '你写了，TA 的还没解锁';
   }
   if (diary.mineWritten) return '你写了，等 TA';
-  if (diary.partnerWritten) return 'TA 写了，明天就能看';
+  if (diary.partnerWritten) return diary.partnerUnlocked ? 'TA 写了，去看看' : 'TA 写了，到时间就能看';
   return '今天还没写';
 }
 
